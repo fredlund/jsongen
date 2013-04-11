@@ -67,4 +67,4 @@ string() ->
     eqc_gen:list(eqc_gen:char()).
 
 propname() ->
-    non_empty(list(choose($a,$z)))
+    eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
