@@ -2,6 +2,8 @@
 
 -compile(export_all).
 
+-include_lib("eqc/include/eqc.hrl").
+
 schema(Schema) ->
     case jsonschema:type(Schema) of
         %% array
