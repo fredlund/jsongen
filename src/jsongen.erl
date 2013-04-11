@@ -36,7 +36,6 @@
 
 -compile(export_all).
 
-
 -define(debug,true).
 
 -ifdef(debug).
@@ -58,6 +57,17 @@
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
 -spec schema(json_term()) -> eqc_gen:gen(json_term()).
+
+
+% Use example
+write_instance(File) ->
+    {ok, S} = jsonschema:read_file(File),
+    JsonGenerator = jsongen:schema(S),
+    JsonInstance = eqc_gen:pick(JsonGenerator),
+    JsonString = mochijson2:encode(JsonInstance),
+    io:format("~s~n",[JsonString]).
+
+
 schema(Schema) ->
     ?LOG("schema(~p)~n",[Schema]),
     case jsonschema:type(Schema) of
@@ -129,7 +139,11 @@ boolean() ->
     eqc_gen:bool().
 
 string() ->
-    eqc_gen:list(eqc_gen:char()).
+    % eqc_gen:list(eqc_gen:char()).
+    name().
 
 propname() ->
+    name().
+
+name() ->
     eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
