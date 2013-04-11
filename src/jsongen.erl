@@ -2,6 +2,8 @@
 
 -compile(export_all).
 
+% Use example: io:format("~s~n",[mochijson2:encode(eqc_gen:pick(jsongen:schema(S)))]).
+
 schema(Schema) ->
     case jsonschema:type(Schema) of
         %% array
@@ -67,4 +69,4 @@ string() ->
     eqc_gen:list(eqc_gen:char()).
 
 propname() ->
-    non_empty(list(choose($a,$z)))
+    eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
