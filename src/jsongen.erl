@@ -110,20 +110,27 @@ schema(Schema) ->
         %%     A JSON string.
         <<"string">> ->
 	    string();
-       Types when is_list(Types) ->
-	    %% Not totally correct, we should probably preserve
-	    %% some other schema attributes...
+        %% any
+        %%     Any JSON data, including "null".
+        <<"any">> ->
+	    any();
+        %% Union types
+        %%     An array of two or more *simple type definitions*.
+        Types when is_list(Types) ->
 	    eqc_gen:oneof
-		(lists:map
-		   (fun (Type) ->
-			    schema({struct,[{<<"type">>,Type}]})
-		    end, Types))
+              (lists:map
+                 (fun (Type) ->
+                          ConcreteSchema = jsonschema:set_type(Schema,Type),
+                          schema(ConcreteSchema)
+                  end,
+                  Types))
     end.
 
 array(Schema) ->
     eqc_gen:list(schema(Schema)).
 
 template(_Template) ->
+    %% TODO: generator for template
     null().
 
 null() ->
@@ -139,7 +146,8 @@ boolean() ->
     eqc_gen:bool().
 
 string() ->
-    % eqc_gen:list(eqc_gen:char()).
+    % TODO: generator of valid JSON strings
+    % for the moment...
     name().
 
 propname() ->
@@ -147,3 +155,17 @@ propname() ->
 
 name() ->
     eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
+
+any() ->
+    eqc_gen:oneof
+      ([string(),number(),integer(),boolean(),object(),array(),null()]).
+
+object() ->
+    %% TODO: generator for object
+    %% (could it be integrated in... schema/1?)
+    null().
+
+array() ->
+    %% TODO: generator for array (no items)
+    %% (it could be integrated in array/1)
+    null().
