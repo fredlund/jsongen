@@ -10,3 +10,6 @@ ebin/%.beam: src/%.erl
 
 ebin:
 	mkdir -p ebin
+
+edoc: 
+	erl -noshell -run edoc_run files '["src/jsongen.erl"]' '[{sort_functions,false},{dir,"doc"}]'
