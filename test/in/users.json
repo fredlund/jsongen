@@ -1,0 +1,8 @@
+{ "users": [ { "id": 1,
+               "username": "davidwalsh",
+               "numPosts": 404,
+               "realName": "David Walsh" },
+             { "id": 2,
+               "username": "russianprince",
+               "numPosts": 12,
+               "realName": "Andrei Arshavin" } ] }
