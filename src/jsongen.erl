@@ -4,6 +4,8 @@
 
 % Use example: io:format("~s~n",[mochijson2:encode(eqc_gen:pick(jsongen:schema(S)))]).
 
+-include_lib("eqc/include/eqc.hrl").
+
 schema(Schema) ->
     case jsonschema:type(Schema) of
         %% array
