@@ -23,6 +23,10 @@ type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
     Type.
 
+set_type(_Schema={struct, Def},Type) ->
+    DefNoType = proplists:delete(<<"type">>,Def),
+    {struct, [{<<"type">>,Type} | DefNoType]}.
+
 items(_Schema={struct, Def}) ->
     {_, Items} = proplists:lookup(<<"items">>,Def),
     case Items of
