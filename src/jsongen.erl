@@ -2,9 +2,15 @@
 
 -compile(export_all).
 
-% Use example: io:format("~s~n",[mochijson2:encode(eqc_gen:pick(jsongen:schema(S)))]).
-
 -include_lib("eqc/include/eqc.hrl").
+
+% Use example
+write_instance(File) ->
+    {ok, S} = jsonschema:read_file(File),
+    JsonGenerator = jsongen:schema(S),
+    JsonInstance = eqc_gen:pick(JsonGenerator),
+    JsonString = mochijson2:encode(JsonInstance),
+    io:format("~s~n",[JsonString]).
 
 schema(Schema) ->
     case jsonschema:type(Schema) of
@@ -68,7 +74,11 @@ boolean() ->
     eqc_gen:bool().
 
 string() ->
-    eqc_gen:list(eqc_gen:char()).
+    % eqc_gen:list(eqc_gen:char()).
+    name().
 
 propname() ->
+    name().
+
+name() ->
     eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
