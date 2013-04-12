@@ -50,14 +50,11 @@
 %% Mochijson2 should export a better type...
 -opaque json_term() :: any().
 
-% Use example: io:format("~s~n",[mochijson2:encode(eqc_gen:pick(jsongen:schema(S)))]).
-
 -include_lib("eqc/include/eqc.hrl").
 
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
 -spec schema(json_term()) -> eqc_gen:gen(json_term()).
-
 
 % Use example
 write_instance_of(File) ->
