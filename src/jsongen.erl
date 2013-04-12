@@ -65,8 +65,22 @@ write_instance(File) ->
     JsonGenerator = jsongen:schema(S),
     JsonInstance = eqc_gen:pick(JsonGenerator),
     JsonString = mochijson2:encode(JsonInstance),
-    io:format("~s~n",[JsonString]).
+    io:format
+      ("~s~nTu estas mandando, quizas:~n~s~n~w~n~s~n~s~n~w~n",
+       [JsonString,lists:flatten(JsonString),JsonString,
+	super_flatten(JsonString),
+       lists:flatten(super_flatten(JsonString)),
+       lists:flatten(super_flatten(JsonString))]).
 
+super_flatten(Output) ->
+  if
+    is_list(Output) ->
+      lists:flatten(lists:map(fun super_flatten/1,Output));
+    is_binary(Output) ->
+      lists:flatten(binary_to_list(Output));
+    true ->
+      Output
+  end.
 
 schema(Schema) ->
     ?LOG("schema(~p)~n",[Schema]),
@@ -148,7 +162,7 @@ boolean() ->
 string() ->
     % TODO: generator of valid JSON strings
     % for the moment...
-    name().
+    ?LET(Name,name(),list_to_binary(Name)).
 
 propname() ->
     name().
