@@ -38,6 +38,12 @@ properties(_Schema = {struct, Def}) ->
     {_,{struct, Properties}} = proplists:lookup(<<"properties">>,Def),
     Properties.
 
+keyword(_Schema = {struct, Def}, KeyWord) ->
+    proplists:get_value(list_to_binary(KeyWord),Def).
+
+keyword(_Schema = {struct, Def}, KeyWord, DefaultValue) ->
+    proplists:get_value(list_to_binary(KeyWord),Def,DefaultValue).
+
 %% patternProperties(_Schema = {struct, Def}) ->
 %%     {_,{struct, Properties}} = proplists:lookup(<<"patternProperties">>,Def),
 %%     Properties.

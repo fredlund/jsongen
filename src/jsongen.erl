@@ -83,7 +83,31 @@ schema(Schema) ->
         %% integer
         %%     A JSON number without a fraction or exponent part. 
         <<"integer">> ->
-            integer();
+	    MaxInt = jsonschema:keyword(Schema,"maximum"),
+	    MinInt = jsonschema:keyword(Schema,"minimum"),
+	    MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+	    case {MaxInt,MinInt} of
+		{undefined,undefined} ->
+		    ?SUCHTHAT(N,integer(),(N rem MultipleOf)==0);
+		_ ->
+		    ExclusiveMaximum = 
+			jsonschema:keyword(Schema,"exclusiveMaximum",false),
+		    Max = 
+			if
+			    MaxInt == undefined -> 1000000;
+			    ExclusiveMaximum -> MaxInt-1;
+			    true -> MaxInt
+			end,
+		    ExclusiveMinimum = 
+			jsonschema:keyword(Schema,"exclusiveMinimum",false),
+		    Min = 
+			if
+			    MinInt == undefined -> -1000000;
+			    ExclusiveMinimum -> MinInt+1;
+			    true -> MinInt
+			end,
+		    ?SUCHTHAT(N,eqc_gen:choose(Min,Max),(N rem MultipleOf)==0)
+	    end;
         %% number
         %%     Any JSON number. Number includes integer.
         <<"number">> ->
