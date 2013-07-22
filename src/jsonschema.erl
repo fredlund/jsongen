@@ -2,18 +2,16 @@
 
 -compile(export_all).
 
--define(JSONLIB, mochijson2).
-
 read_schema(Url) ->    
     {ok, {{_Version, 200, _ReasonPhrase}, _Headers, JsonString}} =
         httpc:request(Url),
-    {ok, ?JSONLIB:decode(JsonString)}.
+    {ok, json:decode(JsonString)}.
 
 read_file(Filename) ->
     Result = file:read_file(Filename),
     case Result of
         {ok, JsonString} ->
-            Schema = ?JSONLIB:decode(JsonString),
+            Schema = json:decode(JsonString),
             {ok, Schema};
         _ ->
             Result

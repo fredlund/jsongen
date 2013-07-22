@@ -3,11 +3,13 @@
 -compile(export_all).
 
 %% Run it using, for example,
-%% erl -pa ebin -noshell -run test gen test/in/combined.jsch 
+%% erl -pa ebin -noshell -run test write_instance_of test/in/combined.jsch 
 
-gen([Filename]) ->
-    {ok,Schema} = jsonschema:read_file(Filename),
-    eqc_gen:sample(jsongen:schema(Schema)),
+write_instance_of(File) ->
+    {ok, Schema} = jsonschema:read_file(File),
+    JsonGenerator = jsongen:json(Schema),
+    JsonInstance = eqc_gen:pick(JsonGenerator),
+    JsonString = json:encode(JsonInstance),
+    io:format("~s~n", [JsonString]),
     halt().
-
 

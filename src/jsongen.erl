@@ -32,7 +32,7 @@
 
 -module(jsongen).
 
--export([schema/1]).
+-export([json/1]).
 
 -compile(export_all).
 
@@ -45,8 +45,6 @@
 -define(LOG(X,Y),true).
 -endif.
 
-
-
 %% Mochijson2 should export a better type...
 -opaque json_term() :: any().
 
@@ -54,18 +52,10 @@
 
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
--spec schema(json_term()) -> eqc_gen:gen(json_term()).
+-spec json(json_term()) -> eqc_gen:gen(json_term()).
 
-% Use example
-write_instance_of(File) ->
-    {ok, S} = jsonschema:read_file(File),
-    JsonGenerator = jsongen:schema(S),
-    JsonInstance = eqc_gen:pick(JsonGenerator),
-    JsonString = mochijson2:encode(JsonInstance),
-    io:format("~s~n", [JsonString]).
-
-schema(Schema) ->
-    ?LOG("schema(~p)~n",[Schema]),
+json(Schema) ->
+    ?LOG("json(~p)~n",[Schema]),
     case jsonschema:type(Schema) of
         %% array
         %%     A JSON array. 
@@ -123,7 +113,7 @@ schema(Schema) ->
             % TODO: regular expressions for generating properties
             % _PP = jsonschema:patternProperties(Schema),
             {struct, lists:map (fun ({M,S}) ->
-                                        {M,schema(S)}
+                                        {M,json(S)}
                                 end,
                                 P)};
         %% string
@@ -141,13 +131,13 @@ schema(Schema) ->
               (lists:map
                  (fun (Type) ->
                           ConcreteSchema = jsonschema:set_type(Schema,Type),
-                          schema(ConcreteSchema)
+                          json(ConcreteSchema)
                   end,
                   Types))
     end.
 
 array(Schema) ->
-    eqc_gen:list(schema(Schema)).
+    eqc_gen:list(json(Schema)).
 
 template(_Template) ->
     %% TODO: generator for template
@@ -182,7 +172,7 @@ any() ->
 
 object() ->
     %% TODO: generator for object
-    %% (could it be integrated in... schema/1?)
+    %% (could it be integrated in... json/1?)
     null().
 
 array() ->
