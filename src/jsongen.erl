@@ -121,48 +121,20 @@ json(Schema) ->
         <<"string">> ->
 	    MinLength = jsonschema:keyword(Schema,"minLength"),
 	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
-	    case {MinLength,MaxLength} of 
-		{undefined,_} ->
-		    Min = 0;
-		    %?SUCHTHAT(S, string(), 
-		%	      begin
-		%		  string:len(binary_to_list(S)) >= list_to_integer(binary_to_list(Min)),
-				  
-		%		  end)
-		_ ->
-		    Min = MinLength
+	    case MinLength of 
+		undefined -> Min = 0;
+		_ -> Min = binary_to_integer(MinLength)
 	    end,
+	    case MaxLength of
+                undefined ->
+                    ?SUCHTHAT(S, string(),string:len(binary_to_list(S)) >= Min);
+                _ ->  
+		    Max = binary_to_integer(MaxLength),
+                    ?SUCHTHAT(S, string(), 
+                              (string:len(binary_to_list(S)) >= Min)
+                               and (string:len(binary_to_list(S)) =< Max))
 
-	    
-	    if
-		MaxLength == undefined -> 
-		     ?SUCHTHAT(S, string(), 
-			       string:len(binary_to_list(S)) >= list_to_integer(binary_to_list(Min)));
-
-		true -> 
-		    Max = MaxLength,
-		     ?SUCHTHAT(S, string(), 
-			       begin	   
-				   string:len(binary_to_list(S)) >= list_to_integer(binary_to_list(Min)),
-				    string:len(binary_to_list(S)) =< list_to_integer(binary_to_list(Max))
-			       end)
-	    end;    
-	
-			       
-	       
-
-%		    ?LOG("**LOG: MinLength found, and its ~p~n",[binary_to_list(MinLength)]),
-		    %?LOG("**LOG: Random string size is ~p~n",[string:len(string())]),
-		    %P1 = eqc_gen:pick(string()),
-		    %?LOG("**LOG: P is ~p~n",[P1]),
-		    %P2 = binary_to_list(P1),
-		    %?LOG("**LOG: P2 is ~p~n",[P2]),
-		    %P3 = string:len(P2),
-		    %?LOG("**LOG: And the length is ~p~n",[P3]),
-
-
-		    %?SUCHTHAT(S, string(), string:len(binary_to_list(S)) >= list_to_integer(binary_to_list(MinLength)))
-	    %end;
+	    end;
         %% any
         %%     Any JSON data, including "null".
         <<"any">> ->
