@@ -119,7 +119,17 @@ json(Schema) ->
         %% string
         %%     A JSON string.
         <<"string">> ->
-	    string();
+	    MinLength = jsonschema:keyword(Schema,"minLength"),
+
+	    case MinLength of 
+		undefined ->
+		    string();
+
+		_ ->
+		     ?LOG("**LOG: MinLength found, and its ~p~n",[MinLength]),
+		    ?SUCHTHAT(S, string(), string:len(S) > MinLength)
+	    end;
+	    %string();
         %% any
         %%     Any JSON data, including "null".
         <<"any">> ->
