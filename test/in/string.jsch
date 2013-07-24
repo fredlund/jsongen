@@ -1,4 +1,5 @@
 {
  "type" : "string",
-  "minLength" : "0" 
+  "minLength" : "14",
+  "maxLength" : "5" 
 }
