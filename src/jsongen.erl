@@ -74,8 +74,9 @@ json(Schema) ->
         %%     A JSON number without a fraction or exponent part. 
         <<"integer">> ->
 	    MaxInt = jsonschema:keyword(Schema,"maximum"),
+		%ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum"),
 	    MinInt = jsonschema:keyword(Schema,"minimum"),
-	    MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+   	    MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
 	    case {MaxInt,MinInt} of
 		{undefined,undefined} ->
 		    ?SUCHTHAT(N,integer(),(N rem MultipleOf)==0);
@@ -121,6 +122,7 @@ json(Schema) ->
         <<"string">> ->
 	    MinLength = jsonschema:keyword(Schema,"minLength"),
 	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
+		%Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
 	    case MinLength of 
 		undefined -> Min = 0;
 		_ -> Min = binary_to_integer(MinLength)

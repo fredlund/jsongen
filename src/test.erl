@@ -3,7 +3,7 @@
 -compile(export_all).
 
 %% Run it using, for example,
-%% erl -pa ebin -noshell -run test write_instance_of test/in/combined.jsch 
+%% erl -pa ebin -noshell -run test write_10_instances_of test/in/combined.jsch 
 
 write_instance_of(File) ->
     {ok, Schema} = jsonschema:read_file(File),
@@ -25,7 +25,7 @@ gen_list(L, JsonGenerator, N) when N > 0 ->
  %   io:format("Done~n"),
   %  halt();
 
-instances_10_times(File) ->
+write_10_instances_of(File) ->
     {ok, Schema} = jsonschema:read_file(File),
     JsonGenerator = jsongen:json(Schema),
     io:format("RUNNING 10 INSTANCES...~n"),

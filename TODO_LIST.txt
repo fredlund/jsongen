@@ -1,0 +1,6 @@
+List of things to do or change
+
+1) String generator values are really small (Usually between two and four chars.
+When using 'minLength' keyword, most of the instances generated have that 
+length. The best solution would be to modify the generator implementation).
+
