@@ -27,7 +27,7 @@
 %% @doc This module implements translates an JSON Schema into
 %% an Erlang QuickCheck generator.
 %% @author Ángel Herranz (aherranz@fi.upm.es, Lars-Ake Fredlund (lfredlund@fi.upm.es)
-%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund
+%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil Luque
 %%
 
 -module(jsongen).
@@ -111,6 +111,8 @@ json(Schema) ->
         %%     A JSON object.
         <<"object">> ->
             P = jsonschema:properties(Schema),
+			Properties = jsonschema:keyword(Schema,"properties"), %% values must be objects!!
+			Required = jsonschema:keyword(Schema, "required"), %% values from properties
             % TODO: regular expressions for generating properties
             % _PP = jsonschema:patternProperties(Schema),
             {struct, lists:map (fun ({M,S}) ->
@@ -174,7 +176,7 @@ boolean() ->
 
 string() ->
     % TODO: generator of valid JSON strings
-    % for the moment...
+    % Its not a good generator. Implementation has to be changed
     ?LET(Name,name(),list_to_binary(Name)).
 
 propname() ->
