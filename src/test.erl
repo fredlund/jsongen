@@ -30,7 +30,7 @@ write_10_instances_of(File) ->
     JsonGenerator = jsongen:json(Schema),
     io:format("RUNNING 10 INSTANCES...~n"),
     L = gen_list([json:encode(eqc_gen:pick(JsonGenerator))],JsonGenerator,9),
-    [io:format("~s~n", [X]) || X <- L],
+    [io:format("--> ~s~n", [X]) || X <- L],
     io:format("Done~n"),
     halt().
 

@@ -1,4 +1,4 @@
-%% Copyright (c) 2013, Ángel Herranz, Lars-Ake Fredlund
+%% Copyright (c) 2013, Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
 %% All rights reserved.
 %%
 %% Redistribution and use in source and binary forms, with or without
@@ -26,8 +26,8 @@
 
 %% @doc This module implements translates an JSON Schema into
 %% an Erlang QuickCheck generator.
-%% @author Ángel Herranz (aherranz@fi.upm.es, Lars-Ake Fredlund (lfredlund@fi.upm.es)
-%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil Luque
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
+%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil 
 %%
 
 -module(jsongen).
@@ -131,12 +131,21 @@ json(Schema) ->
 	    end,
 	    case MaxLength of
                 undefined ->
-                    ?SUCHTHAT(S, string(),string:len(binary_to_list(S)) >= Min);
+                    %?SUCHTHAT(S, string(),string:len(binary_to_list(S)) >= Min);
+				?SUCHTHAT(S, stringGen(Min),string:len(S) >= Min);
                 _ ->  
 		    Max = binary_to_integer(MaxLength),
-                    ?SUCHTHAT(S, string(), 
-                              (string:len(binary_to_list(S)) >= Min)
-                               and (string:len(binary_to_list(S)) =< Max))
+
+				%% CALLING FIRST GENERATOR IMPLEMENTATION
+                    %?SUCHTHAT(S, string(), 
+                    %          (string:len(binary_to_list(S)) >= Min)
+                    %           and (string:len(binary_to_list(S)) =< Max))
+
+				%% CALLING SECOND GENERATOR IMPLEMENTATION
+					?SUCHTHAT(S, ystringGen(Min), 
+                              (string:len(S) >= Min)
+                               and (string:len(S) =< Max))
+
 
 	    end;
         %% any
@@ -178,6 +187,30 @@ string() ->
     % TODO: generator of valid JSON strings
     % Its not a good generator. Implementation has to be changed
     ?LET(Name,name(),list_to_binary(Name)).
+	%?SIZED(Size,list_to_binary(name())).
+
+stringGen() ->
+	?LAZY(?LET (Rand,int(),stringGen(Rand))).
+
+stringGen(0) ->
+	?LAZY(oneof([[],
+		   ?LET({S,G},{eqc_gen:choose($a,$z), stringGen(0)}, lists:append([S],G))])); 
+
+stringGen(N) ->
+	%oneof(["",
+		   %?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, lists:append([S],G))]).
+?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, lists:append([S],G)).
+
+%append(List1, List2) -> List3
+
+
+%queue() ->
+%   ?SIZED(Size,queue(Size)).
+
+
+%queue(N) ->
+%  oneof([queue:new(),
+%         ?LET({I,Q},{int(),queue(N-1)},queue:cons(I,Q))]).
 
 propname() ->
     name().
