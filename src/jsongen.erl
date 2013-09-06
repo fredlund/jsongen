@@ -45,8 +45,8 @@
 -define(LOG(X,Y),true).
 -endif.
 
-%% Mochijson2 should export a better type...
--opaque json_term() :: any().
+%% Mochijson2 should export a better type... (?)
+-opaque json_term() :: mochijson2:json_term().
 
 -include_lib("eqc/include/eqc.hrl").
 
@@ -111,8 +111,8 @@ json(Schema) ->
         %%     A JSON object.
         <<"object">> ->
             P = jsonschema:properties(Schema),
-			Properties = jsonschema:keyword(Schema,"properties"), %% values must be objects!!
-			Required = jsonschema:keyword(Schema, "required"), %% values from properties
+			_Properties = jsonschema:keyword(Schema,"properties"), %% values must be objects!!
+			_Required = jsonschema:keyword(Schema, "required"), %% values from properties
             % TODO: regular expressions for generating properties
             % _PP = jsonschema:patternProperties(Schema),
             {struct, lists:map (fun ({M,S}) ->
@@ -142,7 +142,7 @@ json(Schema) ->
                     %           and (string:len(binary_to_list(S)) =< Max))
 
 				%% CALLING SECOND GENERATOR IMPLEMENTATION
-					?SUCHTHAT(S, ystringGen(Min), 
+					?SUCHTHAT(S, stringGen(Min), 
                               (string:len(S) >= Min)
                                and (string:len(S) =< Max))
 
