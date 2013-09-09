@@ -111,8 +111,8 @@ json(Schema) ->
         %%     A JSON object.
         <<"object">> ->
             P = jsonschema:properties(Schema),
-			Properties = jsonschema:keyword(Schema,"properties"), %% values must be objects!!
-			Required = jsonschema:keyword(Schema, "required"), %% values from properties
+			_Properties = jsonschema:keyword(Schema,"properties"), %% values must be objects!!
+			_Required = jsonschema:keyword(Schema, "required"), %% values from properties
             % TODO: regular expressions for generating properties
             % _PP = jsonschema:patternProperties(Schema),
             {struct, lists:map (fun ({M,S}) ->
@@ -124,30 +124,30 @@ json(Schema) ->
         <<"string">> ->
 	    MinLength = jsonschema:keyword(Schema,"minLength"),
 	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
-		%Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
+		_Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
+
 	    case MinLength of 
-		undefined -> Min = 0;
-		_ -> Min = binary_to_integer(MinLength)
+			undefined -> 
+				Min = 0;
+			_ -> 
+				Min = MinLength
 	    end,
+
 	    case MaxLength of
-                undefined ->
-                    %?SUCHTHAT(S, string(),string:len(binary_to_list(S)) >= Min);
-				?SUCHTHAT(S, stringGen(Min),string:len(S) >= Min);
-                _ ->  
-		    Max = binary_to_integer(MaxLength),
 
-				%% CALLING FIRST GENERATOR IMPLEMENTATION
-                    %?SUCHTHAT(S, string(), 
-                    %          (string:len(binary_to_list(S)) >= Min)
-                    %           and (string:len(binary_to_list(S)) =< Max))
+			undefined ->
+				Max = 10000;
 
-				%% CALLING SECOND GENERATOR IMPLEMENTATION
-					?SUCHTHAT(S, ystringGen(Min), 
-                              (string:len(S) >= Min)
-                               and (string:len(S) =< Max))
+			_ ->  
+				Max = MaxLength
+		end,			
+	    
+
+		?LET(Rand,eqc_gen:pick(randInt(Min,Max)), 
+			?LET(S, eqc_gen:pick(stringGen(Rand)), list_to_binary(S)));
+		
 
 
-	    end;
         %% any
         %%     Any JSON data, including "null".
         <<"any">> ->
@@ -189,28 +189,26 @@ string() ->
     ?LET(Name,name(),list_to_binary(Name)).
 	%?SIZED(Size,list_to_binary(name())).
 
-stringGen() ->
-	?LAZY(?LET (Rand,int(),stringGen(Rand))).
+%stringGen() ->
+%	?LET (Rand, nat(),stringGen(Rand)).
+
 
 stringGen(0) ->
-	?LAZY(oneof([[],
-		   ?LET({S,G},{eqc_gen:choose($a,$z), stringGen(0)}, lists:append([S],G))])); 
+	%?LAZY(oneof([[],
+		   %?LET({S,G},{eqc_gen:choose($a,$z), stringGen(0)}, lists:append([S],G))])); 
+	[];
 
 stringGen(N) ->
 	%oneof(["",
 		   %?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, lists:append([S],G))]).
-?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, lists:append([S],G)).
-
-%append(List1, List2) -> List3
-
-
-%queue() ->
-%   ?SIZED(Size,queue(Size)).
+	%?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, lists:append([S],G)).
+	?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, [S|G]).
 
 
-%queue(N) ->
-%  oneof([queue:new(),
-%         ?LET({I,Q},{int(),queue(N-1)},queue:cons(I,Q))]).
+%random integer generator between Min and Max values
+randInt (Min, Max) ->
+	eqc_gen:choose(Min,Max).
+
 
 propname() ->
     name().
