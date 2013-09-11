@@ -24,7 +24,7 @@
 %% OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF 
 %% ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-%% @doc This module implements translates an JSON Schema into
+%% @doc This module translates a JSON Schema into
 %% an Erlang QuickCheck generator.
 %% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
 %% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil 
@@ -55,7 +55,7 @@
 -spec json(json_term()) -> eqc_gen:gen(json_term()).
 
 json(Schema) ->
-    ?LOG("json(~p)~n",[Schema]),
+    %?LOG("json(~p)~n",[Schema]),
     case jsonschema:type(Schema) of
         %% array
         %%     A JSON array. 
@@ -74,7 +74,7 @@ json(Schema) ->
         %%     A JSON number without a fraction or exponent part. 
         <<"integer">> ->
 	    MaxInt = jsonschema:keyword(Schema,"maximum"),
-		%ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum"),
+		_ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum"),
 	    MinInt = jsonschema:keyword(Schema,"minimum"),
    	    MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
 	    case {MaxInt,MinInt} of
@@ -136,12 +136,14 @@ json(Schema) ->
 	    case MaxLength of
 
 			undefined ->
-				Max = 10000;
+				Max = 10000; %temp value. Might be changed later on
 
 			_ ->  
 				Max = MaxLength
 		end,			
 	    
+%?LET(N,eqc_gen:choose(Min,Max),
+ %                ?LET(S,stringGen(N),list_to_binary(S)))
 
 		?LET(Rand,eqc_gen:pick(randInt(Min,Max)), 
 			?LET(S, eqc_gen:pick(stringGen(Rand)), list_to_binary(S)));
@@ -188,20 +190,10 @@ string() ->
     % Its not a good generator. Implementation has to be changed
     ?LET(Name,name(),list_to_binary(Name)).
 	%?SIZED(Size,list_to_binary(name())).
-
-%stringGen() ->
-%	?LET (Rand, nat(),stringGen(Rand)).
-
-
 stringGen(0) ->
-	%?LAZY(oneof([[],
-		   %?LET({S,G},{eqc_gen:choose($a,$z), stringGen(0)}, lists:append([S],G))])); 
 	[];
 
 stringGen(N) ->
-	%oneof(["",
-		   %?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, lists:append([S],G))]).
-	%?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, lists:append([S],G)).
 	?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, [S|G]).
 
 
