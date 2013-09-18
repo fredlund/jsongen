@@ -45,6 +45,9 @@
 -define(LOG(X,Y),true).
 -endif.
 
+-define(MAX_INT_VALUE,100000).
+-define(MAX_STR_LENGTH,1000).
+
 %% Mochijson2 should export a better type...
 -opaque json_term() :: any().
 
@@ -70,35 +73,69 @@ json(Schema) ->
         %%     A JSON boolean. 
         <<"boolean">> ->
             boolean();
+
+
+
+
         %% integer
         %%     A JSON number without a fraction or exponent part. 
         <<"integer">> ->
-	    MaxInt = jsonschema:keyword(Schema,"maximum"),
-		_ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum"),
-	    MinInt = jsonschema:keyword(Schema,"minimum"),
-   	    MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
-	    case {MaxInt,MinInt} of
-		{undefined,undefined} ->
-		    ?SUCHTHAT(N,integer(),(N rem MultipleOf)==0);
-		_ ->
-		    ExclusiveMaximum = 
-			jsonschema:keyword(Schema,"exclusiveMaximum",false),
-		    Max = 
-			if
-			    MaxInt == undefined -> 1000000;
-			    ExclusiveMaximum -> MaxInt-1;
-			    true -> MaxInt
+			
+			MaxScanned = jsonschema:keyword(Schema,"maximum"),
+			ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum"),
+			MinScanned = jsonschema:keyword(Schema,"minimum"),
+			ExcMinScanned = jsonschema:keyword(Schema,"exlusiveMinimum"),
+		   	MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+
+			% Setting up keywords
+			case {MaxScanned,ExcMaxScanned} of
+				
+				{undefined,undefined} ->
+					Max = ?MAX_INT_VALUE;
+				
+
+				%% There should be an error case here. Json-schema doc says that if exclusiveMaximum is present, maximum MUST be present as well
+
+				{undefined, true} ->
+					Max = ?MAX_INT_VALUE - 1;
+
+				{MaxScanned, true} ->
+					Max = MaxScanned -1;
+
+				{MaxScanned, _} ->
+					Max = MaxScanned
+			
 			end,
-		    ExclusiveMinimum = 
-			jsonschema:keyword(Schema,"exclusiveMinimum",false),
-		    Min = 
-			if
-			    MinInt == undefined -> -1000000;
-			    ExclusiveMinimum -> MinInt+1;
-			    true -> MinInt
+			
+
+
+
+			case {MinScanned,ExcMinScanned} of
+				
+				{undefined,undefined} ->
+					Min = 0;
+				
+
+				%% There should be an error case here. Json-schema doc says that if exclusiveMinimum is present, minimum MUST be present as well
+
+				{undefined, _} ->
+					Min = 1;
+
+				{MinScanned, true} ->
+					Min = MinScanned + 1;
+
+				{MinScanned, _} ->
+					Min = MinScanned
+			
 			end,
-		    ?SUCHTHAT(N,eqc_gen:choose(Min,Max),(N rem MultipleOf)==0)
-	    end;
+
+ 
+			%Creating the generator
+
+			?SUCHTHAT(Int,randInt(Min,Max), 
+					  isMultiple(Int,MultipleOf));
+
+
         %% number
         %%     Any JSON number. Number includes integer.
         <<"number">> ->
@@ -127,8 +164,10 @@ json(Schema) ->
 		_Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
 
 	    case MinLength of 
+
 			undefined -> 
 				Min = 0;
+
 			_ -> 
 				Min = MinLength
 	    end,
@@ -136,17 +175,15 @@ json(Schema) ->
 	    case MaxLength of
 
 			undefined ->
-				Max = 10000; %temp value. Might be changed later on
+				Max = ?MAX_STR_LENGTH; 
 
 			_ ->  
 				Max = MaxLength
 		end,			
 	    
-%?LET(N,eqc_gen:choose(Min,Max),
- %                ?LET(S,stringGen(N),list_to_binary(S)))
 
-		?LET(Rand,eqc_gen:pick(randInt(Min,Max)), 
-			?LET(S, eqc_gen:pick(stringGen(Rand)), list_to_binary(S)));
+		?LET(Rand,randInt(Min,Max), 
+			?LET(S, stringGen(Rand), list_to_binary(S)));
 		
 
 
@@ -221,3 +258,6 @@ array() ->
     %% TODO: generator for array (no items)
     %% (it could be integrated in array/1)
     null().
+
+isMultiple(N,Mul) when Mul > 0 ->
+	N rem Mul == 0.
