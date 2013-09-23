@@ -63,12 +63,16 @@ json(Schema) ->
         %% array
         %%     A JSON array. 
         <<"array">> ->
+	    MaxItems = jsonschema:keyword(Schema,"maxItems"),
+	    MinItems = jsonschema:keyword(Schema,"minItems"),
+	    _UniqueItems,
             case jsonschema:items(Schema) of
                 {itemSchema, ItemSchema} ->
                     array(ItemSchema);
                 {itemsTemplate, ItemsTemplate} ->
                     template(ItemsTemplate)
             end;
+
         %% boolean
         %%     A JSON boolean. 
         <<"boolean">> ->
@@ -108,8 +112,6 @@ json(Schema) ->
 			end,
 			
 
-
-
 			case {MinScanned,ExcMinScanned} of
 				
 				{undefined,undefined} ->
@@ -140,28 +142,33 @@ json(Schema) ->
         %%     Any JSON number. Number includes integer.
         <<"number">> ->
             number();
+
         %% null
         %%     The JSON null value. 
         <<"null">> ->
             null();
+
         %% object
         %%     A JSON object.
         <<"object">> ->
             P = jsonschema:properties(Schema),
-			_Properties = jsonschema:keyword(Schema,"properties"), %% values must be objects!!
-			_Required = jsonschema:keyword(Schema, "required"), %% values from properties
+	    MaxProp = jsonschema:keyword(Schema, "maxProperties"),
+	    MinProp = jsonschema:keyword(Schema, "minProperties"),
+	    Required = jsonschema:keyword(Schema, "required"), %% values from properties
+	    
             % TODO: regular expressions for generating properties
             % _PP = jsonschema:patternProperties(Schema),
             {struct, lists:map (fun ({M,S}) ->
                                         {M,json(S)}
                                 end,
                                 P)};
+
         %% string
         %%     A JSON string.
         <<"string">> ->
 	    MinLength = jsonschema:keyword(Schema,"minLength"),
 	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
-		_Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
+	    _Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
 
 	    case MinLength of 
 
