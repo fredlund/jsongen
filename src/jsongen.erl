@@ -145,53 +145,70 @@ json(Schema) ->
 			ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum"),
 			MinScanned = jsonschema:keyword(Schema,"minimum"),
 			ExcMinScanned = jsonschema:keyword(Schema,"exlusiveMinimum"),
-		   	MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+		   	_MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
 
 			% Setting up keywords
-			case {MaxScanned,ExcMaxScanned} of
-				
-				{undefined,undefined} ->
+			%case {MaxScanned,ExcMaxScanned} of
+			case {MaxScanned} of	
+				{undefined} ->
 					Max = ?MAX_INT_VALUE;
 				
 				%% There should be an error case here. Json-schema doc says that if exclusiveMaximum is present, maximum MUST be present as well
 
-				{undefined, true} ->
-					Max = ?MAX_INT_VALUE - 0.1;
+				%{undefined, true} ->
+				%	Max = ?MAX_INT_VALUE - 0.1;
 
 			    %% Exclusive maximum for floats???
-				{MaxScanned, true} ->
-					Max = MaxScanned - 0.1;
+				%{MaxScanned, true} ->
+					%Max = MaxScanned - 0.1;
 
-				{MaxScanned, _} ->
+				{MaxScanned} ->
 					Max = MaxScanned
 			
 			end,
 			
 
-			case {MinScanned,ExcMinScanned} of
+			case {MinScanned} of
 				
-				{undefined,undefined} ->
+				{undefined} ->
 					Min = 0;
 				
 
 				%% There should be an error case here. Json-schema doc says that if exclusiveMinimum is present, minimum MUST be present as well
 
-				{undefined, _} ->
-					Min = 1;
+				%{undefined, _} ->
+					%Min = 1;
 
-				{MinScanned, true} ->
-					Min = MinScanned + 0.1;
+		%		{MinScanned} ->
+		%			Min = MinScanned + 0.1;
 
-				{MinScanned, _} ->
+				{MinScanned} ->
 					Min = MinScanned
 			
 			end,
 
 
+	    case {ExcMinScanned, ExcMaxScanned} of
 
-	    ?SUCHTHAT(Float,randFlt(Min, Max),
-		      (Float > Min) and (Float < Max)); % and isMultipleFloat(Float,MultipleOf));
+		{undefined, undefined} ->
 
+		    ?SUCHTHAT(Float,randFlt(Min, Max),
+			      (Float >= Min) and (Float =< Max)) ;
+
+		{true, undefined} ->
+		    ?SUCHTHAT(Float,randFlt(Min, Max),
+			      (Float > Min) and (Float =< Max)) ;
+
+		{undefined,true} ->
+
+		    ?SUCHTHAT(Float,randFlt(Min, Max),
+			      (Float >= Min) and (Float < Max)) ;
+
+		{true,true} ->
+
+		    ?SUCHTHAT(Float,randFlt(Min, Max),
+			      (Float > Min) and (Float < Max)) % and isMultipleFloat(Float,MultipleOf));
+	    end;
 
         %% null
         %%     The JSON null value. 
@@ -205,8 +222,10 @@ json(Schema) ->
 	    MaxProp = jsonschema:keyword(Schema, "maxProperties"),
 	    MinProp = jsonschema:keyword(Schema, "minProperties"),
 	    Required = jsonschema:keyword(Schema, "required"), %% values from properties
-	    
-            % TODO: regular expressions for generating properties
+	    %_Req_prop = filter
+	    io:format("Required is: ~p~n",[Required]),
+            
+	    % TODO: regular expressions for generating properties
             % _PP = jsonschema:patternProperties(Schema),
             {struct, lists:map (fun ({M,S}) ->
                                         {M,json(S)}
@@ -324,5 +343,6 @@ array() ->
 isMultiple(N,Mul) when Mul > 0 ->
 	N rem Mul == 0.
 
+%test, not implemented yet
 isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
