@@ -58,14 +58,14 @@
 -spec json(json_term()) -> eqc_gen:gen(json_term()).
 
 json(Schema) ->
-    %?LOG("json(~p)~n",[Schema]),
+    ?LOG("json(~p)~n",[Schema]),
     case jsonschema:type(Schema) of
         %% array
         %%     A JSON array. 
         <<"array">> ->
 	    MaxItems = jsonschema:keyword(Schema,"maxItems"),
 	    MinItems = jsonschema:keyword(Schema,"minItems"),
-	    _UniqueItems,
+	    _UniqueItems = 0,
             case jsonschema:items(Schema) of
                 {itemSchema, ItemSchema} ->
                     array(ItemSchema);
@@ -138,10 +138,60 @@ json(Schema) ->
 					  isMultiple(Int,MultipleOf));
 
 
-        %% number
+        %% Number
         %%     Any JSON number. Number includes integer.
         <<"number">> ->
-            number();
+			MaxScanned = jsonschema:keyword(Schema,"maximum"),
+			ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum"),
+			MinScanned = jsonschema:keyword(Schema,"minimum"),
+			ExcMinScanned = jsonschema:keyword(Schema,"exlusiveMinimum"),
+		   	MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+
+			% Setting up keywords
+			case {MaxScanned,ExcMaxScanned} of
+				
+				{undefined,undefined} ->
+					Max = ?MAX_INT_VALUE;
+				
+				%% There should be an error case here. Json-schema doc says that if exclusiveMaximum is present, maximum MUST be present as well
+
+				{undefined, true} ->
+					Max = ?MAX_INT_VALUE - 0.1;
+
+			    %% Exclusive maximum for floats???
+				{MaxScanned, true} ->
+					Max = MaxScanned - 0.1;
+
+				{MaxScanned, _} ->
+					Max = MaxScanned
+			
+			end,
+			
+
+			case {MinScanned,ExcMinScanned} of
+				
+				{undefined,undefined} ->
+					Min = 0;
+				
+
+				%% There should be an error case here. Json-schema doc says that if exclusiveMinimum is present, minimum MUST be present as well
+
+				{undefined, _} ->
+					Min = 1;
+
+				{MinScanned, true} ->
+					Min = MinScanned + 0.1;
+
+				{MinScanned, _} ->
+					Min = MinScanned
+			
+			end,
+
+
+
+	    ?SUCHTHAT(Float,randFlt(Min, Max),
+		      (Float > Min) and (Float < Max)); % and isMultipleFloat(Float,MultipleOf));
+
 
         %% null
         %%     The JSON null value. 
@@ -162,6 +212,7 @@ json(Schema) ->
                                         {M,json(S)}
                                 end,
                                 P)};
+	    %io:format("Object is: ~p",[P]);
 
         %% string
         %%     A JSON string.
@@ -245,6 +296,10 @@ stringGen(N) ->
 randInt (Min, Max) ->
 	eqc_gen:choose(Min,Max).
 
+%maybe its not very efficient
+randFlt (Min, _) ->
+    ?LET(Flt, eqc_gen:real(), Min + Flt).
+
 
 propname() ->
     name().
@@ -268,3 +323,6 @@ array() ->
 
 isMultiple(N,Mul) when Mul > 0 ->
 	N rem Mul == 0.
+
+isMultipleFloat(F,Mul) when Mul > 0 ->
+    is_integer(F/Mul).
