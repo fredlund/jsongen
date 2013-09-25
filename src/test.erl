@@ -14,20 +14,17 @@ write_instance_of(File) ->
     halt().
 
 
-gen_instance(Schema,N) when N > 0 ->
-	Generator = jsongen:json(Schema),
-	JsonInstance = eqc_gen:pick(Generator),
-	JsonString = json:encode(JsonInstance),
+gen_instance(Generator,N) when N > 0 ->
+    JsonInstance = eqc_gen:pick(Generator),
+    JsonString = json:encode(JsonInstance),
     io:format("~s~n", [JsonString]),
-    gen_instance(Schema,N-1);
+    gen_instance(Generator,N-1);
 
 gen_instance(_,0) ->
 	halt().
 
-
 write_X_instances_of([File,N])  ->
     {ok, Schema} = jsonschema:read_file(File),
+    JsonGenerator = jsongen:json(Schema),
     io:format("RUNNING ~B INSTANCES...~n",[list_to_integer(N)]),
-    gen_instance(Schema,list_to_integer(N)).
-
-
+    gen_instance(JsonGenerator,list_to_integer(N)).
