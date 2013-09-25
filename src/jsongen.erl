@@ -219,7 +219,7 @@ json(Schema) ->
         <<"object">> ->
             P = jsonschema:properties(Schema),
 	    MaxProp = jsonschema:keyword(Schema, "maxProperties"),
-	    MinProp = jsonschema:keyword(Schema, "minProperties"),
+	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
 	    Required = jsonschema:keyword(Schema, "required"), %% values from properties
 	    %_Req_prop = filter
 	    io:format("Required is: ~p~n",[Required]),
