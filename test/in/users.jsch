@@ -7,16 +7,23 @@
                 "type" : "object",
                 "properties" : {
                     "id": {
-                        "type": "number" 
+                        "type": "integer" 
                     },
                     "username" : {
-                        "type" : "string"
+                        "type" : "string",
+			"maxLength" : 30
                     },
                     "numPosts": {
-                        "type" : "number"
+                        "type" : "integer"
                     },
+		    "averageRate" : {
+			"type" : "number",
+			"minimum" : 0,
+			"maximum" : 5
+			},
                     "realName": {
                         "type" : "string",
+			"maxLength" : 30,
                         "optional": true
                     }
                 }
