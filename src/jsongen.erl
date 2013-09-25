@@ -82,58 +82,66 @@ json(Schema) ->
         %%     A JSON number without a fraction or exponent part. 
         <<"integer">> ->
 			
-			MaxScanned = jsonschema:keyword(Schema,"maximum"),
-			ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum"),
-			MinScanned = jsonschema:keyword(Schema,"minimum"),
-			ExcMinScanned = jsonschema:keyword(Schema,"exlusiveMinimum"),
-		   	MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+	    MaxScanned = jsonschema:keyword(Schema,"maximum"),
+	    ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum",false),
+	    MinScanned = jsonschema:keyword(Schema,"minimum"),
+	    ExcMinScanned = jsonschema:keyword(Schema,"exlusiveMinimum",false),
+	    MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+	    
+	    % Setting up keywords
 
-			% Setting up keywords
-            
-			case {MaxScanned,ExcMaxScanned} of
-				
-				{undefined,undefined} ->
-					Max = ?MAX_INT_VALUE;
-				
+	    case MaxScanned of
+		undefined -> Max = undefined;
+		
+		_ ->
+		    case ExcMaxScanned of
+			true ->
+			    Max = MaxScanned -1;
+			false ->
+			    Max = MaxScanned
+		    end
+	    end,
+	    
 
-				%% There should be an error case here. Json-schema doc says that if exclusiveMaximum is present, maximum MUST be present as well
 
-				{undefined, true} ->
-					Max = ?MAX_INT_VALUE - 1;
+	    case MinScanned of
+		undefined -> Min = undefined;
+		
+		_ ->
+		    case ExcMinScanned of
+			true ->
+			    Min = MinScanned +1;
+			false ->
+			    Min = MinScanned
+		    end
+	    end,
 
-				{MaxScanned, true} ->
-					Max = MaxScanned -1;
-
-				{MaxScanned, _} ->
-					Max = MaxScanned
+	    Gen = case {Min, Max} of
+		{undefined, undefined} ->
+		    integer();
+		    
+		{Min, undefined} ->
+		    integer_min(Min);
 			
-			end,
-			
+		{undefined, Max} ->
+		    integer_max(Max);
 
-			case {MinScanned,ExcMinScanned} of
-				
-				{undefined,undefined} ->
-					Min = 0;
-				
+		{Min, Max} ->
+		    integer_min_max(Min,Max)
+		  end,
+	    
+	 
+	?SUCHTHAT(I, Gen, isMultiple(I,MultipleOf));
+	 
+       
+		    
 
-				%% There should be an error case here. Json-schema doc says that if exclusiveMinimum is present, minimum MUST be present as well
-
-				{undefined, _} ->
-					Min = 1;
-
-				{MinScanned, true} ->
-					Min = MinScanned + 1;
-
-				{MinScanned, _} ->
-					Min = MinScanned
-			
-			end,
 
  
 			%Creating the generator
 
-			?SUCHTHAT(Int,randInt(Min,Max), 
-					  isMultiple(Int,MultipleOf));
+			%?SUCHTHAT(Int,randInt(Min,Max), 
+					  %sMultiple(Int,MultipleOf));
 
 
         %% Number
@@ -223,10 +231,41 @@ json(Schema) ->
 	    %_Req_prop = filter
 	    io:format("Required is: ~p~n",[Required]),
             
+	 io:format("Required is: ~p~n",[Required]),
+            
+	    case {Required} of
+		{undefined} ->
+		    ReqList = [];
+		{_} ->
+		    ReqList = Required
+		    %ReqList = lists:map(fun (X) -> io:format("binary is: ~p~n",[X]),
+		%				   binary_to_list(X)
+					%end, Required)
+	    end,
+	    io:format("Final list: ~p~n",[ReqList]),
+            
 	    % TODO: regular expressions for generating properties
             % _PP = jsonschema:patternProperties(Schema),
+	    %lists:map ( fun ({M,S}) -> processProperties({M,S},Required)
+	%		end,
+	%		P),
             {struct, lists:map (fun ({M,S}) ->
+
+					%case processProperties({M,S},ReqList) of
+
+					 %   true ->
                                         {M,json(S)}
+
+					    %false ->
+					%	case eqc_gen:pick(boolean()) of
+					%	    true ->
+					%		{M,json(S)};
+					%	    false -> 
+					%		{M,null}
+					%	end
+						    %eqc_gen:oneof([ [], [{M,json(S)}]])
+				%	end
+						%eqc_gen:oneof([ [] , {M,json(S)} ])
                                 end,
                                 P)};
 	    %io:format("Object is: ~p",[P]);
