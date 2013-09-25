@@ -48,14 +48,11 @@
 -define(MAX_INT_VALUE,100000).
 -define(MAX_STR_LENGTH,1000).
 
-%% Mochijson2 should export a better type...
--opaque json_term() :: any().
-
 -include_lib("eqc/include/eqc.hrl").
 
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
--spec json(json_term()) -> eqc_gen:gen(json_term()).
+-spec json(json:json_term()) -> eqc_gen:gen(json:json_term()).
 
 json(Schema) ->
     ?LOG("json(~p)~n",[Schema]),
