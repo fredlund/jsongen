@@ -36,7 +36,7 @@
 
 -compile(export_all).
 
--define(debug,true).
+% -define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -85,8 +85,8 @@ json(Schema) ->
 	    MaxScanned = jsonschema:keyword(Schema,"maximum"),
 	    ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum",false),
 	    MinScanned = jsonschema:keyword(Schema,"minimum"),
-	    ExcMinScanned = jsonschema:keyword(Schema,"exlusiveMinimum",false),
-	    MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+	    ExcMinScanned = jsonschema:keyword(Schema,"exclusiveMinimum",false),
+	    Multiple = jsonschema:keyword(Schema,"multipleOf",1),
 	    
 	    % Setting up keywords
 
@@ -118,25 +118,18 @@ json(Schema) ->
 
 	    Gen = case {Min, Max} of
 		{undefined, undefined} ->
-		    integer();
+		    multiple_of(Multiple);
 		    
 		{Min, undefined} ->
-		    integer_min(Min);
+		    multiple_of_min(Multiple, Min);
 			
 		{undefined, Max} ->
-		    integer_max(Max);
+		    multiple_of_max(Multiple, Max);
 
 		{Min, Max} ->
-		    integer_min_max(Min,Max)
+		    multiple_of_min_max(Multiple, Min,Max)
 		  end,
-	    
-	 
-	?SUCHTHAT(I, Gen, isMultiple(I,MultipleOf));
-	 
-       
-		    
-
-
+            Gen;
  
 			%Creating the generator
 
@@ -332,14 +325,21 @@ null() ->
 integer() ->
     eqc_gen:int().
 
-integer_min(Min) ->
-    ?LET(N, eqc_gen:nat(), N + Min).
+multiple_of(M) ->
+    ?LET(N, integer(), M * N).
 
-integer_max(Max) ->
-    ?LET(N, nat(), Max - N).
+multiple_of_min(Mul,Min) ->
+    MinMul = Mul * (1 + (Min-1) div Mul),
+    ?LET(N, nat(), MinMul + Mul * N).
 
-integer_min_max(Min,Max) ->
-    eqc_gen:choose(Min,Max).
+multiple_of_max(Mul,Max) ->
+    MaxMul = Mul * (Max div Mul),
+    ?LET(N, nat(), MaxMul - Mul * N).
+
+multiple_of_min_max(Mul,Min,Max) ->
+    MinMul = (1 + (Min-1) div Mul),
+    MaxMul = (Max div Mul),
+    ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 number() ->
