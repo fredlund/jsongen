@@ -220,48 +220,14 @@ json(Schema) ->
             P = jsonschema:properties(Schema),
 	    MaxProp = jsonschema:keyword(Schema, "maxProperties"),
 	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
-	    Required = jsonschema:keyword(Schema, "required"), %% values from properties
-	    %_Req_prop = filter
-	    io:format("Required is: ~p~n",[Required]),
-            
-	 io:format("Required is: ~p~n",[Required]),
-            
-	    case {Required} of
-		{undefined} ->
-		    ReqList = [];
-		{_} ->
-		    ReqList = Required
-		    %ReqList = lists:map(fun (X) -> io:format("binary is: ~p~n",[X]),
-		%				   binary_to_list(X)
-					%end, Required)
-	    end,
-	    io:format("Final list: ~p~n",[ReqList]),
-            
-	    % TODO: regular expressions for generating properties
-            % _PP = jsonschema:patternProperties(Schema),
-	    %lists:map ( fun ({M,S}) -> processProperties({M,S},Required)
-	%		end,
-	%		P),
+	    _Required = jsonschema:keyword(Schema, "required"), %% values from properties
+	    L = filterProp(P),
+
             {struct, lists:map (fun ({M,S}) ->
-
-					%case processProperties({M,S},ReqList) of
-
-					 %   true ->
                                         {M,json(S)}
-
-					    %false ->
-					%	case eqc_gen:pick(boolean()) of
-					%	    true ->
-					%		{M,json(S)};
-					%	    false -> 
-					%		{M,null}
-					%	end
-						    %eqc_gen:oneof([ [], [{M,json(S)}]])
-				%	end
-						%eqc_gen:oneof([ [] , {M,json(S)} ])
                                 end,
-                                P)};
-	    %io:format("Object is: ~p",[P]);
+                                L)};
+
 
         %% string
         %%     A JSON string.
@@ -395,3 +361,13 @@ isMultiple(N,Mul) when Mul > 0 ->
 %test, not implemented yet
 isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
+
+filterProp(P) ->
+    lists:foldl( fun(Px, Fl) -> 
+		   case eqc_gen:pick(boolean()) of   %random value
+		       true ->
+			   [Px | Fl];
+		       false ->
+			   Fl
+		   end
+	   end, [], P).
