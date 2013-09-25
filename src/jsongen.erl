@@ -89,6 +89,7 @@ json(Schema) ->
 		   	MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
 
 			% Setting up keywords
+            
 			case {MaxScanned,ExcMaxScanned} of
 				
 				{undefined,undefined} ->
@@ -287,9 +288,21 @@ template(_Template) ->
 null() ->
     null.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Integer generators
 integer() ->
     eqc_gen:int().
 
+integer_min(Min) ->
+    ?LET(N, eqc_gen:nat(), N + Min).
+
+integer_max(Max) ->
+    ?LET(N, nat(), Max - N).
+
+integer_min_max(Min,Max) ->
+    eqc_gen:choose(Min,Max).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 number() ->
     eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]).
 
