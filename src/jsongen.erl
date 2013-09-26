@@ -220,13 +220,24 @@ json(Schema) ->
             P = jsonschema:properties(Schema),
 	    MaxProp = jsonschema:keyword(Schema, "maxProperties"),
 	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
-	    _Required = jsonschema:keyword(Schema, "required"), %% values from properties
-	    L = filterProp(P),
+	    Required = jsonschema:keyword(Schema, "required",[]), %% values from properties
+	    
+	    %L = filterProp_test(P),	    io:format("Required is: ~p~n",[Required]),
+	    %G=?LET(PList, filterProp(P),PList),
+	    
+	    ReqList = lists:filter(fun({M,S}) -> lists:member(M, Required) end,P),
+	    OptP = lists:filter(fun({M,S}) -> not (lists:member(M, Required)) end,P),
 
+	    io:format("Required is: ~p~n",[ReqList]),
+	    io:format("Not Required is: ~p~n",[OptP]),
+
+%member(Elem, List) -> boolean()
+
+	    ?LET(G, filterProp(OptP),
             {struct, lists:map (fun ({M,S}) ->
                                         {M,json(S)}
                                 end,
-                                L)};
+                                lists:append(ReqList,G))});
 
 
         %% string
@@ -362,12 +373,13 @@ isMultiple(N,Mul) when Mul > 0 ->
 isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
 
+
 filterProp(P) ->
     lists:foldl( fun(Px, Fl) -> 
-		   case eqc_gen:pick(boolean()) of   %random value
+		   ?LET(B, boolean(), case B of   %random value
 		       true ->
-			   [Px | Fl];
+			   [Px|Fl];
 		       false ->
 			   Fl
-		   end
+		   end)
 	   end, [], P).
