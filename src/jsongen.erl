@@ -57,6 +57,8 @@
 json(Schema) ->
     ?LOG("json(~p)~n",[Schema]),
     case jsonschema:type(Schema) of
+
+
         %% array
         %%     A JSON array. 
         <<"array">> ->
@@ -70,11 +72,11 @@ json(Schema) ->
                     template(ItemsTemplate)
             end;
 
+
         %% boolean
         %%     A JSON boolean. 
         <<"boolean">> ->
             boolean();
-
 
 
 
@@ -100,8 +102,7 @@ json(Schema) ->
 			false ->
 			    Max = MaxScanned
 		    end
-	    end,
-	    
+	    end,	    
 
 
 	    case MinScanned of
@@ -115,6 +116,7 @@ json(Schema) ->
 			    Min = MinScanned
 		    end
 	    end,
+
 
 	    Gen = case {Min, Max} of
 		{undefined, undefined} ->
@@ -131,28 +133,40 @@ json(Schema) ->
 		  end,
             Gen;
  
-			%Creating the generator
-
-			%?SUCHTHAT(Int,randInt(Min,Max), 
-					  %sMultiple(Int,MultipleOf));
 
 
         %% Number
         %%     Any JSON number. Number includes integer.
         <<"number">> ->
-			MaxScanned = jsonschema:keyword(Schema,"maximum"),
-			ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum"),
-			MinScanned = jsonschema:keyword(Schema,"minimum"),
-			ExcMinScanned = jsonschema:keyword(Schema,"exlusiveMinimum"),
-		   	_MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+	    Max = jsonschema:keyword(Schema,"maximum"),
+	    ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum",false),
+	    Min = jsonschema:keyword(Schema,"minimum"),
+	    ExcMin = jsonschema:keyword(Schema,"exlusiveMinimum",false),
+	    _MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
 
-			% Setting up keywords
-			%case {MaxScanned,ExcMaxScanned} of
-			case {MaxScanned} of	
-				{undefined} ->
-					Max = ?MAX_INT_VALUE;
-				
-				%% There should be an error case here. Json-schema doc says that if exclusiveMaximum is present, maximum MUST be present as well
+
+	    case {Min, Max} of
+
+		{undefined, undefined} ->
+		    number();
+		
+		{Min, undefined} ->
+		    number_min(Min,ExcMin);
+
+		{undefined, Max} ->
+		    number_max(Max, ExcMax);
+		
+		{Min,Max} ->
+		    number_min_max(Min,Max,{ExcMin,ExcMax})
+	    end;
+       
+
+
+	
+
+
+
+			%% There should be an error case here. Json-schema doc says that if exclusiveMaximum is present, maximum MUST be present as well
 
 				%{undefined, true} ->
 				%	Max = ?MAX_INT_VALUE - 0.1;
@@ -161,53 +175,53 @@ json(Schema) ->
 				%{MaxScanned, true} ->
 					%Max = MaxScanned - 0.1;
 
-				{MaxScanned} ->
-					Max = MaxScanned
+		%% 		{MaxScanned} ->
+		%% 			Max = MaxScanned
 			
-			end,
+		%% 	end,
 			
 
-			case {MinScanned} of
+		%% 	case {MinScanned} of
 				
-				{undefined} ->
-					Min = 0;
+		%% 		{undefined} ->
+		%% 			Min = 0;
 				
 
-				%% There should be an error case here. Json-schema doc says that if exclusiveMinimum is present, minimum MUST be present as well
+		%% 		%% There should be an error case here. Json-schema doc says that if exclusiveMinimum is present, minimum MUST be present as well
 
-				%{undefined, _} ->
-					%Min = 1;
+		%% 		%{undefined, _} ->
+		%% 			%Min = 1;
 
-		%		{MinScanned} ->
-		%			Min = MinScanned + 0.1;
+		%% %		{MinScanned} ->
+		%% %			Min = MinScanned + 0.1;
 
-				{MinScanned} ->
-					Min = MinScanned
+		%% 		{MinScanned} ->
+		%% 			Min = MinScanned
 			
-			end,
+		%% 	end,
 
 
-	    case {ExcMinScanned, ExcMaxScanned} of
+	    %% case {ExcMinScanned, ExcMaxScanned} of
 
-		{undefined, undefined} ->
+	    %% 	{undefined, undefined} ->
 
-		    ?SUCHTHAT(Float,randFlt(Min, Max),
-			      (Float >= Min) and (Float =< Max)) ;
+	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
+	    %% 		      (Float >= Min) and (Float =< Max)) ;
 
-		{true, undefined} ->
-		    ?SUCHTHAT(Float,randFlt(Min, Max),
-			      (Float > Min) and (Float =< Max)) ;
+	    %% 	{true, undefined} ->
+	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
+	    %% 		      (Float > Min) and (Float =< Max)) ;
 
-		{undefined,true} ->
+	    %% 	{undefined,true} ->
 
-		    ?SUCHTHAT(Float,randFlt(Min, Max),
-			      (Float >= Min) and (Float < Max)) ;
+	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
+	    %% 		      (Float >= Min) and (Float < Max)) ;
 
-		{true,true} ->
+	    %% 	{true,true} ->
 
-		    ?SUCHTHAT(Float,randFlt(Min, Max),
-			      (Float > Min) and (Float < Max)) % and isMultipleFloat(Float,MultipleOf));
-	    end;
+	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
+	    %% 		      (Float > Min) and (Float < Max)) % and isMultipleFloat(Float,MultipleOf));
+	    %% end;
 
         %% null
         %%     The JSON null value. 
@@ -222,16 +236,11 @@ json(Schema) ->
 	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
 	    Required = jsonschema:keyword(Schema, "required",[]), %% values from properties
 	    
-	    %L = filterProp_test(P),	    io:format("Required is: ~p~n",[Required]),
-	    %G=?LET(PList, filterProp(P),PList),
-	    
-	    ReqList = lists:filter(fun({M,S}) -> lists:member(M, Required) end,P),
-	    OptP = lists:filter(fun({M,S}) -> not (lists:member(M, Required)) end,P),
+	    ReqList = lists:filter(fun({M,_}) -> lists:member(M, Required) end,P),
+	    OptP = lists:filter(fun({M,_}) -> not (lists:member(M, Required)) end,P),
 
 	    io:format("Required is: ~p~n",[ReqList]),
 	    io:format("Not Required is: ~p~n",[OptP]),
-
-%member(Elem, List) -> boolean()
 
 	    ?LET(G, filterProp(OptP),
             {struct, lists:map (fun ({M,S}) ->
@@ -319,8 +328,35 @@ multiple_of_min_max(Mul,Min,Max) ->
     ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Number generators
 number() ->
     eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]).
+
+number_positive() ->
+    ?SUCHTHAT(N, eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]), N>=0).
+
+number_min(Min, Exc) ->
+    case Exc of
+	true ->
+	    ?SUCHTHAT(N, Min + number_positive(), N /= Min);
+	
+	false ->
+	    ?LET(N, number_positive(), N + Min)
+    end.
+
+number_max(Max, Exc) ->
+    case Exc of 
+	true ->
+	    ?SUCHTHAT(N, Max - number_positive(), N /= Max);
+	
+	false ->
+	    ?LET(N, number_positive(), Max - N)
+    end.
+
+number_min_max(Min, Max, {MinExc, MaxExc}) ->
+    number().
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 boolean() ->
     eqc_gen:bool().
