@@ -142,7 +142,7 @@ json(Schema) ->
 	    ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum",false),
 	    Min = jsonschema:keyword(Schema,"minimum"),
 	    ExcMin = jsonschema:keyword(Schema,"exlusiveMinimum",false),
-	    _MultipleOf = jsonschema:keyword(Schema,"multipleOf",1),
+	    Mul = jsonschema:keyword(Schema,"multipleOf",1),
 
 
 	    case {Min, Max} of
@@ -151,82 +151,22 @@ json(Schema) ->
 		    number();
 		
 		{Min, undefined} ->
-		    number_min(Min,ExcMin);
+		    number_mul_min(Mul,Min,ExcMin);
 
 		{undefined, Max} ->
-		    number_max(Max, ExcMax);
+		    number_mul_max(Mul,Max, ExcMax);
 		
 		{Min,Max} ->
-		    number_min_max(Min,Max,{ExcMin,ExcMax})
+		    number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax})
 	    end;
        
 
-
-	
-
-
-
-			%% There should be an error case here. Json-schema doc says that if exclusiveMaximum is present, maximum MUST be present as well
-
-				%{undefined, true} ->
-				%	Max = ?MAX_INT_VALUE - 0.1;
-
-			    %% Exclusive maximum for floats???
-				%{MaxScanned, true} ->
-					%Max = MaxScanned - 0.1;
-
-		%% 		{MaxScanned} ->
-		%% 			Max = MaxScanned
-			
-		%% 	end,
-			
-
-		%% 	case {MinScanned} of
-				
-		%% 		{undefined} ->
-		%% 			Min = 0;
-				
-
-		%% 		%% There should be an error case here. Json-schema doc says that if exclusiveMinimum is present, minimum MUST be present as well
-
-		%% 		%{undefined, _} ->
-		%% 			%Min = 1;
-
-		%% %		{MinScanned} ->
-		%% %			Min = MinScanned + 0.1;
-
-		%% 		{MinScanned} ->
-		%% 			Min = MinScanned
-			
-		%% 	end,
-
-
-	    %% case {ExcMinScanned, ExcMaxScanned} of
-
-	    %% 	{undefined, undefined} ->
-
-	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
-	    %% 		      (Float >= Min) and (Float =< Max)) ;
-
-	    %% 	{true, undefined} ->
-	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
-	    %% 		      (Float > Min) and (Float =< Max)) ;
-
-	    %% 	{undefined,true} ->
-
-	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
-	    %% 		      (Float >= Min) and (Float < Max)) ;
-
-	    %% 	{true,true} ->
-
-	    %% 	    ?SUCHTHAT(Float,randFlt(Min, Max),
-	    %% 		      (Float > Min) and (Float < Max)) % and isMultipleFloat(Float,MultipleOf));
-	    %% end;
 
         %% null
         %%     The JSON null value. 
         <<"null">> ->
             null();
+
 
         %% object
         %%     A JSON object.
@@ -284,6 +224,8 @@ json(Schema) ->
         %%     Any JSON data, including "null".
         <<"any">> ->
 	    any();
+
+
         %% Union types
         %%     An array of two or more *simple type definitions*.
         Types when is_list(Types) ->
@@ -335,26 +277,48 @@ number() ->
 number_positive() ->
     ?SUCHTHAT(N, eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]), N>=0).
 
-number_min(Min, Exc) ->
-    case Exc of
+number_mul(Mul) ->
+    ?LET(N, integer(), Mul * N).
+
+number_mul_min(Mul,Min,MinExc) ->
+    MinMul = Mul * (1 + floor( (Min-1) / Mul)),
+    case MinExc of
 	true ->
-	    ?SUCHTHAT(N, Min + number_positive(), N /= Min);
-	
+	    ?SUCHTHAT(N, MinMul + Mul * nat(), N /= Min);
+
 	false ->
-	    ?LET(N, number_positive(), N + Min)
+	    ?LET(N,nat(),MinMul + Mul * N)
     end.
 
-number_max(Max, Exc) ->
-    case Exc of 
+number_mul_max(Mul,Max,MaxExc) ->
+    MaxMul = Mul * (Max div Mul),
+
+    case MaxExc of
 	true ->
-	    ?SUCHTHAT(N, Max - number_positive(), N /= Max);
-	
+	    ?SUCHTHAT(N, MaxMul - Mul * nat(), N /= Max);
 	false ->
-	    ?LET(N, number_positive(), Max - N)
+	    ?LET(N, nat(), MaxMul - Mul * N)
     end.
 
-number_min_max(Min, Max, {MinExc, MaxExc}) ->
-    number().
+
+number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
+    MinMul = (1 + floor((Min-1) / Mul)),
+    MaxMul = floor(Max/  Mul),
+
+    case {MinExc,MaxExc} of
+
+	{true,true} ->
+	    ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), (N /= Min) and (N /= Max));
+	
+	{true,false} ->
+	    ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Min);
+
+	{false,true} ->
+	    ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Max);
+
+	{false,false} ->
+	    ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N)
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -380,7 +344,6 @@ randInt (Min, Max) ->
 %maybe its not very efficient
 randFlt (Min, _) ->
     ?LET(Flt, eqc_gen:real(), Min + Flt).
-
 
 propname() ->
     name().
@@ -419,3 +382,13 @@ filterProp(P) ->
 			   Fl
 		   end)
 	   end, [], P).
+
+floor(X) when X < 0 ->
+    T = trunc(X),
+    case X - T == 0 of
+        true -> T;
+        false -> T - 1
+    end;
+
+floor(X) ->
+    trunc(X).
