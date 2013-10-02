@@ -194,31 +194,49 @@ json(Schema) ->
         <<"string">> ->
 	    MinLength = jsonschema:keyword(Schema,"minLength"),
 	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
-	    _Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
+	    Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
 
+	    %% Currently we do not like length specifications 
+	    %% combined with regular expressions. Will this change? 
+	    %% Maybe, it is not easy to do.
+	    if
+	      ((MinLength=/=undefined) orelse (MaxLength=/=undefined)) andalso
+	      (Pattern=/=undefined) ->
+		io:format
+		  ("Specifying both minimum or maximum string lengths "++
+		     "and a regular expression is not currently supported"),
+		throw(nyi);
+	      true -> ok
+	    end,
+
+	if 
+	  (MinLength=/=undefined) orelse (MaxLength=/=undefined) ->
 	    case MinLength of 
-
-			undefined -> 
-				Min = 0;
-
-			_ -> 
-				Min = MinLength
+	      undefined -> 
+		Min = 0;
+	      _ -> 
+		Min = MinLength
 	    end,
 
 	    case MaxLength of
-
-			undefined ->
-				Max = ?MAX_STR_LENGTH; 
-
-			_ ->  
-				Max = MaxLength
-		end,			
+	      undefined ->
+		Max = ?MAX_STR_LENGTH; 
+	      _ ->  
+		Max = MaxLength
+	    end,			
 	    
+	    ?LET(Rand,randInt(Min,Max), 
+		 ?LET(S, stringGen(Rand), list_to_binary(S)));
 
-		?LET(Rand,randInt(Min,Max), 
-			?LET(S, stringGen(Rand), list_to_binary(S)));
-		
-
+	  %% Regular expression pattern specified
+	  true ->
+	    RegularExpression = binary_to_list(Pattern),
+	    InternalRegularExpression = regexp_parse:string(RegularExpression),
+	    ?LET
+	      (String,
+	       gen_string_from_regexp:gen(InternalRegularExpression),
+	       list_to_binary(String))
+	end;
 
         %% any
         %%     Any JSON data, including "null".
