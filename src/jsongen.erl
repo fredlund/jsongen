@@ -45,7 +45,7 @@
 -define(LOG(X,Y),true).
 -endif.
 
--define(MAX_INT_VALUE,100000).
+-define(MAX_ARRAY_SIZE,1000).
 -define(MAX_STR_LENGTH,1000).
 
 -include_lib("eqc/include/eqc.hrl").
@@ -63,11 +63,11 @@ json(Schema) ->
         %%     A JSON array. 
         <<"array">> ->
 	    MaxItems = jsonschema:keyword(Schema,"maxItems"),
-	    MinItems = jsonschema:keyword(Schema,"minItems"),
+	    MinItems = jsonschema:keyword(Schema,"minItems",0),
 	    _UniqueItems = 0,
             case jsonschema:items(Schema) of
                 {itemSchema, ItemSchema} ->
-                    array(ItemSchema);
+                    array(ItemSchema, {MinItems,MaxItems});
                 {itemsTemplate, ItemsTemplate} ->
                     template(ItemsTemplate)
             end;
@@ -182,11 +182,11 @@ json(Schema) ->
 	    io:format("Required is: ~p~n",[ReqList]),
 	    io:format("Not Required is: ~p~n",[OptP]),
 
-	    ?LET(G, filterProp(OptP),
-            {struct, lists:map (fun ({M,S}) ->
-                                        {M,json(S)}
-                                end,
-                                lists:append(ReqList,G))});
+	    ?LET(L, filterProp(OptP, MaxProp - length(ReqList)),
+		 {struct, lists:map (fun ({M,S}) ->
+					     {M,json(S)}
+				     end,
+				     lists:append(ReqList,L))});
 
 
         %% string
@@ -256,8 +256,29 @@ json(Schema) ->
                   Types))
     end.
 
-array(Schema) ->
-    eqc_gen:list(json(Schema)).
+
+
+array(Schema,{MinItems,MaxItems}) ->
+
+    case MaxItems of
+	undefined ->
+	    ?LET(N, eqc_gen:choose(MinItems, ?MAX_ARRAY_SIZE), arrayGen(Schema,N));
+
+	MaxItems ->
+	    ?LET(N, eqc_gen:choose(MinItems,MaxItems), arrayGen(Schema,N))
+    end.		  
+	 
+   
+
+
+arrayGen(_Schema,0) ->
+    [];
+
+arrayGen(Schema,N) when N > 0->
+    [json(Schema) | arrayGen(Schema,N-1)].
+
+
+
 
 template(_Template) ->
     %% TODO: generator for template
@@ -391,15 +412,24 @@ isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
 
 
-filterProp(P) ->
-    lists:foldl( fun(Px, Fl) -> 
-		   ?LET(B, boolean(), case B of   %random value
-		       true ->
-			   [Px|Fl];
-		       false ->
-			   Fl
-		   end)
-	   end, [], P).
+filterProp(P, N) ->
+    G = lists:foldl(fun (Px, G) ->
+			    ?LET({Fl,N},G,
+				 if N =< 0 -> {Fl,0};
+				    N > 0 ->
+					 ?LET(B, boolean(),
+					      case B of   %random value
+						  true ->
+						      {[Px|Fl], N-1};
+						  false ->
+						      {Fl,N}
+					      end)
+				 end)
+		    
+		    end,
+		    {[],N},
+		    P),
+    ?LET({L,_},G,L).
 
 floor(X) when X < 0 ->
     T = trunc(X),
