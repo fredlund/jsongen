@@ -182,7 +182,7 @@ json(Schema) ->
 	    io:format("Required is: ~p~n",[ReqList]),
 	    io:format("Not Required is: ~p~n",[OptP]),
 
-	    ?LET(L, filterProp(OptP, MaxProp - length(ReqList)),
+	    ?LET(L, filterProp(OptP, MaxProp - length(ReqList), {length(ReqList),MinProp}),
 		 {struct, lists:map (fun ({M,S}) ->
 					     {M,json(S)}
 				     end,
@@ -412,7 +412,7 @@ isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
 
 
-filterProp(P, N) ->
+filterProp(P, N, {Rq,Min}) ->
     G = lists:foldl(fun (Px, G) ->
 			    ?LET({Fl,N},G,
 				 if N =< 0 -> {Fl,0};
@@ -429,7 +429,13 @@ filterProp(P, N) ->
 		    end,
 		    {[],N},
 		    P),
-    ?LET({L,_},G,L).
+
+    ?LET({L,R},G,
+
+	 %This is for not generating objects with less properties than 'minProperties' keyword. 
+	 %There should be better way to check this. Temp
+
+	?SUCHTHAT(X, L, Rq + (N-R) >= Min)).
 
 floor(X) when X < 0 ->
     T = trunc(X),
