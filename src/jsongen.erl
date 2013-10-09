@@ -36,7 +36,7 @@
 
 -compile(export_all).
 
-% -define(debug,true).
+ %-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -175,14 +175,20 @@ json(Schema) ->
 	    MaxProp = jsonschema:keyword(Schema, "maxProperties"),
 	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
 	    Required = jsonschema:keyword(Schema, "required",[]), %% values from properties
-	    
 	    ReqList = lists:filter(fun({M,_}) -> lists:member(M, Required) end,P),
 	    OptP = lists:filter(fun({M,_}) -> not (lists:member(M, Required)) end,P),
 
 	    io:format("Required is: ~p~n",[ReqList]),
 	    io:format("Not Required is: ~p~n",[OptP]),
 
-	    ?LET(L, filterProp(OptP, MaxProp - length(ReqList), {length(ReqList),MinProp}),
+
+            case MinProp - length(ReqList) < 0 of
+                true -> Min = 0;
+
+                false -> Min = MinProp - length(ReqList)
+            end,
+
+            ?LET(L, filterProp(OptP, {Min, MaxProp - length(ReqList)}),
 		 {struct, lists:map (fun ({M,S}) ->
 					     {M,json(S)}
 				     end,
@@ -257,7 +263,8 @@ json(Schema) ->
     end.
 
 
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Array gen
 array(Schema,{MinItems,MaxItems}) ->
 
     case MaxItems of
@@ -342,21 +349,22 @@ number_mul_max(Mul,Max,MaxExc) ->
 
 number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
     MinMul = (1 + floor((Min-1) / Mul)),
+    %io:format("MinMul: ~p~n",[MinMul]),
     MaxMul = floor(Max/  Mul),
 
     case {MinExc,MaxExc} of
 
-	{true,true} ->
-	    ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), (N /= Min) and (N /= Max));
-	
-	{true,false} ->
-	    ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Min);
+        {true,true} ->
+            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), (N /= Min) and (N /= Max));
 
-	{false,true} ->
-	    ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Max);
+        {true,false} ->
+            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Min);
 
-	{false,false} ->
-	    ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N)
+        {false,true} ->
+            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Max);
+
+        {false,false} ->
+            ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -368,12 +376,12 @@ string() ->
     % TODO: generator of valid JSON strings
     % Its not a good generator. Implementation has to be changed
     ?LET(Name,name(),list_to_binary(Name)).
-	%?SIZED(Size,list_to_binary(name())).
+        %?SIZED(Size,list_to_binary(name())).
 stringGen(0) ->
-	[];
+    [];
 
 stringGen(N) ->
-	?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, [S|G]).
+    ?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, [S|G]).
 
 
 %random integer generator between Min and Max values
@@ -412,30 +420,50 @@ isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
 
 
-filterProp(P, N, {Rq,Min}) ->
-    G = lists:foldl(fun (Px, G) ->
-			    ?LET({Fl,N},G,
-				 if N =< 0 -> {Fl,0};
-				    N > 0 ->
-					 ?LET(B, boolean(),
-					      case B of   %random value
-						  true ->
-						      {[Px|Fl], N-1};
-						  false ->
-						      {Fl,N}
-					      end)
-				 end)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% TO REMOVE IN NEXT UPDATE
+
+%% filterProp(P, N, {Rq,Min}) ->
+%%     G = lists:foldl(fun (Px, G) ->
+%% 			    ?LET({Fl,N},G,
+%% 				 if N =< 0 -> {Fl,0};
+%% 				    N > 0 ->
+%% 					 ?LET(B, boolean(),
+%% 					      case B of   %random value
+%% 						  true ->
+%% 						      {[Px|Fl], N-1};
+%% 						  false ->
+%% 						      {Fl,N}
+%% 					      end)
+%% 				 end)
 		    
-		    end,
-		    {[],N},
-		    P),
+%% 		    end,
+%% 		    {[],N},
+%% 		    P),
 
-    ?LET({L,R},G,
+%%     ?LET({L,R},G,
 
-	 %This is for not generating objects with less properties than 'minProperties' keyword. 
-	 %There should be better way to check this. Temp
+%% 	 %This is for not generating objects with less properties than 'minProperties' keyword. 
+%% 	 %There should be better way to check this. Temp
 
-	?SUCHTHAT(X, L, Rq + (N-R) >= Min)).
+%%          ?SUCHTHAT(X, L, Rq + (N-R) >= Min)).
+
+
+
+filterProp(P, {Min,Max}) ->
+    ?LET(N, choose (Min,Max), choose_N(P,N)).
+
+
+choose_N (_List,0) ->
+    [];
+
+choose_N (List, N) when (N > 0) and (length(List) > 0) ->
+    %io:format("Choose_n: List is: ~p~n N is: ~p~n and lenght is: ~p~n",[List,N,length(List)]),
+    ?LET(Nat, choose(1, length(List)), 
+         [lists:nth(Nat,List) | choose_N( delete_nth_element(Nat,List) ,N-1) ] ).
+         
+         %[lists:nth(Nat,List) | choose_N( lists:delete(lists:nth(Nat,List),List),N-1) ] ).
+
 
 floor(X) when X < 0 ->
     T = trunc(X),
@@ -446,3 +474,20 @@ floor(X) when X < 0 ->
 
 floor(X) ->
     trunc(X).
+
+
+delete_nth_element(N, List) ->
+    delete_nth_element(N-1,List, []).
+
+delete_nth_element(0, [_nthEl|T], Res) ->
+    concat_and_reverse(T, Res);
+
+
+delete_nth_element(N, [H|T], Res) ->
+    delete_nth_element(N-1, T, [H|Res]).
+
+concat_and_reverse([],Res) ->
+    lists:reverse(Res);
+
+concat_and_reverse([H|T], Res) ->
+    concat_and_reverse(T, [H|Res]).
