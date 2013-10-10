@@ -442,14 +442,8 @@ choose_N ([],_) ->
     [];
 
 choose_N (List, N) when (N > 0) and (length(List) > 0) ->
- 
- %io:format("Choose_n: List is: ~p~n N is: ~p~n and lenght is: ~p~n",[List,N,length(List)]),
- 
     ?LET(Nat, choose(1, length(List)), 
          [lists:nth(Nat,List) | choose_N( delete_nth_element(Nat,List) ,N-1) ] ).
-
-         %[lists:nth(Nat,List) | choose_N( lists:delete(lists:nth(Nat,List),List),N-1) ] ).
-
 
 floor(X) when X < 0 ->
     T = trunc(X),
@@ -467,7 +461,6 @@ delete_nth_element(N, List) ->
 
 delete_nth_element(0, [_nthEl|T], Res) ->
     concat_and_reverse(T, Res);
-
 
 delete_nth_element(N, [H|T], Res) ->
     delete_nth_element(N-1, T, [H|Res]).
