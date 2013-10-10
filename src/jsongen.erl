@@ -47,6 +47,7 @@
 
 -define(MAX_ARRAY_SIZE,1000).
 -define(MAX_STR_LENGTH,1000).
+-define(MAX_PROPERTIES,100).
 
 -include_lib("eqc/include/eqc.hrl").
 
@@ -57,8 +58,8 @@
 json(Schema) ->
     ?LOG("json(~p)~n",[Schema]),
     case jsonschema:type(Schema) of
-
-
+        
+        
         %% array
         %%     A JSON array. 
         <<"array">> ->
@@ -83,15 +84,14 @@ json(Schema) ->
         %% integer
         %%     A JSON number without a fraction or exponent part. 
         <<"integer">> ->
-			
+            
 	    MaxScanned = jsonschema:keyword(Schema,"maximum"),
 	    ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum",false),
 	    MinScanned = jsonschema:keyword(Schema,"minimum"),
 	    ExcMinScanned = jsonschema:keyword(Schema,"exclusiveMinimum",false),
 	    Multiple = jsonschema:keyword(Schema,"multipleOf",1),
 	    
-	    % Setting up keywords
-
+            % Setting up keywords
 	    case MaxScanned of
 		undefined -> Max = undefined;
 		
@@ -103,8 +103,8 @@ json(Schema) ->
 			    Max = MaxScanned
 		    end
 	    end,	    
-
-
+            
+            
 	    case MinScanned of
 		undefined -> Min = undefined;
 		
@@ -116,25 +116,25 @@ json(Schema) ->
 			    Min = MinScanned
 		    end
 	    end,
-
-
+            
+            
 	    Gen = case {Min, Max} of
-		{undefined, undefined} ->
-		    multiple_of(Multiple);
-		    
-		{Min, undefined} ->
-		    multiple_of_min(Multiple, Min);
-			
-		{undefined, Max} ->
-		    multiple_of_max(Multiple, Max);
-
-		{Min, Max} ->
-		    multiple_of_min_max(Multiple, Min,Max)
+                      {undefined, undefined} ->
+                          multiple_of(Multiple);
+                      
+                      {Min, undefined} ->
+                          multiple_of_min(Multiple, Min);
+                      
+                      {undefined, Max} ->
+                          multiple_of_max(Multiple, Max);
+                      
+                      {Min, Max} ->
+                          multiple_of_min_max(Multiple, Min,Max)
 		  end,
             Gen;
- 
+        
 
-
+        
         %% Number
         %%     Any JSON number. Number includes integer.
         <<"number">> ->
@@ -143,107 +143,120 @@ json(Schema) ->
 	    Min = jsonschema:keyword(Schema,"minimum"),
 	    ExcMin = jsonschema:keyword(Schema,"exlusiveMinimum",false),
 	    Mul = jsonschema:keyword(Schema,"multipleOf",1),
-
-
+            
+            
 	    case {Min, Max} of
-
+                
 		{undefined, undefined} ->
 		    number();
 		
 		{Min, undefined} ->
 		    number_mul_min(Mul,Min,ExcMin);
-
+                
 		{undefined, Max} ->
 		    number_mul_max(Mul,Max, ExcMax);
 		
 		{Min,Max} ->
 		    number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax})
 	    end;
-       
+        
 
-
+        
         %% null
         %%     The JSON null value. 
         <<"null">> ->
             null();
-
-
+        
+        
         %% object
         %%     A JSON object.
         <<"object">> ->
             P = jsonschema:properties(Schema),
-	    MaxProp = jsonschema:keyword(Schema, "maxProperties"),
+	    MaxProp = jsonschema:keyword(Schema, "maxProperties", ?MAX_PROPERTIES),
 	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
-	    Required = jsonschema:keyword(Schema, "required",[]), %% values from properties
+	    Required = jsonschema:keyword(Schema, "required",[]),
+            PatternProp = jsonschema:keyword(Schema, "patternProperties",{}),
 	    ReqList = lists:filter(fun({M,_}) -> lists:member(M, Required) end,P),
 	    OptP = lists:filter(fun({M,_}) -> not (lists:member(M, Required)) end,P),
-
+            
 	    io:format("Required is: ~p~n",[ReqList]),
 	    io:format("Not Required is: ~p~n",[OptP]),
-
-
+            
+      %% BETA -->
+            %% case PatternProp of
+            %%     true ->
+            %%         [];
+            %%     false ->
+            %%         OptP++ = OptP;
+            
+            %%     Schema ->
+            %%         OptP++ = [Schema | OptP]
+            %% end,
+            
             case MinProp - length(ReqList) < 0 of
                 true -> Min = 0;
-
+                
                 false -> Min = MinProp - length(ReqList)
             end,
-
+            
             ?LET(L, filterProp(OptP, {Min, MaxProp - length(ReqList)}),
 		 {struct, lists:map (fun ({M,S}) ->
 					     {M,json(S)}
 				     end,
 				     lists:append(ReqList,L))});
-
-
+        
+        
         %% string
         %%     A JSON string.
         <<"string">> ->
 	    MinLength = jsonschema:keyword(Schema,"minLength"),
 	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
 	    Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
-
+            
 	    %% Currently we do not like length specifications 
 	    %% combined with regular expressions. Will this change? 
 	    %% Maybe, it is not easy to do.
 	    if
-	      ((MinLength=/=undefined) orelse (MaxLength=/=undefined)) andalso
-	      (Pattern=/=undefined) ->
-		io:format
-		  ("Specifying both minimum or maximum string lengths "++
-		     "and a regular expression is not currently supported"),
-		throw(nyi);
-	      true -> ok
+                ((MinLength=/=undefined) orelse (MaxLength=/=undefined)) andalso
+                (Pattern=/=undefined) ->
+                    io:format
+                      ("Specifying both minimum or maximum string lengths "++
+                       "and a regular expression is not currently supported"),
+                    throw(nyi);
+                true -> ok
 	    end,
+            
+            if 
+                (MinLength=/=undefined) orelse (MaxLength=/=undefined) ->
+                    case MinLength of 
+                        undefined -> 
+                            Min = 0;
+                        _ -> 
+                            Min = MinLength
+                    end,
+                    
+                    case MaxLength of
+                        undefined ->
+                            Max = ?MAX_STR_LENGTH; 
+                        _ ->  
+                            Max = MaxLength
+                    end,			
+                    
+                    ?LET(Rand,randInt(Min,Max), 
+                         ?LET(S, stringGen(Rand), list_to_binary(S)));
+                
+                %% Regular expression pattern specified
+                true ->
+                    pattern_gen(Pattern)
 
-	if 
-	  (MinLength=/=undefined) orelse (MaxLength=/=undefined) ->
-	    case MinLength of 
-	      undefined -> 
-		Min = 0;
-	      _ -> 
-		Min = MinLength
-	    end,
-
-	    case MaxLength of
-	      undefined ->
-		Max = ?MAX_STR_LENGTH; 
-	      _ ->  
-		Max = MaxLength
-	    end,			
-	    
-	    ?LET(Rand,randInt(Min,Max), 
-		 ?LET(S, stringGen(Rand), list_to_binary(S)));
-
-	  %% Regular expression pattern specified
-	  true ->
-	    RegularExpression = binary_to_list(Pattern),
-	    InternalRegularExpression = regexp_parse:string(RegularExpression),
-	    ?LET
-	      (String,
-	       gen_string_from_regexp:gen(InternalRegularExpression),
-	       list_to_binary(String))
-	end;
-
+                    %% RegularExpression = binary_to_list(Pattern),
+                    %% InternalRegularExpression = regexp_parse:string(RegularExpression),
+                    %% ?LET
+                    %%    (String,
+                    %%     gen_string_from_regexp:gen(InternalRegularExpression),
+                    %%     list_to_binary(String))
+            end;
+        
         %% any
         %%     Any JSON data, including "null".
         <<"any">> ->
@@ -273,9 +286,7 @@ array(Schema,{MinItems,MaxItems}) ->
 
 	MaxItems ->
 	    ?LET(N, eqc_gen:choose(MinItems,MaxItems), arrayGen(Schema,N))
-    end.		  
-	 
-   
+    end.		   
 
 
 arrayGen(_Schema,0) ->
@@ -283,8 +294,6 @@ arrayGen(_Schema,0) ->
 
 arrayGen(Schema,N) when N > 0->
     [json(Schema) | arrayGen(Schema,N-1)].
-
-
 
 
 template(_Template) ->
@@ -331,14 +340,14 @@ number_mul_min(Mul,Min,MinExc) ->
     case MinExc of
 	true ->
 	    ?SUCHTHAT(N, MinMul + Mul * nat(), N /= Min);
-
+        
 	false ->
 	    ?LET(N,nat(),MinMul + Mul * N)
     end.
 
 number_mul_max(Mul,Max,MaxExc) ->
     MaxMul = Mul * (Max div Mul),
-
+    
     case MaxExc of
 	true ->
 	    ?SUCHTHAT(N, MaxMul - Mul * nat(), N /= Max);
@@ -356,13 +365,13 @@ number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
 
         {true,true} ->
             ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), (N /= Min) and (N /= Max));
-
+        
         {true,false} ->
             ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Min);
-
+        
         {false,true} ->
             ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Max);
-
+        
         {false,false} ->
             ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N)
     end.
@@ -376,7 +385,9 @@ string() ->
     % TODO: generator of valid JSON strings
     % Its not a good generator. Implementation has to be changed
     ?LET(Name,name(),list_to_binary(Name)).
-        %?SIZED(Size,list_to_binary(name())).
+    %?SIZED(Size,list_to_binary(name())).
+
+
 stringGen(0) ->
     [];
 
@@ -420,36 +431,6 @@ isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% TO REMOVE IN NEXT UPDATE
-
-%% filterProp(P, N, {Rq,Min}) ->
-%%     G = lists:foldl(fun (Px, G) ->
-%% 			    ?LET({Fl,N},G,
-%% 				 if N =< 0 -> {Fl,0};
-%% 				    N > 0 ->
-%% 					 ?LET(B, boolean(),
-%% 					      case B of   %random value
-%% 						  true ->
-%% 						      {[Px|Fl], N-1};
-%% 						  false ->
-%% 						      {Fl,N}
-%% 					      end)
-%% 				 end)
-		    
-%% 		    end,
-%% 		    {[],N},
-%% 		    P),
-
-%%     ?LET({L,R},G,
-
-%% 	 %This is for not generating objects with less properties than 'minProperties' keyword. 
-%% 	 %There should be better way to check this. Temp
-
-%%          ?SUCHTHAT(X, L, Rq + (N-R) >= Min)).
-
-
-
 filterProp(P, {Min,Max}) ->
     ?LET(N, choose (Min,Max), choose_N(P,N)).
 
@@ -457,11 +438,16 @@ filterProp(P, {Min,Max}) ->
 choose_N (_List,0) ->
     [];
 
+choose_N ([],_) ->
+    [];
+
 choose_N (List, N) when (N > 0) and (length(List) > 0) ->
-    %io:format("Choose_n: List is: ~p~n N is: ~p~n and lenght is: ~p~n",[List,N,length(List)]),
+ 
+ %io:format("Choose_n: List is: ~p~n N is: ~p~n and lenght is: ~p~n",[List,N,length(List)]),
+ 
     ?LET(Nat, choose(1, length(List)), 
          [lists:nth(Nat,List) | choose_N( delete_nth_element(Nat,List) ,N-1) ] ).
-         
+
          %[lists:nth(Nat,List) | choose_N( lists:delete(lists:nth(Nat,List),List),N-1) ] ).
 
 
@@ -491,3 +477,11 @@ concat_and_reverse([],Res) ->
 
 concat_and_reverse([H|T], Res) ->
     concat_and_reverse(T, [H|Res]).
+
+pattern_gen(Pattern) ->
+    RegularExpression = binary_to_list(Pattern),
+    InternalRegularExpression = regexp_parse:string(RegularExpression),
+    ?LET
+       (String,
+        gen_string_from_regexp:gen(InternalRegularExpression),
+        list_to_binary(String)).
