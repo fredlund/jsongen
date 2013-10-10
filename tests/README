@@ -4,10 +4,14 @@ tester function.
 
 A schema may contain a property "empty", which should be either true or
 false, which determines whether it should be possible to generate a value
-from the schema or not.
+from the schema or not [note: this has not been tested yet].
+
+[Possibly we should also think of adding "invalid-schema": boolean
+as well, for the case when generator generation fails.
+For instance, when a regular expression is not a regular expression.]
 
 In the case when empty is true just a single value is generated.
-In the case when empty is false 10 values are generated.
+In the case when empty is false (the default case) 10 values are generated.
 
 To run this "tests" execute
 erl -pa ebin -run rtest test -run erlang halt
