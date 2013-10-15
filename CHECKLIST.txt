@@ -14,4 +14,16 @@
 
 	+ Array: 'minItems', 'additionalItems' and 'uniqueItems' not implemented yet
 
+Ideas
+------
+
+- We should do a validator as well OR
+- Are there any usable validators out there? (we should search for them).
+
+- Given a validator we could generate data for some additional types of
+  generators as well, the ones where we have a generation part, 
+  and a restriction part (similar to ?SUCHTHAT). 
+  Similarly to ?SUCHTHAT this will not be efficient, but at least
+  doable.
+
 
