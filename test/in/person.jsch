@@ -1,11 +1,13 @@
 {
     "description":"A person (extracted from http://tools.ietf.org/html/draft-zyp-json-schema-03)",
     "type":"object",
-    "required" : [ "name", "notasRedes", "aniosEnCarrera" ],
+    "required" : [ "name", "notasRedes" ],
+    "minProperties" : 3,
+
     "properties": {
         "name": {"type":"string",
 		"maxLength" : 10,
-		"minLength" : 1},
+		"minLength" : 3},
         "age" : {
             "type":"integer",
             "maximum": 120,
@@ -24,5 +26,11 @@
 	"minimum" : 1
 	}
 	
-    }
+    },
+
+    "additionalProperties" : 
+	{
+		"type" : "boolean"
+	}
+	
 }

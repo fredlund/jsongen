@@ -175,13 +175,34 @@ json(Schema) ->
 	    MaxProp = jsonschema:keyword(Schema, "maxProperties", ?MAX_PROPERTIES),
 	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
 	    Required = jsonschema:keyword(Schema, "required",[]),
-            PatternProp = jsonschema:keyword(Schema, "patternProperties",{}),
+            PatternProp = jsonschema:keyword(Schema, "patternProperties"),
+            AdditionalProp = jsonschema:keyword(Schema, "additionalProperties", {}),
+            
 	    ReqList = lists:filter(fun({M,_}) -> lists:member(M, Required) end,P),
 	    OptP = lists:filter(fun({M,_}) -> not (lists:member(M, Required)) end,P),
             
+
+            case AdditionalProp of
+                false -> 
+                    AddP = [];
+
+                true -> 
+                    AddP = {};
+
+                {} ->
+                    AddP = {};
+
+              AddSchema ->
+                    AddP = AddSchema
+            end,
+
 	    io:format("Required is: ~p~n",[ReqList]),
 	    io:format("Not Required is: ~p~n",[OptP]),
+            io:format("Additional Prop are: ~p~n", [AddP]),
             
+            
+
+
       %% BETA -->
             %% case PatternProp of
             %%     true ->
@@ -192,18 +213,41 @@ json(Schema) ->
             %%     Schema ->
             %%         OptP++ = [Schema | OptP]
             %% end,
-            
+
+
+
+            io:format("PatternProperties are: ~p~n",[PatternProp]),
+
+            %% case PatternProp of
+            %%     undefined ->
+            %%         Pat_list = [];
+
+            %%     {struct, Patterns} ->
+
+            %%         io:format("Patterns before map: ~p~n",[Patterns]),
+
+            %%         Pat_list = ?LET(N, eqc_gen:choose(0,10),
+            %%                         lists:foldl( fun(Pat, Res) ->
+            %%                                              pattern_gen(Pat,N)
+            %%                                      end, [], Patterns))
+            %% end,
+
+            %% io:format("Pat_list is ~p~n", [Pat_list]),
+
             case MinProp - length(ReqList) < 0 of
                 true -> Min = 0;
                 
                 false -> Min = MinProp - length(ReqList)
             end,
-            
-            ?LET(L, filterProp(OptP, {Min, MaxProp - length(ReqList)}),
+             
+            ?LET({L,PatRand,AddRand,StrRand}, {filterProp(OptP, {Min, MaxProp - length(ReqList)}), eqc_gen:choose(0,10), eqc_gen:choose(0,10), eqc_gen:choose(1,15)},
 		 {struct, lists:map (fun ({M,S}) ->
 					     {M,json(S)}
 				     end,
-				     lists:append(ReqList,L))});
+				     lists:append(ReqList,
+                                                  lists:append(create_patterns(PatternProp,PatRand),
+                                                               lists:append(create_additionals(AddP,AddRand,StrRand),
+                                                               L))))});
         
         
         %% string
@@ -246,7 +290,11 @@ json(Schema) ->
                          ?LET(S, stringGen(Rand), list_to_binary(S)));
                 
                 %% Regular expression pattern specified
+
+   
+                
                 true ->
+                    io:format("Pattern is: ~p~n",[Pattern]),
                     pattern_gen(Pattern)
 
                     %% RegularExpression = binary_to_list(Pattern),
@@ -478,3 +526,35 @@ pattern_gen(Pattern) ->
        (String,
         gen_string_from_regexp:gen(InternalRegularExpression),
         list_to_binary(String)).
+
+
+pattern_gen(_Pat,0) ->
+    [];
+
+
+pattern_gen({Pattern, Schema},N) when N > 0 ->
+    %io:format("{Pattern, schema} = ~p~n", [{Pattern,Schema}]),
+    [{pattern_gen(Pattern), Schema} | pattern_gen({Pattern,Schema}, N-1) ].
+
+
+create_patterns({struct,PatternPropList}, Rand) ->
+    lists:foldl( fun(Pat, _Res) ->
+                         pattern_gen(Pat,Rand)
+                 end, [], PatternPropList);
+
+create_patterns(undefined,_) ->
+[].
+
+
+create_additionals({struct, AddTypes}, AddRand, StrRand) ->
+    lists:foldl( fun (Add, _Res) ->
+                         additional_gen(Add,AddRand,StrRand)
+                 end,[],AddTypes).
+
+
+additional_gen(_Schema,0,_) ->
+    [];
+
+additional_gen(Schema,N, Length) when N > 0 ->
+
+         [ { stringGen(Length) , {struct,[Schema]}}  | additional_gen(Schema,N-1,Length)].
