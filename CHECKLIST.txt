@@ -1,18 +1,18 @@
 - JSONGEN CHECKLIST
 
-	+ String generator: 'pattern' keyword implemented, but it doesn't work with 'minLength' and 'maxLength'
+	+ String generator: Implemented, but 'pattern' keyword doesn't work with 'minLength' and 'maxLength'
 
 	+ Integer generator: Fully implemented
 
-	+ Number generator: Fully implemented, although there are some bugs with negative numbers.
+	+ Number generator: There are some bugs with negative numbers.
 
 	+ Null generator: Fully implemented
 
 	+ Boolean generator: Fully implemented
 
-	+ Object generator: 'additionalProperties' and 'patternProperties' not implemented yet
+	+ Object generator: Fully implemented (beta)
 
-	+ Array: 'minItems', 'additionalItems' and 'uniqueItems' not implemented yet
+	+ Array: 'additionalItems' and 'uniqueItems' not implemented yet
 
 Ideas
 ------
