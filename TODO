@@ -1,0 +1,24 @@
+Ideas:
+
+- Generadores QuickCheck dentro JSON schemas:
+
+Propongo que permitimos que se especifica una funcion erlang como
+schema también, con el significado de que es un generador. Tenemos que
+pensar en como especificarlo en jason pero el resto es obvio
+
+Propongo añadir un par de keywords: "jsongen" y "jsonval". Sus values
+pueden ser el nombre de una función erlang en el formato
+"module:function(params)", para jsongen se devuelve un generador de
+json y para el caso de jsonval se devuelve una función que devuelve un
+boolean.
+
+
+- All JSON data are JSON schemas:
+
+Proponemos que todos los datos son JSON schemas, son valores 'literales'.
+Problema: que hacer con los JSON schemas.
+Un objeto es un JSON schema 'tradicional' si contiene un atributo
+"schema" : true.
+Dentro schemas tradicionales podemos meter valores literales usando
+enum (ya se puede), pero, ojo, permitimos que se mete JSON schemas dentro
+otra vez usando "schema : true.
