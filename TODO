@@ -12,6 +12,8 @@ pueden ser el nombre de una función erlang en el formato
 json y para el caso de jsonval se devuelve una función que devuelve un
 boolean.
 
++ Que hacer con ?LET, y otros macros. Falta sintaxis in eqc.
+
 
 - All JSON data are JSON schemas:
 
@@ -22,3 +24,4 @@ Un objeto es un JSON schema 'tradicional' si contiene un atributo
 Dentro schemas tradicionales podemos meter valores literales usando
 enum (ya se puede), pero, ojo, permitimos que se mete JSON schemas dentro
 otra vez usando "schema : true.
+
