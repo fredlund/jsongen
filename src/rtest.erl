@@ -1,8 +1,18 @@
 -module(rtest).
 
+-export([check/0]).
+
 %% run a test using erl -pa ebin -run rtest test -run erlang halt
 
 -include_lib("eunit/include/eunit.hrl").
+
+check() ->
+  case ?MODULE:test() of
+    ok ->
+      halt(0);
+    error ->
+      halt(1)
+  end.
 
 schemas_test_() ->
   %% Figure out where the schema tests are
