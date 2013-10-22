@@ -36,12 +36,26 @@ properties(_Schema = {struct, Def}) ->
     {_,{struct, Properties}} = proplists:lookup(<<"properties">>,Def),
     Properties.
 
+minProperties(Schema,Def) ->
+    keyword(Schema,"minProperties",Def).
+
+
+maxProperties(Schema,Def) ->
+    keyword(Schema,"maxProperties",Def).
+
 keyword(_Schema = {struct, Def}, KeyWord) ->
     proplists:get_value(list_to_binary(KeyWord),Def).
 
 keyword(_Schema = {struct, Def}, KeyWord, DefaultValue) ->
     proplists:get_value(list_to_binary(KeyWord),Def,DefaultValue).
 
-%% patternProperties(_Schema = {struct, Def}) ->
-%%     {_,{struct, Properties}} = proplists:lookup(<<"patternProperties">>,Def),
-%%     Properties.
+patternProperties(Schema) ->
+    M = proplists:lookup(<<"patternProperties">>, []),
+    case proplists:lookup(<<"patternProperties">>, []) of
+        
+        {_,{struct, Properties}} -> Properties;
+        
+        none -> undefined
+    end.
+
+
