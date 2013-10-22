@@ -49,13 +49,15 @@ keyword(_Schema = {struct, Def}, KeyWord) ->
 keyword(_Schema = {struct, Def}, KeyWord, DefaultValue) ->
     proplists:get_value(list_to_binary(KeyWord),Def,DefaultValue).
 
-patternProperties(Schema) ->
-    M = proplists:lookup(<<"patternProperties">>, []),
-    case proplists:lookup(<<"patternProperties">>, []) of
+patternProperties({struct,Schema}) ->
+
+    case proplists:lookup(<<"patternProperties">>, Schema) of
         
-        {_,{struct, Properties}} -> Properties;
+       {_, {struct, Properties}} -> 
+            Properties;
         
-        none -> undefined
+        none -> 
+            undefined
     end.
 
 

@@ -37,7 +37,7 @@
 
 -compile(export_all).
 
--define(debug,true).
+%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -142,7 +142,7 @@ json(Schema) ->
 	    Max = jsonschema:keyword(Schema,"maximum"),
 	    ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum",false),
 	    Min = jsonschema:keyword(Schema,"minimum"),
-	    ExcMin = jsonschema:keyword(Schema,"exlusiveMinimum",false),
+	    ExcMin = jsonschema:keyword(Schema,"exclusiveMinimum",false),
 	    Mul = jsonschema:keyword(Schema,"multipleOf",1),
             
             
@@ -158,6 +158,7 @@ json(Schema) ->
 		    number_mul_max(Mul,Max, ExcMax);
 		
 		{Min,Max} ->
+                    ?LOG("number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax}):  number_mul_min_max(~p,~p,~p,{~p,~p})",[Mul,Min,Max,ExcMin,ExcMax]),
 		    number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax})
 	    end;
         
@@ -177,25 +178,26 @@ json(Schema) ->
             MaxProperties = jsonschema:maxProperties(Schema, ?MAX_PROPERTIES),
 	    Required = jsonschema:keyword(Schema, "required",[]),
             PatternProperties = jsonschema:patternProperties(Schema),
-            AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties", {}),
+
+            _AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties", {}),
 
 
             ReqProps = [P || P <- Properties, lists:member(P, Required)],
             OptProps = [P || P <- Properties, not lists:member(P, Required)],
 
-            case AdditionalProperties of 
-                false -> 
-                    AddP = [];
+            %% case AdditionalProperties of 
+            %%     false -> 
+            %%         AddP = [];
 
-                true -> 
-                    AddP = {};
+            %%     true -> 
+            %%         AddP = {};
 
-                {} ->
-                    AddP = {};
+            %%     {} ->
+            %%         AddP = {};
 
-              AddSchema ->
-                    AddP = AddSchema
-            end,
+            %%   AddSchema ->
+            %%         AddP = AddSchema
+            %% end,
 
 	    ?LOG("Required is: ~p~n",[Required]),
 	    ?LOG("Not Required is: ~p~n",[OptProps]),
@@ -380,22 +382,25 @@ number_mul_max(Mul,Max,MaxExc) ->
 
 number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
     MinMul = (1 + floor((Min-1) / Mul)),
-    ?LOG("MinMul: ~p~n",[MinMul]),
     MaxMul = floor(Max/  Mul),
 
     case {MinExc,MaxExc} of
 
         {true,true} ->
-            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), (N /= Min) and (N /= Max));
+            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
+                      ((N * Mul)/= Min) and ((N * Mul) /= Max));
         
         {true,false} ->
-            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Min);
+            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
+                      (N * Mul) /= Min);
         
         {false,true} ->
-            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Max);
+            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
+                      (N * Mul) /= Max);
         
         {false,false} ->
-            ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N)
+            ?LET(N, eqc_gen:choose(MinMul,MaxMul), 
+                 Mul * N)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
