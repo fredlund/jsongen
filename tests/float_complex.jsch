@@ -1,0 +1,7 @@
+{ "type" : "number", 
+  	      	"maximum" : 2.75,
+  	      	"minimum" : -30,
+	      	"exclusiveMaximum" : true,
+	      	"exclusiveMinimum" : true,
+	  	"multipleOf" : 0.25
+}
