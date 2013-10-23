@@ -1,0 +1,15 @@
+{
+ "type" : "object",
+ "required" : [ "firstname", "lastname", "age", "gender", "email" ],
+ "properties" :
+ {
+  "firstname" : {"type" : "string", "pattern" : "^[A-Z][a-z]+$"},
+  "lastname" : {"type" : "string", "pattern" : "^[A-Z][a-z]{3,10}$"},
+  "age" : {"type" : "integer", "minimum" : 0, "maximum" : 150},
+  "gender" : {"enum": ["male", "female"]},
+  "married" : {"type" : "boolean"},
+  "email" : 
+      {"type" : "string",
+       "pattern" : "^[a-z][a-z0-9]*@gmail\46com$"}
+ }
+}
