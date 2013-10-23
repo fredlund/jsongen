@@ -37,7 +37,7 @@
 
 -compile(export_all).
 
-%-define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -201,7 +201,7 @@ json(Schema) ->
 
 	    ?LOG("Required is: ~p~n",[Required]),
 	    ?LOG("Not Required is: ~p~n",[OptProps]),
-            ?LOG("Additional Prop are: ~p~n", [AddP]),
+            %?LOG("Additional Prop are: ~p~n", [AddP]),
             ?LOG("PatternProperties are: ~p~n",[PatternProperties]),
 
             case length(ReqProps) > MinProperties of
@@ -290,6 +290,8 @@ json(Schema) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Array gen
+
+-spec array(json:json_term(),{integer(),integer()}) -> eqc_gen:gen(json:json_term()).
 array(Schema,{MinItems,MaxItems}) ->
 
     case MaxItems of
@@ -301,6 +303,7 @@ array(Schema,{MinItems,MaxItems}) ->
     end.		   
 
 
+-spec arrayGen (json:json_term(), integer()) -> eqc_gen:gen(json:json_term()).
 arrayGen(_Schema,0) ->
     [];
 
@@ -317,20 +320,26 @@ null() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Integer generators
+
+-spec integer () -> eqc_gen:gen(integer()).
 integer() ->
     eqc_gen:int().
 
+-spec multiple_of (integer()) -> eqc_gen:gen(integer()).
 multiple_of(M) ->
     ?LET(N, integer(), M * N).
 
+-spec multiple_of_min(integer(), integer()) -> eqc_gen:gen(integer()).
 multiple_of_min(Mul,Min) ->
     MinMul = Mul * (1 + (Min-1) div Mul),
     ?LET(N, nat(), MinMul + Mul * N).
 
+-spec multiple_of_max(integer(), integer()) -> eqc_gen:gen(integer()).
 multiple_of_max(Mul,Max) ->
     MaxMul = Mul * (Max div Mul),
     ?LET(N, nat(), MaxMul - Mul * N).
 
+-spec multiple_of_min_max(integer(), integer(), integer()) -> eqc_gen:gen(integer()).
 multiple_of_min_max(Mul,Min,Max) ->
     MinMul = (1 + (Min-1) div Mul),
     MaxMul = (Max div Mul),
@@ -338,27 +347,36 @@ multiple_of_min_max(Mul,Min,Max) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Natural numbers
+
+-spec natural() -> eqc_gen:gen(integer()).
 natural() ->
     eqc_gen:nat().
 
+-spec positive() -> eqc_gen:gen(integer()).
 positive() ->
     natural_gte(1).
 
+-spec natural_gte(integer()) -> eqc_gen:gen(integer()).
 natural_gte(K) ->
     ?LET(N,natural(),N+K).
     
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Number generators
+
+-spec number() -> eqc_gen:gen(integer()) | eqc_gen:gen(float()).
 number() ->
     eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]).
 
+-spec number_positive() -> eqc_gen:gen(integer()) | eqc_gen:gen(float()).
 number_positive() ->
     ?SUCHTHAT(N, eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]), N>=0).
 
+-spec number_mul(integer() | float()) -> eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul(Mul) ->
     ?LET(N, integer(), Mul * N).
 
+-spec number_mul_min(integer() | float(), integer() | float(), boolean()) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_min(Mul,Min,MinExc) ->
     MinMul = Mul * (1 + floor( (Min-1) / Mul)),
     case MinExc of
@@ -369,6 +387,7 @@ number_mul_min(Mul,Min,MinExc) ->
 	    ?LET(N,nat(),MinMul + Mul * N)
     end.
 
+-spec number_mul_max(integer() | float(), integer() | float(), boolean()) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_max(Mul,Max,MaxExc) ->
     MaxMul = Mul * (Max div Mul),
     
@@ -379,7 +398,7 @@ number_mul_max(Mul,Max,MaxExc) ->
 	    ?LET(N, nat(), MaxMul - Mul * N)
     end.
 
-
+-spec number_mul_min_max(integer() | float(), integer() | float(), integer() | float(), tuple(boolean(), boolean())) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
     MinMul = (1 + floor((Min-1) / Mul)),
     MaxMul = floor(Max/  Mul),
@@ -405,9 +424,11 @@ number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec boolean() -> eqc_gen:gen(boolean()).
 boolean() ->
     eqc_gen:bool().
 
+-spec string() -> eqc_gen:gen(string()).
 string() ->
     % TODO: generator of valid JSON strings
     % Its not a good generator. Implementation has to be changed
@@ -415,6 +436,7 @@ string() ->
     %?SIZED(Size,list_to_binary(name())).
 
 
+-spec stringGen(integer()) -> eqc_gen:gen(string()).
 stringGen(0) ->
     [];
 
@@ -423,16 +445,23 @@ stringGen(N) ->
 
 
 %random integer generator between Min and Max values
+
+-spec randInt (integer(), integer()) -> eqc_gen:gen(integer()).
 randInt (Min, Max) ->
 	eqc_gen:choose(Min,Max).
 
 %maybe its not very efficient
+
+-spec randFlt(float(), float()) -> eqc_gen:gen(float()).
 randFlt (Min, _) ->
     ?LET(Flt, eqc_gen:real(), Min + Flt).
 
+%% candidate for removal
 propname() ->
     name().
 
+
+% candidate for removal
 name() ->
     eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
 
@@ -527,18 +556,25 @@ create_patterns(undefined) ->
 create_patterns(PatternPropList) ->
     % it will crash here if more than one pattern is given. Fix it!
     ?LOG("Inside create_patterns, PatternPropList is ~p~n",[PatternPropList]),
-    [L] = [pattern_gen(Pat) || Pat <- PatternPropList],
-    %[pattern_gen(Pat) || Pat <- PatternPropList].
+    %L = [pattern_gen(Pat) || Pat <- PatternPropList],
+    [L] = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
+    %[pattern_gen(Pat) || Pat <- PatternPropList],
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
 
 
+
+%%% INTEGER OR GEN. OF INTEGER????
+-spec create_additionals ( json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
 
 create_additionals({struct, AddTypes}, AddRand, StrRand) ->
     lists:foldl( fun (Add, _Res) ->
                          additional_gen(Add,AddRand,StrRand)
                  end,[],AddTypes).
 
+
+
+-spec additional_gen (json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
 
 additional_gen(_Schema,0,_) ->
     [];
