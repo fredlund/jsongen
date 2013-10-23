@@ -17,6 +17,25 @@ read_file(Filename) ->
             Result
     end.
 
+hasType(_Schema={struct,Def}) ->
+  case proplists:lookup(<<"type">>,Def) of
+    {_,_Type} ->
+      true;
+    none ->
+      false
+  end;
+hasType(Other) ->
+  io:format("Something other:~p~n",[Other]),
+  throw(bad).
+
+hasEnum(_Schema={struct,Def}) ->
+  case proplists:lookup(<<"enum">>,Def) of
+    {_,_Type} ->
+      true;
+    none ->
+      false
+  end.
+
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
     Type.
@@ -24,6 +43,10 @@ type(_Schema={struct, Def}) ->
 set_type(_Schema={struct, Def},Type) ->
     DefNoType = proplists:delete(<<"type">>,Def),
     {struct, [{<<"type">>,Type} | DefNoType]}.
+
+enumerated(_Schema={struct, Def}) ->
+    {_,Enumerated} = proplists:lookup(<<"enum">>,Def),
+    Enumerated.
 
 items(_Schema={struct, Def}) ->
     {_, Items} = proplists:lookup(<<"items">>,Def),

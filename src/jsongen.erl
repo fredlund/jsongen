@@ -58,8 +58,20 @@
 
 json(Schema) ->
     ?LOG("json(~p)~n",[Schema]),
+    case jsonschema:hasType(Schema) of
+      true ->
+	gen_typed_schema(Schema);
+      false ->
+	case jsonschema:hasEnum(Schema) of
+	  true -> 
+	    eqc_gen:oneof(jsonschema:enumerated(Schema));
+	  false ->
+	    throw(bad)
+	end
+    end.
+
+gen_typed_schema(Schema) ->
     case jsonschema:type(Schema) of
-        
         
         %% array
         %%     A JSON array. 
@@ -79,7 +91,6 @@ json(Schema) ->
         %%     A JSON boolean. 
         <<"boolean">> ->
             boolean();
-
 
 
         %% integer
