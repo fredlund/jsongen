@@ -10,6 +10,6 @@
   "married" : {"type" : "boolean"},
   "email" : 
       {"type" : "string",
-       "pattern" : "^[a-z][a-z0-9]*@gmail\46com$"}
+       "pattern" : "^[a-z][a-z0-9]*@gmail\.com$"}
  }
 }

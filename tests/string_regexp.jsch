@@ -1,4 +1,4 @@
 {
  "type" : "string",
-  "pattern" : "^[a-z][a-z0-9]*@[a-z]+\46com$"
+  "pattern" : "^[a-z][a-z0-9]*@[a-z]+\x2ecom$"
 }
