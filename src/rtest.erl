@@ -55,7 +55,7 @@ test_schema(Schema) ->
 pick_n_values(Generator,N,Schema) when N>0 ->      
   Value = eqc_gen:pick(Generator),
   case json_validate:validate(Value,Schema) of
-    yes -> ok;
+    true -> ok;
     maybe -> ok;
     Other ->
       io:format
