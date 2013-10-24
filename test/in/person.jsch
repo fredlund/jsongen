@@ -31,6 +31,12 @@
     "additionalProperties" : 
 	{
 		"type" : "boolean"
-	}
+	},
 	
+
+    "patternProperties" :
+      {
+          "a.*" : { "type" : "integer" },
+          "b.*" : { "type" : "boolean" }
+      }
 }
