@@ -58,16 +58,20 @@
 
 json(Schema) ->
     ?LOG("json(~p)~n",[Schema]),
-    case jsonschema:hasType(Schema) of
-      true ->
-	gen_typed_schema(Schema);
-      false ->
-	case jsonschema:hasEnum(Schema) of
-	  true -> 
-	    eqc_gen:oneof(jsonschema:enumerated(Schema));
-	  false ->
-	    throw(bad)
-	end
+    %% case jsonschema:ref(Schema) of
+    %%     undefined ->
+            case jsonschema:hasType(Schema) of
+                true ->
+                    gen_typed_schema(Schema);
+                false ->
+                    case jsonschema:hasEnum(Schema) of
+                        true -> 
+                            eqc_gen:oneof(jsonschema:enumerated(Schema));
+                        false ->
+                            throw(bad)
+                    end
+        %%     end;
+        %% Ref -> ok
     end.
 
 gen_typed_schema(Schema) ->
@@ -570,7 +574,7 @@ create_patterns(PatternPropList) ->
     %L = [pattern_gen(Pat) || Pat <- PatternPropList],
     [L] = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
     %[pattern_gen(Pat) || Pat <- PatternPropList],
-    ?LOG("Final patterns created: ~p~n",[L]),
+    ?LOG("Final patterns created: ~p~n",L),
     L.
 
 
