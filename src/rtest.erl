@@ -44,18 +44,28 @@ test_schema(Schema) ->
       if
 	IsEmpty ->
 	  Succeeds =
-	    try Value=pick_n_values(Generator,1), {false,Value}
+	    try Value=pick_n_values(Generator,1,Schema), {false,Value}
 	    catch _:_ -> true end,
 	  Succeeds == true;
 	true ->
-	  pick_n_values(Generator,10)
+	  pick_n_values(Generator,10,Schema)
       end
   end.
 
-pick_n_values(Generator,N) when N>0 ->      
-  eqc_gen:pick(Generator),
-  pick_n_values(Generator,N-1);
-pick_n_values(_Generator,_N) -> 
+pick_n_values(Generator,N,Schema) when N>0 ->      
+  Value = eqc_gen:pick(Generator),
+  case json_validate:validate(Value,Schema) of
+    yes -> ok;
+    maybe -> ok;
+    Other ->
+      io:format
+	("*** Error: validating the value~n~p~nagainst the schema~n~p~n"++
+	   " fails; validation return value:~n~p~n",
+	 [Value,Schema,Other]),
+      throw(validation_error)
+  end,
+  pick_n_values(Generator,N-1,Schema);
+pick_n_values(_Generator,_N,_Schema) -> 
   ok.
 
   

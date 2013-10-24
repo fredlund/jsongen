@@ -18,4 +18,4 @@ edoc:
 	erl -noshell -run edoc_run files '["src/jsongen.erl"]' '[{sort_functions,false},{dir,"doc"}]'
 
 dotest:
-	erl -pa ebin -run rtest test -run erlang halt
+	erl -pa ebin -noshell -run rtest test -run erlang halt
