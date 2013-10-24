@@ -1,6 +1,6 @@
 -module(json).
 
--compile(export_all).
+-export([decode/1, encode/1]).
 
 -define(JSONLIB, mochijson2).
 

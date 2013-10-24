@@ -1,6 +1,6 @@
 -module(rtest).
 
--export([check/0]).
+-export([check/0,test_schema_file/1]).
 
 %% run a test using erl -pa ebin -run rtest test -run erlang halt
 
@@ -37,6 +37,10 @@ schemas_test_() ->
 	 end
      end, Filenames).
 
+test_schema_file([Filename]) ->
+  {ok,Schema} = jsonschema:read_file(Filename),
+  (test_schema(Schema))().
+  
 test_schema(Schema) ->
   IsEmpty = jsonschema:keyword(Schema,"empty",false),
   fun () ->

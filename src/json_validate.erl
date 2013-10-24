@@ -18,6 +18,43 @@ validate(Data,Schema) ->
   case jsonschema:hasType(Schema) of
     true ->
       case jsonschema:type(Schema) of
+	<<"object">> ->
+	  case Data of
+	    {struct,DataProperties} ->
+	      Properties =
+		proplists:get_keys(jsonschema:properties(Schema)),
+	      Required =
+		jsonschema:keyword(Schema, "required",[]),
+	      RequiredSet =
+		if
+		  Required==undefined -> sets:new();
+		  true -> sets:from_list(Required)
+		end,
+	      PropertiesSet =
+		if
+		  Properties==undefined -> sets:new();
+		  true -> sets:from_list(Properties)
+		end,
+	      AdditionalProperties =
+		case jsonschema:keyword(Schema, "additionalProperties", {}) of
+		  false -> false;
+		  _ -> true
+		end,
+	      DataPropertiesSet =
+		sets:from_list(proplists:get_keys(DataProperties)),
+	      RequiredPresent =
+		sets:is_subset(RequiredSet,DataPropertiesSet),
+	      Additionals =
+		sets:subtract(DataPropertiesSet,PropertiesSet),
+	      AdditionalsSize =
+		sets:size(Additionals),
+	      if
+		not(RequiredPresent) -> false;
+		not(AdditionalProperties), AdditionalsSize>0 -> false;
+		true -> maybe
+	      end;
+	    _ -> false
+	  end;
 	<<"integer">> ->
 	  case is_integer(Data) of
 	    false ->
