@@ -1,0 +1,5 @@
+{
+ "type" : "any",
+  "minLength" : 3,
+  "maxLength" : 10 
+}

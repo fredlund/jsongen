@@ -1,0 +1,10 @@
+{ "type" : "array", 
+  "items" : { 
+  	      "type" : "integer",
+  	      "maximum" : 10,
+  	      "minimum" : 0,
+	      "exclusiveMaximum" : true,
+	      "exclusiveMinimum" : false,
+	      "multipleOf" : 2
+            } 
+}

@@ -26,7 +26,8 @@
 
 %% @doc This module translates a JSON Schema into
 %% an Erlang QuickCheck generator.
-%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
+%% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
 %% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil 
 %%
 
@@ -36,7 +37,7 @@
 
 -compile(export_all).
 
- %-define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -45,7 +46,7 @@
 -define(LOG(X,Y),true).
 -endif.
 
--define(MAX_ARRAY_SIZE,1000).
+-define(MAX_ARRAY_SIZE,100).
 -define(MAX_STR_LENGTH,1000).
 -define(MAX_PROPERTIES,100).
 
@@ -57,8 +58,20 @@
 
 json(Schema) ->
     ?LOG("json(~p)~n",[Schema]),
+    case jsonschema:hasType(Schema) of
+      true ->
+	gen_typed_schema(Schema);
+      false ->
+	case jsonschema:hasEnum(Schema) of
+	  true -> 
+	    eqc_gen:oneof(jsonschema:enumerated(Schema));
+	  false ->
+	    throw(bad)
+	end
+    end.
+
+gen_typed_schema(Schema) ->
     case jsonschema:type(Schema) of
-        
         
         %% array
         %%     A JSON array. 
@@ -78,7 +91,6 @@ json(Schema) ->
         %%     A JSON boolean. 
         <<"boolean">> ->
             boolean();
-
 
 
         %% integer
@@ -141,7 +153,7 @@ json(Schema) ->
 	    Max = jsonschema:keyword(Schema,"maximum"),
 	    ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum",false),
 	    Min = jsonschema:keyword(Schema,"minimum"),
-	    ExcMin = jsonschema:keyword(Schema,"exlusiveMinimum",false),
+	    ExcMin = jsonschema:keyword(Schema,"exclusiveMinimum",false),
 	    Mul = jsonschema:keyword(Schema,"multipleOf",1),
             
             
@@ -157,6 +169,7 @@ json(Schema) ->
 		    number_mul_max(Mul,Max, ExcMax);
 		
 		{Min,Max} ->
+                    ?LOG("number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax}):  number_mul_min_max(~p,~p,~p,{~p,~p})",[Mul,Min,Max,ExcMin,ExcMax]),
 		    number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax})
 	    end;
         
@@ -171,84 +184,56 @@ json(Schema) ->
         %% object
         %%     A JSON object.
         <<"object">> ->
-            P = jsonschema:properties(Schema),
-	    MaxProp = jsonschema:keyword(Schema, "maxProperties", ?MAX_PROPERTIES),
-	    MinProp = jsonschema:keyword(Schema, "minProperties", 0),
+            Properties = jsonschema:properties(Schema),
+	    MinProperties = jsonschema:minProperties(Schema, 0),
+            MaxProperties = jsonschema:maxProperties(Schema, ?MAX_PROPERTIES),
 	    Required = jsonschema:keyword(Schema, "required",[]),
-            PatternProp = jsonschema:keyword(Schema, "patternProperties"),
-            AdditionalProp = jsonschema:keyword(Schema, "additionalProperties", {}),
-            
-	    ReqList = lists:filter(fun({M,_}) -> lists:member(M, Required) end,P),
-	    OptP = lists:filter(fun({M,_}) -> not (lists:member(M, Required)) end,P),
-            
+            PatternProperties = jsonschema:patternProperties(Schema),
 
-            case AdditionalProp of
-                false -> 
-                    AddP = [];
-
-                true -> 
-                    AddP = {};
-
-                {} ->
-                    AddP = {};
-
-              AddSchema ->
-                    AddP = AddSchema
-            end,
-
-	    io:format("Required is: ~p~n",[ReqList]),
-	    io:format("Not Required is: ~p~n",[OptP]),
-            io:format("Additional Prop are: ~p~n", [AddP]),
-            
-            
+            _AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties", {}),
 
 
-      %% BETA -->
-            %% case PatternProp of
-            %%     true ->
-            %%         [];
-            %%     false ->
-            %%         OptP++ = OptP;
-            
-            %%     Schema ->
-            %%         OptP++ = [Schema | OptP]
+            ReqProps = [P || P <- Properties, lists:member(P, Required)],
+            OptProps = [P || P <- Properties, not lists:member(P, Required)],
+
+            %% case AdditionalProperties of 
+            %%     false -> 
+            %%         AddP = [];
+
+            %%     true -> 
+            %%         AddP = {};
+
+            %%     {} ->
+            %%         AddP = {};
+
+            %%   AddSchema ->
+            %%         AddP = AddSchema
             %% end,
 
+	    ?LOG("Required is: ~p~n",[Required]),
+	    ?LOG("Not Required is: ~p~n",[OptProps]),
+            %?LOG("Additional Prop are: ~p~n", [AddP]),
+            ?LOG("PatternProperties are: ~p~n",[PatternProperties]),
 
-
-            io:format("PatternProperties are: ~p~n",[PatternProp]),
-
-            %% case PatternProp of
-            %%     undefined ->
-            %%         Pat_list = [];
-
-            %%     {struct, Patterns} ->
-
-            %%         io:format("Patterns before map: ~p~n",[Patterns]),
-
-            %%         Pat_list = ?LET(N, eqc_gen:choose(0,10),
-            %%                         lists:foldl( fun(Pat, Res) ->
-            %%                                              pattern_gen(Pat,N)
-            %%                                      end, [], Patterns))
-            %% end,
-
-            %% io:format("Pat_list is ~p~n", [Pat_list]),
-
-            case MinProp - length(ReqList) < 0 of
+            case length(ReqProps) > MinProperties of
                 true -> Min = 0;
-                
-                false -> Min = MinProp - length(ReqList)
+                false -> Min = MinProperties - length(ReqProps)
             end,
-             
-            ?LET({L,PatRand,AddRand,StrRand}, {filterProp(OptP, {Min, MaxProp - length(ReqList)}), eqc_gen:choose(0,10), eqc_gen:choose(0,10), eqc_gen:choose(1,15)},
-		 {struct, lists:map (fun ({M,S}) ->
-					     {M,json(S)}
-				     end,
-				     lists:append(ReqList,
-                                                  lists:append(create_patterns(PatternProp,PatRand),
-                                                               lists:append(create_additionals(AddP,AddRand,StrRand),
-                                                               L))))});
-        
+            Max = MaxProperties - length(ReqProps),
+
+            
+            ?LET({PatternGen,AdditionalGen}, {create_patterns(PatternProperties),[]},
+                 ?LET(Optionals, 
+                      choose_properties(OptProps ++ PatternGen ++ AdditionalGen , Min, Max),    
+
+                      {
+                        struct,
+                        [{P,json(S)} || {P,S} <- ReqProps
+                                            ++ 
+                                            Optionals
+                        ]
+                      }));
+         
         
         %% string
         %%     A JSON string.
@@ -288,21 +273,11 @@ json(Schema) ->
                     
                     ?LET(Rand,randInt(Min,Max), 
                          ?LET(S, stringGen(Rand), list_to_binary(S)));
-                
-                %% Regular expression pattern specified
-
    
                 
                 true ->
-                    io:format("Pattern is: ~p~n",[Pattern]),
-                    pattern_gen(Pattern)
-
-                    %% RegularExpression = binary_to_list(Pattern),
-                    %% InternalRegularExpression = regexp_parse:string(RegularExpression),
-                    %% ?LET
-                    %%    (String,
-                    %%     gen_string_from_regexp:gen(InternalRegularExpression),
-                    %%     list_to_binary(String))
+                    ?LOG("Pattern is: ~p~n",[Pattern]),
+                    property_name(Pattern)
             end;
         
         %% any
@@ -326,6 +301,8 @@ json(Schema) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Array gen
+
+-spec array(json:json_term(),{integer(),integer()}) -> eqc_gen:gen(json:json_term()).
 array(Schema,{MinItems,MaxItems}) ->
 
     case MaxItems of
@@ -337,6 +314,7 @@ array(Schema,{MinItems,MaxItems}) ->
     end.		   
 
 
+-spec arrayGen (json:json_term(), integer()) -> eqc_gen:gen(json:json_term()).
 arrayGen(_Schema,0) ->
     [];
 
@@ -353,36 +331,63 @@ null() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Integer generators
+
+-spec integer () -> eqc_gen:gen(integer()).
 integer() ->
     eqc_gen:int().
 
+-spec multiple_of (integer()) -> eqc_gen:gen(integer()).
 multiple_of(M) ->
     ?LET(N, integer(), M * N).
 
+-spec multiple_of_min(integer(), integer()) -> eqc_gen:gen(integer()).
 multiple_of_min(Mul,Min) ->
     MinMul = Mul * (1 + (Min-1) div Mul),
     ?LET(N, nat(), MinMul + Mul * N).
 
+-spec multiple_of_max(integer(), integer()) -> eqc_gen:gen(integer()).
 multiple_of_max(Mul,Max) ->
     MaxMul = Mul * (Max div Mul),
     ?LET(N, nat(), MaxMul - Mul * N).
 
+-spec multiple_of_min_max(integer(), integer(), integer()) -> eqc_gen:gen(integer()).
 multiple_of_min_max(Mul,Min,Max) ->
     MinMul = (1 + (Min-1) div Mul),
     MaxMul = (Max div Mul),
     ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Natural numbers
+
+-spec natural() -> eqc_gen:gen(integer()).
+natural() ->
+    eqc_gen:nat().
+
+-spec positive() -> eqc_gen:gen(integer()).
+positive() ->
+    natural_gte(1).
+
+-spec natural_gte(integer()) -> eqc_gen:gen(integer()).
+natural_gte(K) ->
+    ?LET(N,natural(),N+K).
+    
+    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Number generators
+
+-spec number() -> eqc_gen:gen(integer()) | eqc_gen:gen(float()).
 number() ->
     eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]).
 
+-spec number_positive() -> eqc_gen:gen(integer()) | eqc_gen:gen(float()).
 number_positive() ->
     ?SUCHTHAT(N, eqc_gen:oneof([eqc_gen:int(),eqc_gen:real()]), N>=0).
 
+-spec number_mul(integer() | float()) -> eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul(Mul) ->
     ?LET(N, integer(), Mul * N).
 
+-spec number_mul_min(integer() | float(), integer() | float(), boolean()) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_min(Mul,Min,MinExc) ->
     MinMul = Mul * (1 + floor( (Min-1) / Mul)),
     case MinExc of
@@ -393,6 +398,7 @@ number_mul_min(Mul,Min,MinExc) ->
 	    ?LET(N,nat(),MinMul + Mul * N)
     end.
 
+-spec number_mul_max(integer() | float(), integer() | float(), boolean()) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_max(Mul,Max,MaxExc) ->
     MaxMul = Mul * (Max div Mul),
     
@@ -403,32 +409,37 @@ number_mul_max(Mul,Max,MaxExc) ->
 	    ?LET(N, nat(), MaxMul - Mul * N)
     end.
 
-
+-spec number_mul_min_max(integer() | float(), integer() | float(), integer() | float(), tuple(boolean(), boolean())) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
     MinMul = (1 + floor((Min-1) / Mul)),
-    %io:format("MinMul: ~p~n",[MinMul]),
     MaxMul = floor(Max/  Mul),
 
     case {MinExc,MaxExc} of
 
         {true,true} ->
-            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), (N /= Min) and (N /= Max));
+            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
+                      ((N * Mul)/= Min) and ((N * Mul) /= Max));
         
         {true,false} ->
-            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Min);
+            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
+                      (N * Mul) /= Min);
         
         {false,true} ->
-            ?SUCHTHAT(N, Mul * eqc_gen:choose(MinMul,MaxMul), N /= Max);
+            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
+                      (N * Mul) /= Max);
         
         {false,false} ->
-            ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul * N)
+            ?LET(N, eqc_gen:choose(MinMul,MaxMul), 
+                 Mul * N)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec boolean() -> eqc_gen:gen(boolean()).
 boolean() ->
     eqc_gen:bool().
 
+-spec string() -> eqc_gen:gen(string()).
 string() ->
     % TODO: generator of valid JSON strings
     % Its not a good generator. Implementation has to be changed
@@ -436,6 +447,7 @@ string() ->
     %?SIZED(Size,list_to_binary(name())).
 
 
+-spec stringGen(integer()) -> eqc_gen:gen(string()).
 stringGen(0) ->
     [];
 
@@ -444,16 +456,23 @@ stringGen(N) ->
 
 
 %random integer generator between Min and Max values
+
+-spec randInt (integer(), integer()) -> eqc_gen:gen(integer()).
 randInt (Min, Max) ->
 	eqc_gen:choose(Min,Max).
 
 %maybe its not very efficient
+
+-spec randFlt(float(), float()) -> eqc_gen:gen(float()).
 randFlt (Min, _) ->
     ?LET(Flt, eqc_gen:real(), Min + Flt).
 
+%% candidate for removal
 propname() ->
     name().
 
+
+% candidate for removal
 name() ->
     eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
 
@@ -478,20 +497,18 @@ isMultiple(N,Mul) when Mul > 0 ->
 isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
 
+% -spec choose_properties([string()],natural(),natural()) -> eqc_gen:gen([string()]).
+choose_properties(P, Min, Max) when Max >= Min -> 
+    ?LOG("Choosing properties: ~p~n",[P]),
+    ?LET(N, eqc_gen:choose (Min,Max), choose_n_properties(P,N,Min)).
 
-filterProp(P, {Min,Max}) ->
-    ?LET(N, choose (Min,Max), choose_N(P,N)).
-
-
-choose_N (_List,0) ->
+choose_n_properties(_List,0,_Min) ->
     [];
-
-choose_N ([],_) ->
+choose_n_properties([],_,Min) when Min =< 0 ->
     [];
-
-choose_N (List, N) when (N > 0) and (length(List) > 0) ->
-    ?LET(Nat, choose(1, length(List)), 
-         [lists:nth(Nat,List) | choose_N( delete_nth_element(Nat,List) ,N-1) ] ).
+choose_n_properties(List, N, Min) ->
+    ?LET(I, eqc_gen:choose(1, length(List)), 
+         [lists:nth(I,List) | choose_n_properties(delete_nth_element(I,List), N-1, Min -1)]).
 
 floor(X) when X < 0 ->
     T = trunc(X),
@@ -502,7 +519,6 @@ floor(X) when X < 0 ->
 
 floor(X) ->
     trunc(X).
-
 
 delete_nth_element(N, List) ->
     delete_nth_element(N-1,List, []).
@@ -519,7 +535,9 @@ concat_and_reverse([],Res) ->
 concat_and_reverse([H|T], Res) ->
     concat_and_reverse(T, [H|Res]).
 
-pattern_gen(Pattern) ->
+% <<"i.*">>
+property_name(Pattern) ->
+    ?LOG("Pattern name: ~p~n",[Pattern]),
     RegularExpression = binary_to_list(Pattern),
     InternalRegularExpression = regexp_parse:string(RegularExpression),
     ?LET
@@ -527,30 +545,47 @@ pattern_gen(Pattern) ->
         gen_string_from_regexp:gen(InternalRegularExpression),
         list_to_binary(String)).
 
-
-pattern_gen(_Pat,0) ->
+% {<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}
+pattern_gen(_,0) ->
     [];
-
-
 pattern_gen({Pattern, Schema},N) when N > 0 ->
-    %io:format("{Pattern, schema} = ~p~n", [{Pattern,Schema}]),
-    [{pattern_gen(Pattern), Schema} | pattern_gen({Pattern,Schema}, N-1) ].
+    ?LOG("{Pattern, schema} = ~p~n", [{Pattern,Schema}]),
+    [{property_name(Pattern), Schema} | pattern_gen({Pattern,Schema}, N-1)].
+
+pattern_gen(Pattern_Schema) ->
+    ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
+    ?LET(N,natural(), pattern_gen(Pattern_Schema,N)).
 
 
-create_patterns({struct,PatternPropList}, Rand) ->
-    lists:foldl( fun(Pat, _Res) ->
-                         pattern_gen(Pat,Rand)
-                 end, [], PatternPropList);
+% { "i.*" : { "type" : "integer" }, "s.*" : { "type" : "string" } }
+% 
 
-create_patterns(undefined,_) ->
-[].
+%{struct, [{<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}, {<<"s.*">>, {struct, [{ <<"type">>,<<"string">>}]}}]}
+create_patterns(undefined) ->
+[];
 
+create_patterns(PatternPropList) ->
+    % it will crash here if more than one pattern is given. Fix it!
+    ?LOG("Inside create_patterns, PatternPropList is ~p~n",[PatternPropList]),
+    %L = [pattern_gen(Pat) || Pat <- PatternPropList],
+    [L] = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
+    %[pattern_gen(Pat) || Pat <- PatternPropList],
+    ?LOG("Final patterns created: ~p~n",[L]),
+    L.
+
+
+
+%%% INTEGER OR GEN. OF INTEGER????
+-spec create_additionals ( json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
 
 create_additionals({struct, AddTypes}, AddRand, StrRand) ->
     lists:foldl( fun (Add, _Res) ->
                          additional_gen(Add,AddRand,StrRand)
                  end,[],AddTypes).
 
+
+
+-spec additional_gen (json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
 
 additional_gen(_Schema,0,_) ->
     [];

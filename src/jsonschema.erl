@@ -17,6 +17,25 @@ read_file(Filename) ->
             Result
     end.
 
+hasType(_Schema={struct,Def}) ->
+  case proplists:lookup(<<"type">>,Def) of
+    {_,_Type} ->
+      true;
+    none ->
+      false
+  end;
+hasType(Other) ->
+  io:format("Something other:~p~n",[Other]),
+  throw(bad).
+
+hasEnum(_Schema={struct,Def}) ->
+  case proplists:lookup(<<"enum">>,Def) of
+    {_,_Type} ->
+      true;
+    none ->
+      false
+  end.
+
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
     Type.
@@ -24,6 +43,10 @@ type(_Schema={struct, Def}) ->
 set_type(_Schema={struct, Def},Type) ->
     DefNoType = proplists:delete(<<"type">>,Def),
     {struct, [{<<"type">>,Type} | DefNoType]}.
+
+enumerated(_Schema={struct, Def}) ->
+    {_,Enumerated} = proplists:lookup(<<"enum">>,Def),
+    Enumerated.
 
 items(_Schema={struct, Def}) ->
     {_, Items} = proplists:lookup(<<"items">>,Def),
@@ -36,12 +59,28 @@ properties(_Schema = {struct, Def}) ->
     {_,{struct, Properties}} = proplists:lookup(<<"properties">>,Def),
     Properties.
 
+minProperties(Schema,Def) ->
+    keyword(Schema,"minProperties",Def).
+
+
+maxProperties(Schema,Def) ->
+    keyword(Schema,"maxProperties",Def).
+
 keyword(_Schema = {struct, Def}, KeyWord) ->
     proplists:get_value(list_to_binary(KeyWord),Def).
 
 keyword(_Schema = {struct, Def}, KeyWord, DefaultValue) ->
     proplists:get_value(list_to_binary(KeyWord),Def,DefaultValue).
 
-%% patternProperties(_Schema = {struct, Def}) ->
-%%     {_,{struct, Properties}} = proplists:lookup(<<"patternProperties">>,Def),
-%%     Properties.
+patternProperties({struct,Schema}) ->
+
+    case proplists:lookup(<<"patternProperties">>, Schema) of
+        
+       {_, {struct, Properties}} -> 
+            Properties;
+        
+        none -> 
+            undefined
+    end.
+
+

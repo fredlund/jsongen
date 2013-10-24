@@ -1,0 +1,7 @@
+{
+    "type" : "object",
+    "properties" : {
+        "user_id" : { "type" : "string", "maxLength" : 10 },
+        "age" : {"type" : "integer", "minimum" : 18 }
+    }
+}
