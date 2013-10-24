@@ -40,6 +40,10 @@ ref(Schema) ->
     URL = keyword(Schema,"$ref"),
     URL.
 
+anyOf(Schema) ->
+    Schemas = keyword(Schema,"anyOf"),
+    Schemas.
+
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
     Type.

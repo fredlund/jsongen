@@ -1,0 +1,4 @@
+{
+    "anyOf" : [ {"$ref" : "tests/array_simple.jsch"},
+                {"$ref" : "tests/person2.jsch"} ]
+}

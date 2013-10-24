@@ -60,18 +60,27 @@ json(Schema) ->
 
 json(Schema,Options) ->
   ?LOG("json(~p)~n",[Schema]),
-  %% case jsonschema:ref(Schema) of
-  %%      undefined -> ...                        
-  case jsonschema:hasType(Schema) of
-    true ->
-      gen_typed_schema(Schema,Options);
-    false ->
-      case jsonschema:hasEnum(Schema) of
-	true -> 
-	  eqc_gen:oneof(jsonschema:enumerated(Schema));
-	false ->
-	  throw(bad)
-      end
+  case jsonschema:anyOf(Schema) of
+    undefined ->
+      case jsonschema:ref(Schema) of
+        undefined ->                        
+          case jsonschema:hasType(Schema) of
+            true ->
+              gen_typed_schema(Schema,Options);
+            false ->
+              case jsonschema:hasEnum(Schema) of
+                true -> 
+                  eqc_gen:oneof(jsonschema:enumerated(Schema));
+                false ->
+                  throw(bad)
+              end
+          end;
+        Ref ->
+          {ok, RefSch} = jsonschema:read_file(Ref),
+          ?LAZY(jsongen:json(RefSch))
+      end;
+    Schemas ->
+      eqc_gen:oneof([json(S) || S <- Schemas])
   end.
 
 gen_typed_schema(Schema,Options) ->
