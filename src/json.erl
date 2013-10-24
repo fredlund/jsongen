@@ -4,12 +4,28 @@
 
 -define(JSONLIB, mochijson2).
 
--type json_term() :: mochijson2:json_term().
+-type json_term() ::
+        null % null
+      | true % true
+      | false % false
+      | binary() | atom() % strings
+      | number() % integer or float
+      | {struct, json_dict()} % objects
+      | json_array() % array
+        .
 
--export_type([json_term/0]).
+-type json_array() = list(json_term()).
 
+-type json_dict() = [{binary() | atom(), json_term()}].
+
+-type json_text() :: iolist().
+
+-export_type([json_term/0,json_text/0]).
+
+-spec decode(json_text()) -> json_term().
 decode(JsonString) ->
      ?JSONLIB:decode(JsonString).
 
+-spec decode(json_term()) -> json_text().
 encode(JsonErlang) ->
      ?JSONLIB:encode(JsonErlang).
