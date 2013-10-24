@@ -35,7 +35,7 @@
 
 -export([json/1]).
 
--compile(export_all).
+%%-compile(export_all).
 
 %%-define(debug,true).
 
@@ -54,13 +54,15 @@
 
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
--spec json(json:json_term()) -> eqc_gen:gen(json:json_term()).
-
+-spec json(json:json_term(),[any()]) -> eqc_gen:gen(json:json_term()).
 json(Schema) ->
+  json(Schema,[]).
+
+json(Schema,Options) ->
   ?LOG("json(~p)~n",[Schema]),
   case jsonschema:hasType(Schema) of
     true ->
-      gen_typed_schema(Schema);
+      gen_typed_schema(Schema,Options);
     false ->
       case jsonschema:hasEnum(Schema) of
 	true -> 
@@ -70,7 +72,7 @@ json(Schema) ->
       end
   end.
 
-gen_typed_schema(Schema) ->
+gen_typed_schema(Schema,Options) ->
   case jsonschema:type(Schema) of
     
     %% array
@@ -212,7 +214,7 @@ gen_typed_schema(Schema) ->
 
                       {
                         struct,
-                        [{P,json(S)} || {P,S} <- ReqProps
+                        [{P,json(S,Options)} || {P,S} <- ReqProps
                                             ++ 
                                             Optionals
                         ]
@@ -277,7 +279,7 @@ gen_typed_schema(Schema) ->
               (lists:map
                  (fun (Type) ->
                           ConcreteSchema = jsonschema:set_type(Schema,Type),
-                          json(ConcreteSchema)
+                          json(ConcreteSchema,Options)
                   end,
                   Types))
     end.
@@ -472,7 +474,7 @@ object() ->
 array() ->
     %% TODO: generator for array (no items)
     %% (it could be integrated in array/1)
-  ?LET(Size,nat(),lists:map(fun any/0, lists:duplicate(Size,32))).
+  ?LET(Size,nat(),lists:map(fun (_) -> any() end, lists:duplicate(Size,32))).
 
 isMultiple(N,Mul) when Mul > 0 ->
 	N rem Mul == 0.

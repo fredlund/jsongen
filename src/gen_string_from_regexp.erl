@@ -38,7 +38,7 @@ gen_spec_element({'range',neg,L}) ->
   NegList =
     sets:to_list
       (sets:subtract(sets:from_list(lists:seq(0,127)),
-		     lists:map(fun ({symbol,X}) -> X end))),
+		     sets:from_list(lists:map(fun ({symbol,X}) -> X end, L)))),
   [eqc_gen:oneof(NegList)].
 
 calculate_arity(star) ->
