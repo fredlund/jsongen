@@ -36,6 +36,10 @@ hasEnum(_Schema={struct,Def}) ->
       false
   end.
 
+ref(Schema) ->
+    URL = keyword(Schema,"$ref"),
+    URL.
+
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
     Type.
