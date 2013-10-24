@@ -25,3 +25,22 @@ Dentro schemas tradicionales podemos meter valores literales usando
 enum (ya se puede), pero, ojo, permitimos que se mete JSON schemas dentro
 otra vez usando "schema : true.
 
+- ref
+                  Types));
+        _  ->
+            case jsonschema:keyword(Schema,"$ref") of
+                Value when Value =/= undefined ->
+                    {ok, Nat} = jsonschema:read_file("natural.jsch"),
+                    ?LAZY(jsongen:json(Nat))
+            end
+    end.
+
+
+
+type(_Schema={struct, Def}) ->
+    case proplists:lookup(<<"type">>,Def) of
+        none ->
+            undefined;
+        {_,Type} ->
+            Type
+    end.

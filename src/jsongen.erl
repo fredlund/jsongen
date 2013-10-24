@@ -37,7 +37,7 @@
 
 %%-compile(export_all).
 
-%%-define(debug,true).
+%% -define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -60,6 +60,8 @@ json(Schema) ->
 
 json(Schema,Options) ->
   ?LOG("json(~p)~n",[Schema]),
+  %% case jsonschema:ref(Schema) of
+  %%      undefined -> ...                        
   case jsonschema:hasType(Schema) of
     true ->
       gen_typed_schema(Schema,Options);
@@ -179,8 +181,8 @@ gen_typed_schema(Schema,Options) ->
       _AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties", {}),
 
 
-            ReqProps = [P || P <- Properties, lists:member(P, Required)],
-            OptProps = [P || P <- Properties, not lists:member(P, Required)],
+            ReqProps = [{P,S} || {P,S} <- Properties, lists:member(P, Required)],
+            OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],
 
             %% case AdditionalProperties of 
             %%     false -> 
@@ -196,7 +198,7 @@ gen_typed_schema(Schema,Options) ->
             %%         AddP = AddSchema
             %% end,
 
-	    ?LOG("Required is: ~p~n",[Required]),
+	    ?LOG("Required is: ~p~n",[ReqProps]),
 	    ?LOG("Not Required is: ~p~n",[OptProps]),
             %?LOG("Additional Prop are: ~p~n", [AddP]),
             ?LOG("PatternProperties are: ~p~n",[PatternProperties]),
@@ -206,11 +208,10 @@ gen_typed_schema(Schema,Options) ->
                 false -> Min = MinProperties - length(ReqProps)
             end,
             Max = MaxProperties - length(ReqProps),
-
             
             ?LET({PatternGen,AdditionalGen}, {create_patterns(PatternProperties),[]},
                  ?LET(Optionals, 
-                      choose_properties(OptProps ++ PatternGen ++ AdditionalGen , Min, Max),    
+                      choose_properties(OptProps ++ lists:concat(PatternGen) ++ AdditionalGen , Min, Max),    
 
                       {
                         struct,
@@ -219,7 +220,6 @@ gen_typed_schema(Schema,Options) ->
                                             Optionals
                         ]
                       }));
-         
         
         %% string
         %%     A JSON string.
@@ -554,7 +554,7 @@ create_patterns(PatternPropList) ->
     % it will crash here if more than one pattern is given. Fix it!
     ?LOG("Inside create_patterns, PatternPropList is ~p~n",[PatternPropList]),
     %L = [pattern_gen(Pat) || Pat <- PatternPropList],
-    [L] = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
+    L = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
     %[pattern_gen(Pat) || Pat <- PatternPropList],
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
