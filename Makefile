@@ -18,7 +18,7 @@ ebin:
 	mkdir -p ebin
 
 edoc: 
-	erl -noshell -run edoc_run files '["src/jsongen.erl"]' '[{sort_functions,false},{dir,"doc"}]'
+	erl -noshell -run edoc_run files '["src/jsongen.erl", "src/json_validate.erl"]' '[{sort_functions,false},{dir,"doc"}]'
 
 dialyzer:
 	dialyzer ebin/*beam

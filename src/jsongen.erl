@@ -54,7 +54,7 @@
 
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
--spec json(json:json_term(),[any()]) -> eqc_gen:gen(json:json_term()).
+-spec json(json:json_term()) -> eqc_gen:gen(json:json_term()).
 json(Schema) ->
   json(Schema,[]).
 
