@@ -57,140 +57,124 @@
 -spec json(json:json_term()) -> eqc_gen:gen(json:json_term()).
 
 json(Schema) ->
-    ?LOG("json(~p)~n",[Schema]),
-    case jsonschema:hasType(Schema) of
-      true ->
-	gen_typed_schema(Schema);
-      false ->
-	case jsonschema:hasEnum(Schema) of
-	  true -> 
-	    eqc_gen:oneof(jsonschema:enumerated(Schema));
-	  false ->
-	    throw(bad)
-	end
-    end.
+  ?LOG("json(~p)~n",[Schema]),
+  case jsonschema:hasType(Schema) of
+    true ->
+      gen_typed_schema(Schema);
+    false ->
+      case jsonschema:hasEnum(Schema) of
+	true -> 
+	  eqc_gen:oneof(jsonschema:enumerated(Schema));
+	false ->
+	  throw(bad)
+      end
+  end.
 
 gen_typed_schema(Schema) ->
-    case jsonschema:type(Schema) of
-        
-        %% array
-        %%     A JSON array. 
-        <<"array">> ->
-	    MaxItems = jsonschema:keyword(Schema,"maxItems"),
-	    MinItems = jsonschema:keyword(Schema,"minItems",0),
-	    _UniqueItems = 0,
-            case jsonschema:items(Schema) of
-                {itemSchema, ItemSchema} ->
-                    array(ItemSchema, {MinItems,MaxItems});
-                {itemsTemplate, ItemsTemplate} ->
-                    template(ItemsTemplate)
-            end;
-
-
-        %% boolean
-        %%     A JSON boolean. 
-        <<"boolean">> ->
-            boolean();
-
-
-        %% integer
-        %%     A JSON number without a fraction or exponent part. 
-        <<"integer">> ->
-            
-	    MaxScanned = jsonschema:keyword(Schema,"maximum"),
-	    ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum",false),
-	    MinScanned = jsonschema:keyword(Schema,"minimum"),
-	    ExcMinScanned = jsonschema:keyword(Schema,"exclusiveMinimum",false),
-	    Multiple = jsonschema:keyword(Schema,"multipleOf",1),
-	    
-            % Setting up keywords
-	    case MaxScanned of
-		undefined -> Max = undefined;
-		
-		_ ->
-		    case ExcMaxScanned of
-			true ->
-			    Max = MaxScanned -1;
-			false ->
-			    Max = MaxScanned
-		    end
-	    end,	    
-            
-            
-	    case MinScanned of
-		undefined -> Min = undefined;
-		
-		_ ->
-		    case ExcMinScanned of
-			true ->
-			    Min = MinScanned +1;
-			false ->
-			    Min = MinScanned
-		    end
-	    end,
-            
-            
-	    Gen = case {Min, Max} of
-                      {undefined, undefined} ->
-                          multiple_of(Multiple);
-                      
-                      {Min, undefined} ->
-                          multiple_of_min(Multiple, Min);
-                      
-                      {undefined, Max} ->
-                          multiple_of_max(Multiple, Max);
-                      
-                      {Min, Max} ->
-                          multiple_of_min_max(Multiple, Min,Max)
-		  end,
-            Gen;
-        
-
-        
-        %% Number
-        %%     Any JSON number. Number includes integer.
-        <<"number">> ->
-	    Max = jsonschema:keyword(Schema,"maximum"),
-	    ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum",false),
-	    Min = jsonschema:keyword(Schema,"minimum"),
-	    ExcMin = jsonschema:keyword(Schema,"exclusiveMinimum",false),
-	    Mul = jsonschema:keyword(Schema,"multipleOf",1),
-            
-            
-	    case {Min, Max} of
-                
-		{undefined, undefined} ->
-		    number();
-		
-		{Min, undefined} ->
-		    number_mul_min(Mul,Min,ExcMin);
-                
-		{undefined, Max} ->
-		    number_mul_max(Mul,Max, ExcMax);
-		
-		{Min,Max} ->
-                    ?LOG("number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax}):  number_mul_min_max(~p,~p,~p,{~p,~p})",[Mul,Min,Max,ExcMin,ExcMax]),
-		    number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax})
-	    end;
-        
-
-        
-        %% null
-        %%     The JSON null value. 
-        <<"null">> ->
-            null();
-        
-        
-        %% object
-        %%     A JSON object.
-        <<"object">> ->
-            Properties = jsonschema:properties(Schema),
-	    MinProperties = jsonschema:minProperties(Schema, 0),
-            MaxProperties = jsonschema:maxProperties(Schema, ?MAX_PROPERTIES),
-	    Required = jsonschema:keyword(Schema, "required",[]),
-            PatternProperties = jsonschema:patternProperties(Schema),
-
-            _AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties", {}),
+  case jsonschema:type(Schema) of
+    
+    %% array
+    %%     A JSON array. 
+    <<"array">> ->
+      MaxItems = jsonschema:keyword(Schema,"maxItems"),
+      MinItems = jsonschema:keyword(Schema,"minItems",0),
+      _UniqueItems = 0,
+      case jsonschema:items(Schema) of
+	{itemSchema, ItemSchema} ->
+	  array(ItemSchema, {MinItems,MaxItems});
+	{itemsTemplate, ItemsTemplate} ->
+	  template(ItemsTemplate)
+      end;
+    
+    
+    %% boolean
+    %%     A JSON boolean. 
+    <<"boolean">> ->
+      boolean();
+    
+    
+    %% integer
+    %%     A JSON number without a fraction or exponent part. 
+    <<"integer">> ->
+      
+      MaxScanned = jsonschema:keyword(Schema,"maximum"),
+      ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum",false),
+      MinScanned = jsonschema:keyword(Schema,"minimum"),
+      ExcMinScanned = jsonschema:keyword(Schema,"exclusiveMinimum",false),
+      Multiple = jsonschema:keyword(Schema,"multipleOf",1),
+      
+						% Setting up keywords
+      case MaxScanned of
+	undefined ->
+	  Max = undefined;
+	_ ->
+	  case ExcMaxScanned of
+	    true -> Max = MaxScanned -1;
+	    false -> Max = MaxScanned
+	  end
+      end,	    
+      
+      case MinScanned of
+	undefined ->
+	  Min = undefined;
+	_ ->
+	  case ExcMinScanned of
+	    true -> Min = MinScanned +1;
+	    false -> Min = MinScanned
+	  end
+      end,
+      
+      case {Min, Max} of
+	{undefined, undefined} -> multiple_of(Multiple);
+	{Min, undefined} -> multiple_of_min(Multiple, Min);
+	{undefined, Max} -> multiple_of_max(Multiple, Max);
+	{Min, Max} -> multiple_of_min_max(Multiple, Min,Max)
+      end;
+    
+    %% Number
+    %%     Any JSON number. Number includes integer.
+    <<"number">> ->
+      Max = jsonschema:keyword(Schema,"maximum"),
+      ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum",false),
+      Min = jsonschema:keyword(Schema,"minimum"),
+      ExcMin = jsonschema:keyword(Schema,"exclusiveMinimum",false),
+      Mul = jsonschema:keyword(Schema,"multipleOf",1),
+      
+      
+      case {Min, Max} of
+	
+	{undefined, undefined} ->
+	  number();
+	
+	{Min, undefined} ->
+	  number_mul_min(Mul,Min,ExcMin);
+	
+	{undefined, Max} ->
+	  number_mul_max(Mul,Max, ExcMax);
+	
+	{Min,Max} ->
+	  ?LOG("number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax}):  number_mul_min_max(~p,~p,~p,{~p,~p})",[Mul,Min,Max,ExcMin,ExcMax]),
+	  number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax})
+      end;
+    
+    
+    
+    %% null
+    %%     The JSON null value. 
+    <<"null">> ->
+      null();
+    
+    
+    %% object
+    %%     A JSON object.
+    <<"object">> ->
+      Properties = jsonschema:properties(Schema),
+      MinProperties = jsonschema:minProperties(Schema, 0),
+      MaxProperties = jsonschema:maxProperties(Schema, ?MAX_PROPERTIES),
+      Required = jsonschema:keyword(Schema, "required",[]),
+      PatternProperties = jsonschema:patternProperties(Schema),
+      
+      _AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties", {}),
 
 
             ReqProps = [P || P <- Properties, lists:member(P, Required)],
@@ -483,12 +467,12 @@ any() ->
 object() ->
     %% TODO: generator for object
     %% (could it be integrated in... json/1?)
-    null().
+  json({struct,[{<<"type">>,<<"object">>}]}).
 
 array() ->
     %% TODO: generator for array (no items)
     %% (it could be integrated in array/1)
-    null().
+  ?LET(Size,nat(),lists:map(fun any/0, lists:duplicate(Size,32))).
 
 isMultiple(N,Mul) when Mul > 0 ->
 	N rem Mul == 0.
