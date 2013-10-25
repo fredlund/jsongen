@@ -25,22 +25,17 @@ Dentro schemas tradicionales podemos meter valores literales usando
 enum (ya se puede), pero, ojo, permitimos que se mete JSON schemas dentro
 otra vez usando "schema : true.
 
-- ref
-                  Types));
-        _  ->
-            case jsonschema:keyword(Schema,"$ref") of
-                Value when Value =/= undefined ->
-                    {ok, Nat} = jsonschema:read_file("natural.jsch"),
-                    ?LAZY(jsongen:json(Nat))
-            end
-    end.
+- Uniqueness of names in JSON objects
 
+   http://stackoverflow.com/questions/7202477/are-double-definitions-allowed-in-json-and-if-so-how-should-they-be-interprete
 
+   Is this valid JSON? { "name": "foo", "name": "bar" }
 
-type(_Schema={struct, Def}) ->
-    case proplists:lookup(<<"type">>,Def) of
-        none ->
-            undefined;
-        {_,Type} ->
-            Type
-    end.
+   It's technically legal, but strongly discouraged, according to the
+   RFC (tools.ietf.org/html/rfc4627#section-2.2): "The names within an
+   object SHOULD [RECOMMENDED] be unique".
+
+   Two routes:
+     Javascript: illegal (and JSON is is supposed to be a subset!)
+     Python: overwrite the "bar" entry with the latest value
+
