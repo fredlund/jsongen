@@ -1,0 +1,28 @@
+{
+    "description": "Hungarian notation examples",
+    "type":"object",
+    "maxProperties" : 10,
+    "properties" :
+	{
+	},
+
+
+    "patternProperties" :
+	{
+		"^l[a-z]" : {
+			"type" : "number"
+		},
+
+		"^b[a-z]" : {
+			"type" : "boolean"
+		},
+
+		"^ch[a-z]" : {
+			"type" : "string"
+		}
+	}
+
+	
+}
+
+
