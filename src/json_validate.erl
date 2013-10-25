@@ -55,6 +55,7 @@ validate(Data,Schema) ->
 	      end;
 	    _ -> false
 	  end;
+
 	<<"integer">> ->
 	  case is_integer(Data) of
 	    false ->
@@ -80,6 +81,20 @@ validate(Data,Schema) ->
 		  true
 	      end
 	  end;
+
+	<<"string">> ->
+	  try binary_to_list(Data) of
+	      String ->
+	      MaxLength = jsonschema:keyword(Schema,"maxLength"),
+	      MinLength = jsonschema:keyword(Schema,"minLength"),
+	      Pattern = jsonschema:keyword(Schema,"pattern"),
+	      Length = length(String),
+	      if
+		MaxLength=/=undefined, Length>MaxLength -> false;
+		MinLength=/=undefined, Length<MinLength -> false;
+		true -> maybe
+	      end
+	  catch _:_ -> false end;
 	_ -> maybe
       end;
     false -> maybe
