@@ -23,19 +23,27 @@ schemas_test_() ->
   ?debugFmt("Test directory is~n~p~n",[TestDir]),
   Filenames = filelib:wildcard(TestDir++"/*.jsch"),
   ?debugFmt("Will test schemas~n~p~n",[Filenames]),
-  lists:map
-    (fun (SchemaFile) ->
-	 case jsonschema:read_file(SchemaFile) of
+  lists:foldl
+    (fun (SchemaFile,Acc) ->
+	 try jsonschema:read_file(SchemaFile) of
 	   {ok,Schema} ->
 	     Basename = filename:rootname(filename:basename(SchemaFile)),
-	     {"schema \""++Basename++"\"",test_schema(Schema)};
+	     [{"schema \""++Basename++"\"",test_schema(Schema)}|Acc];
 	   Other ->
 	     ?debugFmt
 		("Reading schema~n  ~s~nfailed with error ~p~n",
 		 [SchemaFile,Other]),
-	     throw(error)
+	     Acc
+	 catch _:_ ->
+	     ?debugFmt
+	       ("*** Error: could not read JSON schema ~s~n",
+		[SchemaFile]),
+	     ?debugFmt
+	       ("Stacktrace:~n~p~n",
+		[erlang:get_stacktrace()]),
+	     Acc
 	 end
-     end, Filenames).
+     end, [], Filenames).
 
 test_schema_file([Filename]) ->
   {ok,Schema} = jsonschema:read_file(Filename),
