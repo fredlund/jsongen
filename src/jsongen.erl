@@ -35,9 +35,9 @@
 
 -export([json/1]).
 
-%%-compile(export_all).
+-compile(export_all).
 
-%%-define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
