@@ -37,7 +37,7 @@
 
 %%-compile(export_all).
 
-%% -define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -207,6 +207,7 @@ gen_typed_schema(Schema,Options) ->
             %%         AddP = AddSchema
             %% end,
 
+            ?LOG("Max Properties: ~p~n",[MaxProperties]),
 	    ?LOG("Required is: ~p~n",[ReqProps]),
 	    ?LOG("Not Required is: ~p~n",[OptProps]),
             %?LOG("Additional Prop are: ~p~n", [AddP]),
@@ -250,8 +251,8 @@ gen_typed_schema(Schema,Options) ->
                 true -> ok
 	    end,
             
-            if 
-                (MinLength=/=undefined) orelse (MaxLength=/=undefined) ->
+
+           if (Pattern == undefined) ->
                     case MinLength of 
                         undefined -> 
                             Min = 0;
@@ -274,6 +275,32 @@ gen_typed_schema(Schema,Options) ->
                     ?LOG("Pattern is: ~p~n",[Pattern]),
                     property_name(Pattern)
             end;
+
+      %% VVV This code wasn't working if there is no keywords for a string type schema VVV
+            %% if 
+            %%     (MinLength=/=undefined) orelse (MaxLength=/=undefined) ->
+            %%         case MinLength of 
+            %%             undefined -> 
+            %%                 Min = 0;
+            %%             _ -> 
+            %%                 Min = MinLength
+            %%         end,
+                    
+            %%         case MaxLength of
+            %%             undefined ->
+            %%                 Max = ?MAX_STR_LENGTH; 
+            %%             _ ->  
+            %%                 Max = MaxLength
+            %%         end,			
+                    
+            %%         ?LET(Rand,randInt(Min,Max), 
+            %%              ?LET(S, stringGen(Rand), list_to_binary(S)));
+   
+                
+            %%     true ->
+            %%         ?LOG("Pattern is: ~p~n",[Pattern]),
+            %%         property_name(Pattern)
+            %% end;
         
         %% any
         %%     Any JSON data, including "null".
@@ -495,15 +522,20 @@ isMultipleFloat(F,Mul) when Mul > 0 ->
 % -spec choose_properties([string()],natural(),natural()) -> eqc_gen:gen([string()]).
 choose_properties(P, Min, Max) when Max >= Min -> 
     ?LOG("Choosing properties: ~p~n",[P]),
+    ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
     ?LET(N, eqc_gen:choose (Min,Max), choose_n_properties(P,N,Min)).
+    
 
 choose_n_properties(_List,0,_Min) ->
     [];
 choose_n_properties([],_,Min) when Min =< 0 ->
     [];
 choose_n_properties(List, N, Min) ->
+    ?LOG("N is  ~p ~n",[N]),
     ?LET(I, eqc_gen:choose(1, length(List)), 
          [lists:nth(I,List) | choose_n_properties(delete_nth_element(I,List), N-1, Min -1)]).
+    %% ?LOG("Chosen prop. are ~p~n",[P]),
+    %% P.
 
 floor(X) when X < 0 ->
     T = trunc(X),
