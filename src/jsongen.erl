@@ -37,7 +37,7 @@
 
 %%-compile(export_all).
 
--define(debug,true).
+%%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -533,9 +533,7 @@ choose_n_properties([],_,Min) when Min =< 0 ->
 choose_n_properties(List, N, Min) ->
     ?LOG("N is  ~p ~n",[N]),
     ?LET(I, eqc_gen:choose(1, length(List)), 
-         [lists:nth(I,List) | choose_n_properties(delete_nth_element(I,List), N-1, Min -1)]).
-    %% ?LOG("Chosen prop. are ~p~n",[P]),
-    %% P.
+    [lists:nth(I,List) | choose_n_properties(delete_nth_element(I,List), N-1, Min -1)]).
 
 floor(X) when X < 0 ->
     T = trunc(X),
@@ -548,6 +546,7 @@ floor(X) ->
     trunc(X).
 
 delete_nth_element(N, List) ->
+    ?LOG("Removing ~p element from list -> ~p~n",[N,List]),
     delete_nth_element(N-1,List, []).
 
 delete_nth_element(0, [_nthEl|T], Res) ->
@@ -592,11 +591,8 @@ create_patterns(undefined) ->
 [];
 
 create_patterns(PatternPropList) ->
-    % it will crash here if more than one pattern is given. Fix it!
     ?LOG("Inside create_patterns, PatternPropList is ~p~n",[PatternPropList]),
-    %L = [pattern_gen(Pat) || Pat <- PatternPropList],
     L = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
-    %[pattern_gen(Pat) || Pat <- PatternPropList],
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
 

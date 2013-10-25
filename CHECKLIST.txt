@@ -10,8 +10,7 @@
 
 	+ Boolean generator: Fully implemented
 
-	+ Object generator: 	+ It crash when several patterns are given in the schema
-				+ Additional properties not implemented (We need a generator of random schemas)
+	+ Object generator: Additional properties not implemented (We need a generator of random schemas)
 
 	+ Array: 'additionalItems' and 'uniqueItems' not implemented yet
 
