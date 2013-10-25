@@ -27,7 +27,7 @@ otra vez usando "schema : true.
 
 - Uniqueness of names in JSON objects
 
-   http://stackoverflow.com/questions/7202477/are-double-definitions-allowed-in-json-and-if-so-how-should-they-be-interprete
+   We need a flag for capturing both semantics:
 
    Is this valid JSON? { "name": "foo", "name": "bar" }
 
@@ -38,4 +38,7 @@ otra vez usando "schema : true.
    Two routes:
      Javascript: illegal (and JSON is is supposed to be a subset!)
      Python: overwrite the "bar" entry with the latest value
+
+   Excerpt from: http://stackoverflow.com/questions/7202477/are-double-definitions-allowed-in-json-and-if-so-how-should-they-be-interprete
+
 
