@@ -74,6 +74,9 @@ minProperties(Schema,Def) ->
 maxProperties(Schema,Def) ->
     keyword(Schema,"maxProperties",Def).
 
+maxProperties(Schema) ->
+    keyword(Schema,"maxProperties").
+
 keyword(_Schema = {struct, Def}, KeyWord) ->
     proplists:get_value(list_to_binary(KeyWord),Def).
 

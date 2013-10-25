@@ -37,7 +37,7 @@
 
 %%-compile(export_all).
 
--define(debug,true).
+%%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -183,12 +183,25 @@ gen_typed_schema(Schema,Options) ->
     <<"object">> ->
       Properties = jsonschema:properties(Schema),
       MinProperties = jsonschema:minProperties(Schema, 0),
-      MaxProperties = jsonschema:maxProperties(Schema, ?MAX_PROPERTIES),
       Required = jsonschema:keyword(Schema, "required",[]),
       PatternProperties = jsonschema:patternProperties(Schema),
-      
-      _AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties", {}),
-
+      AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties"),
+      RawMaxProperties = jsonschema:maxProperties(Schema),
+      MaxProperties =
+	if
+	  RawMaxProperties==undefined,
+	  PatternProperties==undefined,
+	  AdditionalProperties==false ->
+	    %% The following if is wrong in that it does not handle
+	    %% the case when there are required properties which are not
+	    %% in properties.
+	    if
+	      Properties==[] -> 0;
+	      true -> length(Properties)
+	    end;
+	  true ->
+	    ?MAX_PROPERTIES
+	end,
 
             ReqProps = [{P,S} || {P,S} <- Properties, lists:member(P, Required)],
             OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],
@@ -213,15 +226,12 @@ gen_typed_schema(Schema,Options) ->
             %?LOG("Additional Prop are: ~p~n", [AddP]),
             ?LOG("PatternProperties are: ~p~n",[PatternProperties]),
 
-            case length(ReqProps) > MinProperties of
-                true -> Min = 0;
-                false -> Min = MinProperties - length(ReqProps)
-            end,
-            Max = MaxProperties - length(ReqProps),
+            MinOpts = MinProperties - length(ReqProps),
+            MaxOpts = MaxProperties - length(ReqProps),
             
             ?LET({PatternGen,AdditionalGen}, {create_patterns(PatternProperties),[]},
                  ?LET(Optionals, 
-                      choose_properties(OptProps ++ lists:concat(PatternGen) ++ AdditionalGen , Min, Max),    
+                      choose_properties(OptProps ++ lists:concat(PatternGen) ++ AdditionalGen , MinOpts, MaxOpts),    
 
                       {
                         struct,
@@ -523,17 +533,16 @@ isMultipleFloat(F,Mul) when Mul > 0 ->
 choose_properties(P, Min, Max) when Max >= Min -> 
     ?LOG("Choosing properties: ~p~n",[P]),
     ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
-    ?LET(N, eqc_gen:choose (Min,Max), choose_n_properties(P,N,Min)).
+    ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_properties(P,N)).
     
-
-choose_n_properties(_List,0,_Min) ->
+choose_n_properties([],_) ->
     [];
-choose_n_properties([],_,Min) when Min =< 0 ->
+choose_n_properties(_List,0) ->
     [];
-choose_n_properties(List, N, Min) ->
+choose_n_properties(List, N) ->
     ?LOG("N is  ~p ~n",[N]),
     ?LET(I, eqc_gen:choose(1, length(List)), 
-         [lists:nth(I,List) | choose_n_properties(delete_nth_element(I,List), N-1, Min -1)]).
+         [lists:nth(I,List) | choose_n_properties(delete_nth_element(I,List), N-1)]).
     %% ?LOG("Chosen prop. are ~p~n",[P]),
     %% P.
 
@@ -620,3 +629,5 @@ additional_gen(_Schema,0,_) ->
 additional_gen(Schema,N, Length) when N > 0 ->
 
          [ { stringGen(Length) , {struct,[Schema]}}  | additional_gen(Schema,N-1,Length)].
+
+
