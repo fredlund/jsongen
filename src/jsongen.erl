@@ -37,7 +37,7 @@
 
 -compile(export_all).
 
--define(debug,true).
+%%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -229,17 +229,30 @@ gen_typed_schema(Schema,Options) ->
             MinOpts = MinProperties - length(ReqProps),
             MaxOpts = MaxProperties - length(ReqProps),
             
-            ?LET({PatternGen,AdditionalGen}, {create_patterns(PatternProperties),[]},
+            ?LET({PatternGen,AdditionalGen},
+		 {create_patterns(PatternProperties),[]},
                  ?LET(Optionals, 
-                      choose_properties(OptProps ++ lists:concat(PatternGen) ++ AdditionalGen , MinOpts, MaxOpts),    
-
-                      {
-                        struct,
-                        [{P,json(S,Options)} || {P,S} <- ReqProps
-                                            ++ 
-                                            Optionals
-                        ]
-                      }));
+                      choose_properties
+			(OptProps
+			 ++ lists:concat(PatternGen)
+			 ++ AdditionalGen,
+			 MinOpts, MaxOpts),    
+		      begin
+			RawProperties = 
+			  [{P,json(S,Options)} ||
+			    {P,S} <- ReqProps
+			      ++ 
+			      Optionals
+			  ],
+			case proplists:get_value(randomize_properties,Options,true) of
+			  true ->
+			    ?LET(Props,
+				 randomize_list(RawProperties),
+				 {struct, Props});
+			  false ->
+			    {struct,RawProperties}
+			end
+		      end));
         
         %% string
         %%     A JSON string.
@@ -535,14 +548,19 @@ choose_properties(P, Min, Max) when Max >= Min ->
     ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
     ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_properties(P,N)).
     
-choose_n_properties([],_) ->
-    [];
-choose_n_properties(_List,0) ->
-    [];
-choose_n_properties(List, N) ->
-    ?LOG("N is  ~p ~n",[N]),
-    ?LET(I, eqc_gen:choose(1, length(List)), 
-    [lists:nth(I,List) | choose_n_properties(delete_nth_element(I,List), N-1)]).
+
+choose_n_properties(L,N) ->
+  randomize_list(L,N,length(L)).
+
+randomize_list(L) ->
+  Length = length(L),
+  randomize_list(L,Length,Length).
+randomize_list([],_,_Length) -> [];
+randomize_list(_List,0,_Length) -> [];
+randomize_list(List, N, Length) ->
+    ?LET(I, eqc_gen:choose(1, Length), 
+    [lists:nth(I,List) |
+     randomize_list(delete_nth_element(I,List), N-1, Length-1)]).
 
 floor(X) when X < 0 ->
     T = trunc(X),
