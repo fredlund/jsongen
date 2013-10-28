@@ -298,32 +298,6 @@ gen_typed_schema(Schema,Options) ->
                     ?LOG("Pattern is: ~p~n",[Pattern]),
                     property_name(Pattern)
             end;
-
-      %% VVV This code wasn't working if there is no keywords for a string type schema VVV
-            %% if 
-            %%     (MinLength=/=undefined) orelse (MaxLength=/=undefined) ->
-            %%         case MinLength of 
-            %%             undefined -> 
-            %%                 Min = 0;
-            %%             _ -> 
-            %%                 Min = MinLength
-            %%         end,
-                    
-            %%         case MaxLength of
-            %%             undefined ->
-            %%                 Max = ?MAX_STR_LENGTH; 
-            %%             _ ->  
-            %%                 Max = MaxLength
-            %%         end,			
-                    
-            %%         ?LET(Rand,randInt(Min,Max), 
-            %%              ?LET(S, stringGen(Rand), list_to_binary(S)));
-   
-                
-            %%     true ->
-            %%         ?LOG("Pattern is: ~p~n",[Pattern]),
-            %%         property_name(Pattern)
-            %% end;
         
         %% any
         %%     Any JSON data, including "null".
@@ -456,22 +430,35 @@ number_mul_max(Mul,Max,MaxExc) ->
 
 -spec number_mul_min_max(integer() | float(), integer() | float(), integer() | float(), tuple(boolean(), boolean())) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
-    MinMul = (1 + floor((Min-1) / Mul)),
+    ?LOG("Min/Mul is ~p~n",[(Min/Mul)]),
+    MinMul = case (Min/Mul) == trunc(Min/Mul) of
+        % if you add 1 unit, Minimum value will never be generated but its inside the valid range
+                 true -> 
+                     ?LOG("TRUE~n",[]),
+                     trunc(Min/Mul); 
+                 false -> 
+                     ?LOG("FALSE~n",[]),
+                     1 + floor(Min/Mul)
+             end,
     MaxMul = floor(Max/  Mul),
 
+    ?LOG ("MinMul is ~p~n",[MinMul]),
     case {MinExc,MaxExc} of
 
         {true,true} ->
-            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
-                      ((N * Mul)/= Min) and ((N * Mul) /= Max));
+            ?SUCHTHAT(N, 
+                      ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul*N),
+                      (N =/= Min) and (N =/= Max));
         
         {true,false} ->
-            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
-                      (N * Mul) /= Min);
+            ?SUCHTHAT(N, 
+                      ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul*N),
+                      (N =/= Min));
         
         {false,true} ->
-            ?SUCHTHAT(N, eqc_gen:choose(MinMul,MaxMul), 
-                      (N * Mul) /= Max);
+            ?SUCHTHAT(N, 
+                      ?LET(N, eqc_gen:choose(MinMul,MaxMul), Mul*N),
+                      (N =/= Max));
         
         {false,false} ->
             ?LET(N, eqc_gen:choose(MinMul,MaxMul), 

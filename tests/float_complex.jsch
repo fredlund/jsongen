@@ -2,6 +2,6 @@
   	      	"maximum" : 2.75,
   	      	"minimum" : -30,
 	      	"exclusiveMaximum" : true,
-	      	"exclusiveMinimum" : true,
+	      	"exclusiveMinimum" : false,
 	  	"multipleOf" : 0.25
 }

@@ -2,13 +2,13 @@
 
 	+ String generator: Implemented, but 'pattern' keyword doesn't work with 'minLength' and 'maxLength'
 
-	+ Integer generator: Fully implemented
+	+ Integer generator: Fully implemented.
 
-	+ Number generator: There are some bugs with negative numbers.
+	+ Number generator: Fully implemented.
 
-	+ Null generator: Fully implemented
+	+ Null generator: Fully implemented.
 
-	+ Boolean generator: Fully implemented
+	+ Boolean generator: Fully implemented.
 
 	+ Object generator: Additional properties not implemented (We need a generator of random schemas)
 
