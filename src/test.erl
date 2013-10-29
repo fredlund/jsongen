@@ -7,6 +7,7 @@
 
 write_instance_of(File) ->
     {ok, Schema} = jsonschema:read_file(File),
+    io:format("RUNNING 1 INSTANCE...~n"),
     JsonGenerator = jsongen:json(Schema),
     JsonInstance = eqc_gen:pick(JsonGenerator),
     JsonString = json:encode(JsonInstance),
