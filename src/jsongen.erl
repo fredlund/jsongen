@@ -28,8 +28,8 @@
 %% an Erlang QuickCheck generator.
 %% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
 %% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
-%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil 
-%%
+%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
+
 
 -module(jsongen).
 
@@ -116,7 +116,7 @@ gen_typed_schema(Schema,Options) ->
       ExcMinScanned = jsonschema:keyword(Schema,"exclusiveMinimum",false),
       Multiple = jsonschema:keyword(Schema,"multipleOf",1),
       
-						% Setting up keywords
+      % Setting up keywords
       case MaxScanned of
 	undefined ->
 	  Max = undefined;
@@ -166,7 +166,6 @@ gen_typed_schema(Schema,Options) ->
 	  number_mul_max(Mul,Max, ExcMax);
 	
 	{Min,Max} ->
-	  ?LOG("number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax}):  number_mul_min_max(~p,~p,~p,{~p,~p})",[Mul,Min,Max,ExcMin,ExcMax]),
 	  number_mul_min_max(Mul,Min,Max,{ExcMin,ExcMax})
       end;
     
@@ -206,6 +205,7 @@ gen_typed_schema(Schema,Options) ->
             ReqProps = [{P,S} || {P,S} <- Properties, lists:member(P, Required)],
             OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],
 
+            %% THIS WILL BE ADDED LATER
             %% case AdditionalProperties of 
             %%     false -> 
             %%         AddP = [];
@@ -237,11 +237,9 @@ gen_typed_schema(Schema,Options) ->
                                                         MinOpts - length(OptPropsGen)),
                             ?LET(PatternPropsGen, choose_properties(lists:concat(PatternGen), 
                                                         MinOpts - length(OptPropsGen), MaxOpts), 
-
-                                 %OptPropsGen ++ PatternPropsGen
-                                       
                                  begin
-                                    ?LOG("*** FINAL PROPERTIES: ~p***~n",[length(OptPropsGen ++ PatternPropsGen ++ ReqProps)]),
+                                    ?LOG("*** FINAL PROPERTIES: ~p***~n",
+                                         [length(OptPropsGen ++ PatternPropsGen ++ ReqProps)]),
                                 RawProperties = 
                                     [{P,json(S,Options)} ||
                                         {P,S} <- ReqProps
@@ -259,29 +257,8 @@ gen_typed_schema(Schema,Options) ->
                             end)));        
 
 
-                  %% ?LET(PatternGen,
-                  %%      create_patterns(PatternProperties),
-                  %%      ?LET(Optionals, 
-                  %%           choose_properties
-                  %%             (OptProps
-                  %%              ++ lists:concat(PatternGen),
-                  %%              MinOpts, MaxOpts),    
-                  %%           begin
-                  %%               RawProperties = 
-                  %%                   [{P,json(S,Options)} ||
-                  %%                       {P,S} <- ReqProps
-                  %%                           ++ 
-                  %%                           Optionals
-                  %%                   ],
-                  %%               case proplists:get_value(randomize_properties,Options,true) of
-                  %%                   true ->
-                  %%                       ?LET(Props,
-                  %%                            randomize_list(RawProperties),
-                  %%                            {struct, Props});
-                  %%                   false ->
-                  %%                       {struct,RawProperties}
-                  %%               end
-                  %%           end));
+
+              %% THIS IMPLEMENTATION HAS TO BE UPDATED
               _ ->
             ?LET({PatternGen,AdditionalGen},
 		 {create_patterns(PatternProperties),[]},
@@ -705,11 +682,13 @@ additional_gen(Schema,N, Length) when N > 0 ->
          [ { stringGen(Length) , {struct,[Schema]}}  | additional_gen(Schema,N-1,Length)].
 
 ceiling(X) ->
-    T = erlang:trunc(X),
+    T = trunc(X),
     case (X - T) of
-        Neg when Neg < 0 -> T;
-        Pos when Pos > 0 -> T + 1;
+
+        Negative when Negative < 0 -> T;
+        Positive when Positive > 0 -> T + 1;
         _ -> T
+
     end.
 
 
