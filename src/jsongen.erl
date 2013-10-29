@@ -600,7 +600,6 @@ randomize_list(L) ->
 randomize_list([],_,_Length) -> [];
 randomize_list(_List,0,_Length) -> [];
 randomize_list(List, N, Length) ->
-    io:format("."),
     ?LET(I, eqc_gen:choose(1, Length), 
     [lists:nth(I,List) |
      randomize_list(delete_nth_element(I,List), N-1, Length-1)]).
@@ -636,7 +635,6 @@ concat_and_reverse([H|T], Res) ->
 % <<"i.*">>
 property_name(Pattern) ->
     ?LOG("Pattern name: ~p~n",[Pattern]),
-    io:format("."),
     RegularExpression = binary_to_list(Pattern),
     InternalRegularExpression = regexp_parse:string(RegularExpression),
     ?LET
@@ -653,7 +651,7 @@ pattern_gen({Pattern, Schema},N) when N > 0 ->
 
 pattern_gen(Pattern_Schema) ->
     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
-  io:format("~n** THIS MAY TAKE A WHILE **~n"),
+    io:format("~n** THIS MAY TAKE A WHILE **~n"),
     io:format("~nLOADING..."),
     ?LET(N,natural(), pattern_gen(Pattern_Schema,N)).
 

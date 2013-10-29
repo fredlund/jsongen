@@ -11,14 +11,14 @@ write_instance_of(File) ->
     JsonGenerator = jsongen:json(Schema),
     JsonInstance = eqc_gen:pick(JsonGenerator),
     JsonString = json:encode(JsonInstance),
-    io:format("~s~n", [JsonString]),
+    io:format("~n~n~s~n", [JsonString]),
     halt().
 
 
 gen_instance(Generator,N) when N > 0 ->
     JsonInstance = eqc_gen:pick(Generator),
     JsonString = json:encode(JsonInstance),
-    io:format("~s~n", [JsonString]),
+    io:format("~n~n~s~n", [JsonString]),
     gen_instance(Generator,N-1);
 
 gen_instance(_,0) ->
