@@ -37,6 +37,7 @@
 
 -compile(export_all).
 
+%%LOGS
 %%-define(debug,true).
 
 -ifdef(debug).
@@ -206,24 +207,24 @@ gen_typed_schema(Schema,Options) ->
             OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],
 
             %% THIS WILL BE ADDED LATER
-            %% case AdditionalProperties of 
-            %%     false -> 
-            %%         AddP = [];
+             case AdditionalProperties of 
+                 false -> 
+                     AddP = [];
 
-            %%     true -> 
-            %%         AddP = {};
+                 true -> 
+                     AddP = {};
 
-            %%     {} ->
-            %%         AddP = {};
+                 {} ->
+                     AddP = {};
 
-            %%   AddSchema ->
-            %%         AddP = AddSchema
-            %% end,
+               AddSchema ->
+                     AddP = AddSchema
+             end,
 
             ?LOG("Max Properties: ~p~n",[MaxProperties]),
 	    ?LOG("Required is: ~p~n",[ReqProps]),
 	    ?LOG("Not Required is: ~p~n",[OptProps]),
-            %?LOG("Additional Prop are: ~p~n", [AddP]),
+            ?LOG("Additional Prop are: ~p~n", [AddP]),
             ?LOG("PatternProperties are: ~p~n",[PatternProperties]),
 
             MinOpts = MinProperties - length(ReqProps),
@@ -334,7 +335,8 @@ gen_typed_schema(Schema,Options) ->
         %% any
         %%     Any JSON data, including "null".
         <<"any">> ->
-	    any();
+          ?LOG("'any' keyword found",[]),
+	    anyQ();
 
 
         %% Union types
@@ -498,18 +500,43 @@ number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Basic schema generators for additional
 
--spec boolean() -> eqc_gen:gen(boolean()).
-boolean() ->
-    eqc_gen:bool().
+anyQ() ->
+    ?LOG("Choosing random type ('any' keyword)...~n",[]),
+     eqc_gen:oneof
+      ([stringSchema(),numberSchema(),integerSchema(),booleanSchema(),objectSchema(),arraySchema(),null()]).
 
--spec string() -> eqc_gen:gen(string()).
-string() ->
+-spec stringSchema() -> eqc_gen:gen(string()).
+stringSchema() ->
+    json({struct,[{<<"type">>,<<"string">>}]}).
     % TODO: generator of valid JSON strings
     % Its not a good generator. Implementation has to be changed
-    ?LET(Name,name(),list_to_binary(Name)).
+    %?LET(Name,name(),list_to_binary(Name)).
     %?SIZED(Size,list_to_binary(name())).
 
+numberSchema() ->
+    json({struct,[{<<"type">>,<<"number">>}]}).
+
+integerSchema() ->
+    json({struct,[{<<"type">>,<<"integer">>}]}).
+
+-spec booleanSchema() -> eqc_gen:gen(boolean()).
+booleanSchema() ->
+    json({struct,[{<<"type">>,<<"boolean">>}]}).
+
+
+objectSchema() ->
+  json({struct,[{<<"type">>,<<"object">>},{<<"properties">>,{struct,[]}}]}).
+
+arraySchema() ->
+    json({struct,[{<<"type">>,<<"array">>},{<<"items">>,{struct,[{<<"type">>,<<"integer">>}]}}]}).
+  %?LET(Size,nat(),lists:map(fun (_) -> any() end, lists:duplicate(Size,32))).
+
+nullSchema() ->
+    json({struct,[{<<"type">>,<<"null">>}]}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec stringGen(integer()) -> eqc_gen:gen(string()).
 stringGen(0) ->
@@ -531,6 +558,10 @@ randInt (Min, Max) ->
 randFlt (Min, _) ->
     ?LET(Flt, eqc_gen:real(), Min + Flt).
 
+-spec boolean() -> eqc_gen:gen(boolean()).
+boolean() ->
+    eqc_gen:bool().
+
 %% candidate for removal
 propname() ->
     name().
@@ -540,19 +571,6 @@ propname() ->
 name() ->
     eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
 
-any() ->
-    eqc_gen:oneof
-      ([string(),number(),integer(),boolean(),object(),array(),null()]).
-
-object() ->
-    %% TODO: generator for object
-    %% (could it be integrated in... json/1?)
-  json({struct,[{<<"type">>,<<"object">>}]}).
-
-array() ->
-    %% TODO: generator for array (no items)
-    %% (it could be integrated in array/1)
-  ?LET(Size,nat(),lists:map(fun (_) -> any() end, lists:duplicate(Size,32))).
 
 isMultiple(N,Mul) when Mul > 0 ->
 	N rem Mul == 0.

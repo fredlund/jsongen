@@ -18,14 +18,16 @@ read_file(Filename) ->
     end.
 
 hasType(_Schema={struct,Def}) ->
+      %io:format("Case type, DEF: ~p ~n",[Def]),
   case proplists:lookup(<<"type">>,Def) of
-    {_,_Type} ->
-      true;
-    none ->
-      false
+      {_,Type} ->
+          %io:format("Type found, its: ~p~n",[Type]),
+          true;
+      none ->
+          false
   end;
 hasType(Other) ->
-  io:format("Something other:~p~n",[Other]),
+  %io:format("Something other:~p~n",[Other]),
   throw(bad).
 
 hasEnum(_Schema={struct,Def}) ->
