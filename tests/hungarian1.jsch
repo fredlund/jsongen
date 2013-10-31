@@ -1,7 +1,7 @@
 {
     "description": "Hungarian notation examples",
     "type":"object",
-    "maxProperties" : 10,
+    "minProperties" : 40,
     "properties" :
 	{
 	},

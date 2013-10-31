@@ -1,0 +1,11 @@
+{
+    "description": "Hungarian notation examples",
+    "type":"object",
+    "minProperties" : 40,
+    "properties" :
+	{
+	}
+	
+}
+
+

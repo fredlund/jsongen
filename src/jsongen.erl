@@ -38,7 +38,7 @@
 -compile(export_all).
 
 %%LOGS
-%%-define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -206,12 +206,16 @@ gen_typed_schema(Schema,Options) ->
             ReqProps = [{P,S} || {P,S} <- Properties, lists:member(P, Required)],
             OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],
 
-            %% THIS WILL BE ADDED LATER
+
              case AdditionalProperties of 
+
                  false -> 
-                     AddP = [];
+                     AddP = undefined;
 
                  true -> 
+                     AddP = {};
+
+                 undefined ->
                      AddP = {};
 
                  {} ->
@@ -224,28 +228,22 @@ gen_typed_schema(Schema,Options) ->
             ?LOG("Max Properties: ~p~n",[MaxProperties]),
 	    ?LOG("Required is: ~p~n",[ReqProps]),
 	    ?LOG("Not Required is: ~p~n",[OptProps]),
-            ?LOG("Additional Prop are: ~p~n", [AddP]),
+            ?LOG("AddProps are: ~p~n", [AddP]),
             ?LOG("PatternProperties are: ~p~n",[PatternProperties]),
 
             MinOpts = MinProperties - length(ReqProps),
             MaxOpts = MaxProperties - length(ReqProps),
             
-          case AdditionalProperties of
-              undefined ->
-
-                  ?LET(OptPropsGen, choose_properties(OptProps,MinOpts,MaxOpts),
-                       ?LET(PatternGen, create_patterns(PatternProperties, 
-                                                        MinOpts - length(OptPropsGen)),
-                            ?LET(PatternPropsGen, choose_properties(lists:concat(PatternGen), 
-                                                        MinOpts - length(OptPropsGen), MaxOpts), 
-                                 begin
-                                    ?LOG("*** FINAL PROPERTIES: ~p***~n",
-                                         [length(OptPropsGen ++ PatternPropsGen ++ ReqProps)]),
+          case {PatternProperties,AddP} of
+              {undefined,undefined} ->
+                  ?LET(N, randInt(MinOpts,length(OptProps)),
+                       ?LET(OptPropsGen, choose_n_properties(OptProps,N),
+                            begin
                                 RawProperties = 
                                     [{P,json(S,Options)} ||
                                         {P,S} <- ReqProps
                                             ++ 
-                                            OptPropsGen ++ PatternPropsGen
+                                            OptPropsGen
                                     ],
                                 case proplists:get_value(randomize_properties,Options,true) of
                                     true ->
@@ -255,37 +253,150 @@ gen_typed_schema(Schema,Options) ->
                                     false ->
                                         {struct,RawProperties}
                                 end
-                            end)));        
+                            end));
+           
+              {PatternProperties, undefined} ->
+                  ?LET(N_opt, randInt(0,length(OptProps)),
+                       ?LET(N_prop, randInt(MinOpts - N_opt,MaxOpts - N_opt),
+                            ?LET({OptPropsGen, PatPropsGen},
+                                 {choose_n_properties(OptProps,N_opt),
+                                  create_patterns(PatternProperties,N_prop)},
+                                 begin
+                                     ?LOG("**FINAL PROPS: ~p~n",
+                                         [ReqProps ++ OptPropsGen ++ PatPropsGen]),
+                                     RawProperties = 
+                                         [{P,json(S,Options)} ||
+                                             {P,S} <- ReqProps
+                                                 ++ 
+                                                 OptPropsGen
+                                                 ++
+                                                 lists:concat(PatPropsGen)
+                                         ],
+                                     case proplists:get_value(randomize_properties,Options,true) of
+                                         true ->
+                                             ?LET(Props,
+                                                  randomize_list(RawProperties),
+                                                  {struct, Props});
+                                         false ->
+                                             {struct,RawProperties}
+                                     end
+                                 end)));
+             
+
+              {undefined,AddP} ->
+                  ?LOG("{Min,Max}: {~p,~p}~n",[MinOpts,MaxOpts]),
+                  ?LET(N_opt, randInt(0,length(OptProps)),
+                       ?LET(N_add, randInt(MinOpts - N_opt,MaxOpts - N_opt),
+                            ?LET({OptPropsGen, AddPropsGen},
+                                 {choose_n_properties(OptProps,N_opt),
+                                  create_additionals(AddP,N_add)},
+                                 begin
+                                     RawProperties = 
+                                         [{P,json(S,Options)} ||
+                                             {P,S} <- ReqProps
+                                                 ++ 
+                                                 OptPropsGen
+                                                 ++
+                                                 AddPropsGen
+                                         ],
+                                     case proplists:get_value(randomize_properties,Options,true) of
+                                         true ->
+                                             ?LET(Props,
+                                                  randomize_list(RawProperties),
+                                                  {struct, Props});
+                                         false ->
+                                             {struct,RawProperties}
+                                     end
+                                 end)));
+
+              {PatternProperties,AddP} ->
+                  ?LET(N_opt, randInt(0,length(OptProps)),
+                       ?LET(N_pat, randInt(0, MaxOpts - N_opt),
+                           ?LET(N_add, randInt(MinOpts - N_opt - N_pat, MaxOpts - N_opt - N_pat),
+                                ?LET({OptPropsGen,PatPropsGen,AddPropsGen},
+                                     {choose_n_properties(OptProps,N_opt),
+                                      create_patterns(PatternProperties,N_pat),
+                                      create_additionals(AddP,N_add)},
+                                     begin
+                                         RawProperties = 
+                                             [{P,json(S,Options)} ||
+                                                 {P,S} <- ReqProps
+                                                     ++ 
+                                                     OptPropsGen
+                                                     ++
+                                                     PatPropsGen
+                                                     ++
+                                                     AddPropsGen
+                                             ],
+                                         case proplists:get_value(randomize_properties,Options,true) of
+                                             true ->
+                                                 ?LET(Props,
+                                                      randomize_list(RawProperties),
+                                                      {struct, Props});
+                                             false ->
+                                                 {struct,RawProperties}
+                                         end
+                                     end))))
+                                     
+                            
+          end;
+
+          %% case AdditionalProperties of
+          %%     undefined ->
+
+          %%         ?LET(OptPropsGen, choose_properties(OptProps,MinOpts,MaxOpts),
+          %%              ?LET(PatternGen, create_patterns(PatternProperties, 
+          %%                                               MinOpts - length(OptPropsGen)),
+          %%                   ?LET(PatternPropsGen, choose_properties(lists:concat(PatternGen), 
+          %%                                               MinOpts - length(OptPropsGen), MaxOpts), 
+          %%                        begin
+          %%                           ?LOG("*** FINAL PROPERTIES: ~p***~n",
+          %%                                [length(OptPropsGen ++ PatternPropsGen ++ ReqProps)]),
+          %%                       RawProperties = 
+          %%                           [{P,json(S,Options)} ||
+          %%                               {P,S} <- ReqProps
+          %%                                   ++ 
+          %%                                   OptPropsGen ++ PatternPropsGen
+          %%                           ],
+          %%                       case proplists:get_value(randomize_properties,Options,true) of
+          %%                           true ->
+          %%                               ?LET(Props,
+          %%                                    randomize_list(RawProperties),
+          %%                                    {struct, Props});
+          %%                           false ->
+          %%                               {struct,RawProperties}
+          %%                       end
+          %%                   end)));        
 
 
 
-              %% THIS IMPLEMENTATION HAS TO BE UPDATED
-              _ ->
-            ?LET({PatternGen,AdditionalGen},
-		 {create_patterns(PatternProperties),[]},
-                 ?LET(Optionals, 
-                      choose_properties
-			(OptProps
-			 ++ lists:concat(PatternGen)
-			 ++ AdditionalGen,
-			 MinOpts, MaxOpts),    
-		      begin
-			RawProperties = 
-			  [{P,json(S,Options)} ||
-			    {P,S} <- ReqProps
-			      ++ 
-			      Optionals
-			  ],
-			case proplists:get_value(randomize_properties,Options,true) of
-			  true ->
-			    ?LET(Props,
-				 randomize_list(RawProperties),
-				 {struct, Props});
-			  false ->
-			    {struct,RawProperties}
-			end
-		      end))
-              end;
+          %%     %% THIS IMPLEMENTATION HAS TO BE UPDATED
+          %%     _ ->
+          %%   ?LET({PatternGen,AdditionalGen},
+	  %%        {create_patterns(PatternProperties),[]},
+          %%        ?LET(Optionals, 
+          %%             choose_properties
+	  %%       	(OptProps
+	  %%       	 ++ lists:concat(PatternGen)
+	  %%       	 ++ AdditionalGen,
+	  %%       	 MinOpts, MaxOpts),    
+	  %%             begin
+	  %%       	RawProperties = 
+	  %%       	  [{P,json(S,Options)} ||
+	  %%       	    {P,S} <- ReqProps
+	  %%       	      ++ 
+	  %%       	      Optionals
+	  %%       	  ],
+	  %%       	case proplists:get_value(randomize_properties,Options,true) of
+	  %%       	  true ->
+	  %%       	    ?LET(Props,
+	  %%       		 randomize_list(RawProperties),
+	  %%       		 {struct, Props});
+	  %%       	  false ->
+	  %%       	    {struct,RawProperties}
+	  %%       	end
+	  %%             end))
+          %%     end;
         
         %% string
         %%     A JSON string.
@@ -502,6 +613,27 @@ number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Basic schema generators for additional
 
+anyType() ->
+    ?LOG("Choosing random type ('any' keyword)...~n",[]),
+     eqc_gen:oneof
+      ([stringType(),numberType(),integerType(),booleanType()]).
+
+
+-spec stringType() -> eqc_gen:gen(string()).
+stringType() ->
+    {struct,[{<<"type">>,<<"string">>}]}.
+
+numberType() ->
+    {struct,[{<<"type">>,<<"number">>}]}.
+
+integerType() ->
+    {struct,[{<<"type">>,<<"integer">>}]}.
+
+-spec booleanType() -> eqc_gen:gen(boolean()).
+booleanType() ->
+    {struct,[{<<"type">>,<<"boolean">>}]}.
+
+
 anyQ() ->
     ?LOG("Choosing random type ('any' keyword)...~n",[]),
      eqc_gen:oneof
@@ -527,7 +659,7 @@ booleanSchema() ->
 
 
 objectSchema() ->
-  json({struct,[{<<"type">>,<<"object">>},{<<"properties">>,{struct,[]}}]}).
+  json({struct,[{<<"type">>,<<"object">>},{<<"properties">>,{struct,[]}},{<<"additionalProperties">>,<<"false">>}]}).
 
 arraySchema() ->
     json({struct,[{<<"type">>,<<"array">>},{<<"items">>,{struct,[{<<"type">>,<<"integer">>}]}}]}).
@@ -537,6 +669,9 @@ nullSchema() ->
     json({struct,[{<<"type">>,<<"null">>}]}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+randString() ->
+    ?LET(N, positive(),
+         ?LET(S,stringGen(N), list_to_binary(S))).
 
 -spec stringGen(integer()) -> eqc_gen:gen(string()).
 stringGen(0) ->
@@ -591,53 +726,8 @@ isMultiple(N,Mul) when Mul > 0 ->
 isMultipleFloat(F,Mul) when Mul > 0 ->
     is_integer(F/Mul).
 
-% -spec choose_properties([string()],natural(),natural()) -> eqc_gen:gen([string()]).
-choose_properties(P, Min, Max) when Max >= Min -> 
-    ?LOG("Choosing properties: ~p~n",[P]),
-    ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
-    ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_properties(P,N)).
-    
-
-choose_n_properties(L,N) ->
-  randomize_list(L,N,length(L)).
-
-randomize_list(L) ->
-  Length = length(L),
-  randomize_list(L,Length,Length).
-randomize_list([],_,_Length) -> [];
-randomize_list(_List,0,_Length) -> [];
-randomize_list(List, N, Length) ->
-    ?LET(I, eqc_gen:choose(1, Length), 
-    [lists:nth(I,List) |
-     randomize_list(delete_nth_element(I,List), N-1, Length-1)]).
-
-floor(X) when X < 0 ->
-    T = trunc(X),
-    case X - T == 0 of
-        true -> T;
-        false -> T - 1
-    end;
-
-floor(X) ->
-    trunc(X).
-
-delete_nth_element(N, List) ->
-    ?LOG("Removing ~p element from list -> ~p~n",[N,List]),
-    io:format("."),
-    delete_nth_element(N-1,List, []).
-
-delete_nth_element(0, [_nthEl|T], Res) ->
-    concat_and_reverse(T, Res);
-
-delete_nth_element(N, [H|T], Res) ->
-    delete_nth_element(N-1, T, [H|Res]).
-
-concat_and_reverse([],Res) ->
-    io:format("."),
-    lists:reverse(Res);
-
-concat_and_reverse([H|T], Res) ->
-    concat_and_reverse(T, [H|Res]).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generators for patternProperties keyword
 
 % <<"i.*">>
 property_name(Pattern) ->
@@ -691,25 +781,143 @@ create_patterns(PatternPropList, MinimumProps) ->
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generators for additionalProperties keyword
 
-%%% INTEGER OR GEN. OF INTEGER????
--spec create_additionals ( json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
+%% -spec create_additionals ( json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
 
-create_additionals({struct, AddTypes}, AddRand, StrRand) ->
-    lists:foldl( fun (Add, _Res) ->
-                         additional_gen(Add,AddRand,StrRand)
-                 end,[],AddTypes).
+%% create_additionals({struct, AddTypes}, AddRand, StrRand) ->
+%%     lists:foldl( fun (Add, _Res) ->
+%%                          additional_gen(Add,AddRand,StrRand)
+%%                  end,[],AddTypes).
+%% %%%%%%%%%%%%%%%%%
+
+%% % <<"i.*">>
+%% property_name(Pattern) ->
+%%     ?LOG("Pattern name: ~p~n",[Pattern]),
+%%     RegularExpression = binary_to_list(Pattern),
+%%     InternalRegularExpression = regexp_parse:string(RegularExpression),
+%%     ?LET
+%%        (String,
+%%         gen_string_from_regexp:gen(InternalRegularExpression),
+%%         list_to_binary(String)).
+
+%% % {<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}
+%% pattern_gen(_,0) ->
+%%     [];
+%% pattern_gen({Pattern, Schema},N) when N > 0 ->
+%%     ?LOG("{Pattern, schema} = ~p~n", [{Pattern,Schema}]),
+%%     [{property_name(Pattern), Schema} | pattern_gen({Pattern,Schema}, N-1)].
+
+%% pattern_gen(Pattern_Schema) ->
+%%     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
+%%     io:format("~n** THIS MAY TAKE A WHILE **~n"),
+%%     io:format("~nLOADING..."),
+%%     ?LET(N,natural(), pattern_gen(Pattern_Schema,N)).
+
+%% pattern_gen_range(Pattern_Schema, Min) ->
+%%     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
+%%     ?LET(N,natural_gte(Min), pattern_gen(Pattern_Schema,N)).
+%% % { "i.*" : { "type" : "integer" }, "s.*" : { "type" : "string" } }
+%% % 
+
+%% %{struct, [{<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}, {<<"s.*">>, {struct, [{ <<"type">>,<<"string">>}]}}]}
+%% create_patterns(undefined) ->
+%% [];
+
+%% create_patterns(PatternPropList) ->
+%%     ?LOG("Inside create_patterns, PatternPropList is ~p~n",[PatternPropList]),
+%%     L = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
+%%     ?LOG("Final patterns created: ~p~n",[L]),
+%%     L.
+%%%%%%%%
+
+additional_gen (_,0) ->
+[];
+
+additional_gen(AdditionalSchema,N) when N > 0 ->
+    case AdditionalSchema of
+        {} ->
+            [{randString(),anyType()} | additional_gen(AdditionalSchema,N-1)];
+        Schema ->
+            [{randString(),Schema} | additional_gen(AdditionalSchema,N-1)]
+    end.
+
+create_additionals({},N) ->
+    additional_gen({},N);
+
+create_additionals(AddPropList,N) ->
+    ?LOG("create_additionals with fix value, AdditionalPropList is ~p, and N is ~p~n",
+            [AddPropList, N]),
+    FinalProps = ceiling(N / length(AddPropList)),
+    io:format("~n** THIS MAY TAKE A WHILE **~n"),
+    io:format("~nLOADING..."),
+    L = lists:map (fun(X) -> additional_gen(X,FinalProps) end, AddPropList),
+    ?LOG("Final patterns created: ~p~n",[L]),
+    L.
 
 
+%%%%%%%%%%%%%%%%%%%%%
+%% -spec additional_gen (json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
 
--spec additional_gen (json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
+%% additional_gen(_Schema,0,_) ->
+%%     [];
 
-additional_gen(_Schema,0,_) ->
-    [];
+%% additional_gen(Schema,N, Length) when N > 0 ->
 
-additional_gen(Schema,N, Length) when N > 0 ->
+%%          [ { stringGen(Length) , {struct,[Schema]}}  | additional_gen(Schema,N-1,Length)].
 
-         [ { stringGen(Length) , {struct,[Schema]}}  | additional_gen(Schema,N-1,Length)].
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Misc functions
+
+% -spec choose_properties([string()],natural(),natural()) -> eqc_gen:gen([string()]).
+
+choose_properties(P, Min, Max) when Max >= Min -> 
+    ?LOG("Choosing properties: ~p~n",[P]),
+    ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
+    ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_properties(P,N)).
+    
+
+choose_n_properties(L,N) ->
+  randomize_list(L,N,length(L)).
+
+randomize_list(L) ->
+  Length = length(L),
+  randomize_list(L,Length,Length).
+randomize_list([],_,_Length) -> [];
+randomize_list(_List,0,_Length) -> [];
+randomize_list(List, N, Length) ->
+    ?LET(I, eqc_gen:choose(1, Length), 
+    [lists:nth(I,List) |
+     randomize_list(delete_nth_element(I,List), N-1, Length-1)]).
+
+floor(X) when X < 0 ->
+    T = trunc(X),
+    case X - T == 0 of
+        true -> T;
+        false -> T - 1
+    end;
+
+floor(X) ->
+    trunc(X).
+
+delete_nth_element(N, List) ->
+    ?LOG("Removing ~p element from list -> ~p~n",[N,List]),
+    io:format("."),
+    delete_nth_element(N-1,List, []).
+
+delete_nth_element(0, [_nthEl|T], Res) ->
+    concat_and_reverse(T, Res);
+
+delete_nth_element(N, [H|T], Res) ->
+    delete_nth_element(N-1, T, [H|Res]).
+
+concat_and_reverse([],Res) ->
+    io:format("."),
+    lists:reverse(Res);
+
+concat_and_reverse([H|T], Res) ->
+    concat_and_reverse(T, [H|Res]).
 
 ceiling(X) ->
     T = trunc(X),
