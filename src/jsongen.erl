@@ -38,7 +38,7 @@
 -compile(export_all).
 
 %%LOGS
-% -define(debug,true).
+%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -771,53 +771,6 @@ create_patterns(PatternPropList, MinimumProps) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for additionalProperties keyword
 
-%% -spec create_additionals ( json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
-
-%% create_additionals({struct, AddTypes}, AddRand, StrRand) ->
-%%     lists:foldl( fun (Add, _Res) ->
-%%                          additional_gen(Add,AddRand,StrRand)
-%%                  end,[],AddTypes).
-%% %%%%%%%%%%%%%%%%%
-
-%% % <<"i.*">>
-%% property_name(Pattern) ->
-%%     ?LOG("Pattern name: ~p~n",[Pattern]),
-%%     RegularExpression = binary_to_list(Pattern),
-%%     InternalRegularExpression = regexp_parse:string(RegularExpression),
-%%     ?LET
-%%        (String,
-%%         gen_string_from_regexp:gen(InternalRegularExpression),
-%%         list_to_binary(String)).
-
-%% % {<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}
-%% pattern_gen(_,0) ->
-%%     [];
-%% pattern_gen({Pattern, Schema},N) when N > 0 ->
-%%     ?LOG("{Pattern, schema} = ~p~n", [{Pattern,Schema}]),
-%%     [{property_name(Pattern), Schema} | pattern_gen({Pattern,Schema}, N-1)].
-
-%% pattern_gen(Pattern_Schema) ->
-%%     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
-%%     io:format("~n** THIS MAY TAKE A WHILE **~n"),
-%%     io:format("~nLOADING..."),
-%%     ?LET(N,natural(), pattern_gen(Pattern_Schema,N)).
-
-%% pattern_gen_range(Pattern_Schema, Min) ->
-%%     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
-%%     ?LET(N,natural_gte(Min), pattern_gen(Pattern_Schema,N)).
-%% % { "i.*" : { "type" : "integer" }, "s.*" : { "type" : "string" } }
-%% % 
-
-%% %{struct, [{<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}, {<<"s.*">>, {struct, [{ <<"type">>,<<"string">>}]}}]}
-%% create_patterns(undefined) ->
-%% [];
-
-%% create_patterns(PatternPropList) ->
-%%     ?LOG("Inside create_patterns, PatternPropList is ~p~n",[PatternPropList]),
-%%     L = lists:map (fun(X) -> pattern_gen(X) end, PatternPropList),
-%%     ?LOG("Final patterns created: ~p~n",[L]),
-%%     L.
-%%%%%%%%
 
 additional_gen (_,0) ->
 [];
@@ -825,8 +778,10 @@ additional_gen (_,0) ->
 additional_gen(AdditionalSchema,N) when N > 0 ->
     case AdditionalSchema of
         {} ->
+            ?LOG("Empty schema~n",[]),
             [{randString(),anyType()} | additional_gen(AdditionalSchema,N-1)];
         Schema ->
+            ?LOG("Not empty schema, type is ~p~n",[Schema]),
             [{randString(),Schema} | additional_gen(AdditionalSchema,N-1)]
     end.
 
@@ -842,17 +797,6 @@ create_additionals(AddPropList,N) ->
     L = lists:map (fun(X) -> additional_gen(X,FinalProps) end, AddPropList),
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
-
-
-%%%%%%%%%%%%%%%%%%%%%
-%% -spec additional_gen (json:json_term(), integer(), integer()) -> list(eqc_gen:gen(json:json_term())).
-
-%% additional_gen(_Schema,0,_) ->
-%%     [];
-
-%% additional_gen(Schema,N, Length) when N > 0 ->
-
-%%          [ { stringGen(Length) , {struct,[Schema]}}  | additional_gen(Schema,N-1,Length)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc functions
