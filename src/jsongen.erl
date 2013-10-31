@@ -38,7 +38,7 @@
 -compile(export_all).
 
 %%LOGS
--define(debug,true).
+% -define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
