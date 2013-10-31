@@ -2,6 +2,7 @@
     "description": "Hungarian notation examples",
     "type":"object",
     "minProperties" : 40,
+    "additionalProperties" : false,
     "properties" :
 	{
 	},
@@ -9,16 +10,18 @@
 
     "patternProperties" :
 	{
-		"^l[a-z]" : {
+		"^l[A-Z][a-z0-9]*$" : {
 			"type" : "number"
 		},
 
-		"^b[a-z]" : {
+		"^b[A-Z][a-z0-9]*$" : {
 			"type" : "boolean"
 		},
 
-		"^ch[a-z]" : {
-			"type" : "string"
+		"^ch[A-Z][a-z0-9]*$" : {
+			"type" : "integer",
+                        "minimum" : 0,
+                        "maximum" : 255
 		}
 	}
 
