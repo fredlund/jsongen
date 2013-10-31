@@ -48,7 +48,7 @@
 -endif.
 
 -define(MAX_ARRAY_SIZE,100).
--define(MAX_STR_LENGTH,1000).
+-define(MAX_STR_LENGTH,100).
 -define(MAX_PROPERTIES,100).
 
 -include_lib("eqc/include/eqc.hrl").
@@ -548,11 +548,23 @@ stringGen(N) ->
 
 %random integer generator between Min and Max values
 
--spec randInt (integer(), integer()) -> eqc_gen:gen(integer()).
-randInt (Min, Max) ->
+-spec randInt2 (integer(), integer()) -> eqc_gen:gen(integer()).
+randInt2 (Min, Max) ->
 	eqc_gen:choose(Min,Max).
 
-%maybe its not very efficient
+randInt (Min,Max) ->
+
+    case {Min,Max} of 
+            
+        {undefined,undefined} -> 
+            positive();
+        {undefined,Max} ->
+            eqc_gen:choose(1,Max);
+        {Min,undefined} ->
+            natural_gte(Min);
+        {Min,Max} -> 
+            eqc_gen:choose(Min,Max)
+    end.
 
 -spec randFlt(float(), float()) -> eqc_gen:gen(float()).
 randFlt (Min, _) ->
