@@ -38,7 +38,7 @@
 -compile(export_all).
 
 %%LOGS
-%-define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -87,20 +87,7 @@ json(Schema,Options) ->
 gen_typed_schema(Schema,Options) ->
   case jsonschema:type(Schema) of
     
-    %% array
-    %%     A JSON array. 
-    <<"array">> ->
-      MaxItems = jsonschema:keyword(Schema,"maxItems"),
-      MinItems = jsonschema:keyword(Schema,"minItems",0),
-      _UniqueItems = 0,
-      case jsonschema:items(Schema) of
-	{itemSchema, ItemSchema} ->
-	  array(ItemSchema, {MinItems,MaxItems});
-	{itemsTemplate, ItemsTemplate} ->
-	  template(ItemsTemplate)
-      end;
-    
-    
+
     %% boolean
     %%     A JSON boolean. 
     <<"boolean">> ->
@@ -176,6 +163,31 @@ gen_typed_schema(Schema,Options) ->
     %%     The JSON null value. 
     <<"null">> ->
       null();
+    
+    %% array
+    %%     A JSON array. 
+    <<"array">> ->
+      MaxItems = jsonschema:keyword(Schema,"maxItems"),
+      MinItems = jsonschema:keyword(Schema,"minItems",0),
+         
+      AdditionalItems = jsonschema:keyword(Schema,"additionalItems",{}),
+      ?LOG("AdditionalItems: ~p ~n",[AdditionalItems]),
+      _UniqueItems = jsonschema:keyword(Schema, "uniqueItems",false),
+      
+      case jsonschema:items(Schema) of
+	{itemSchema, ItemSchema} ->
+              case AdditionalItems of
+                  {} ->
+                      ?LOG("ArrayOfAny~n",[]),
+                      arrayOfAny(ItemSchema, {MinItems,MaxItems});
+                  true ->
+                      arrayOfAny(ItemSchema, {MinItems,MaxItems});
+                  false ->
+                      array(ItemSchema, {MinItems,MaxItems})
+              end;
+	{itemsTemplate, ItemsTemplate} ->
+	  template(ItemsTemplate)
+      end;
     
     
     %% object
@@ -434,7 +446,7 @@ gen_typed_schema(Schema,Options) ->
         %%     Any JSON data, including "null".
         <<"any">> ->
           ?LOG("'any' keyword found",[]),
-	    anyQ();
+	    any_schema();
 
 
         %% Union types
@@ -455,7 +467,7 @@ gen_typed_schema(Schema,Options) ->
 
 -spec array(json:json_term(),{integer(),integer()}) -> eqc_gen:gen(json:json_term()).
 array(Schema,{MinItems,MaxItems}) ->
-
+    ?LOG("Array schema is ~p ~n",[Schema]),
     case MaxItems of
 	undefined ->
 	    ?LET(N, eqc_gen:choose(MinItems, ?MAX_ARRAY_SIZE), arrayGen(Schema,N));
@@ -464,12 +476,66 @@ array(Schema,{MinItems,MaxItems}) ->
 	    ?LET(N, eqc_gen:choose(MinItems,MaxItems), arrayGen(Schema,N))
     end.		   
 
+insertType(Type, {struct,[Types | Rest]}) ->
+%insertType(Type,{struct,Schema}) ->
+    ?LOG("insertTypeSchema: ~p",[Types]),
+    {<<"type">>, ListOfTypes} = Types,
+    ?LOG("Old list of types: ~p ~n",[ListOfTypes]),
+    NewListOfTypes = [Type| ListOfTypes],
+    ?LOG("New list of types: ~p ~n",[NewListOfTypes]),
+    %NewTypes = [Type | ListOfTypes],
+    %?LOG("Final schema: {struct,[{<<\"type\">>, ~p}, ~p]} ~n",[NewListOfTypes, Rest]),
+    ?LOG("Rest: ~p ~n",[Rest]),
+    %{struct,[{<<"type">>, NewTypes}, Rest]};
+    Res ={struct,[ {<<"type">>, NewListOfTypes} , Rest]},
+        ?LOG ("Final res: ~p ~n",[Res]),
+        Res.
+
+
+
+
+%% arrayOfAny(Schema,{MinItems,MaxItems}) ->
+%%     ?LOG("Array schema is ~p ~n",[Schema]),
+%%     case MaxItems of
+%% 	undefined ->
+%%             ?LOG("Schema: ~p",[Schema]),
+%%             NewSchema = insertType(<<"any">>,Schema),
+%% 	    ?LET(N, eqc_gen:choose(MinItems, ?MAX_ARRAY_SIZE), 
+%%                  arrayGen(NewSchema,N));
+
+%% 	MaxItems ->
+%%             ?LOG("Schema: ~p",[Schema]),
+%%             NewSchema = insertType(<<"any">>,Schema),
+%% 	    ?LET(N, eqc_gen:choose(MinItems,MaxItems), 
+%%                  arrayGen(NewSchema,N))
+%%     end.
+
+arrayOfAny(Schema,{MinItems, MaxItems}) -> 
+    ?LOG("Array schema is ~p ~n",[Schema]),
+    case MaxItems of
+	undefined ->
+            ?LOG("Schema: ~p",[Schema]),
+            NewSchema = {struct,[{<<"type">>,<<"any">>}]},
+            ?LOG("Any schema: ~p ~n",[NewSchema]),
+	    ?LET(N, eqc_gen:choose(MinItems, ?MAX_ARRAY_SIZE), 
+                 arrayGen(NewSchema,N));
+
+	MaxItems ->
+            ?LOG("Schema: ~p",[Schema]),
+            NewSchema = {struct,[{<<"type">>,<<"any">>}]},
+            ?LOG("Any schema: ~p ~n",[NewSchema]),
+	    ?LET(N, eqc_gen:choose(MinItems,MaxItems), 
+                 arrayGen(NewSchema,N))
+    end.
+
+
 
 -spec arrayGen (json:json_term(), integer()) -> eqc_gen:gen(json:json_term()).
 arrayGen(_Schema,0) ->
     [];
 
 arrayGen(Schema,N) when N > 0->
+    ?LOG("arrayGen: ~p ~n",[Schema]),
     [json(Schema) | arrayGen(Schema,N-1)].
 
 
@@ -603,7 +669,10 @@ number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
 anyType() ->
     ?LOG("Choosing random type ('any' keyword)...~n",[]),
      eqc_gen:oneof
-      ([stringType(),numberType(),integerType(),booleanType()]).
+      ([stringType(),numberType(),integerType(),booleanType()]). 
+
+%% VV BUCLE VV
+%,objectType()]). %,arrayType()]).
 
 
 -spec stringType() -> eqc_gen:gen(string()).
@@ -624,12 +693,16 @@ objectType() ->
     {struct,[{<<"type">>,<<"object">>},{<<"properties">>,{struct,[]}}]}.
 
 arrayType() ->
-{struct,[{<<"type">>,<<"array">>},{<<"items">>,{struct,[{<<"type">>,<<"integer">>}]}}]}.
+    {struct,[{<<"type">>,<<"array">>},
+             {<<"additionalItems">>,<<"false">>},
+             {<<"items">>,{struct,[{<<"type">>,<<"any">>}]}}]}.
     
-anyQ() ->
+any_schema() ->
     ?LOG("Choosing random type ('any' keyword)...~n",[]),
      eqc_gen:oneof
-      ([stringSchema(),numberSchema(),integerSchema(),booleanSchema(),objectSchema(),arraySchema(),null()]).
+      ([stringSchema(),numberSchema(),integerSchema(),booleanSchema()]). 
+%  VV BUCLE VV
+%,objectSchema()]). %,arraySchema(),null()]).
 
 -spec stringSchema() -> eqc_gen:gen(string()).
 stringSchema() ->
@@ -651,15 +724,19 @@ booleanSchema() ->
 
 
 objectSchema() ->
-  json({struct,[{<<"type">>,<<"object">>},{<<"properties">>,{struct,[]}},{<<"additionalProperties">>,<<"false">>}]}).
+  json({struct,[{<<"type">>,<<"object">>},{<<"properties">>,{struct,[]}}]}).
 
 arraySchema() ->
-    json({struct,[{<<"type">>,<<"array">>},{<<"items">>,{struct,[{<<"type">>,<<"integer">>}]}}]}).
-  %?LET(Size,nat(),lists:map(fun (_) -> any() end, lists:duplicate(Size,32))).
+?LET(Type, select_simple_types(),
+    json({struct,[{<<"type">>,<<"array">>},
+                  {<<"additionalItems">>,<<"false">>},
+                  {<<"items">>,{struct,[{<<"type">>,Type}]}}]})).
 
 nullSchema() ->
     json({struct,[{<<"type">>,<<"null">>}]}).
 
+select_simple_types() ->
+    eqc_gen:oneof([<<"string">>,<<"integer">>,<<"number">>,<<"boolean">>,<<"null">>]).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 randString() ->
     ?LET(N, positive(),
@@ -801,7 +878,7 @@ additional_gen(AdditionalSchema,N) when N > 0 ->
     case AdditionalSchema of
         {} ->
             ?LOG("Empty schema~n",[]),
-            [{randString(),anyType()} | additional_gen(AdditionalSchema,N-1)];
+            [{randString(), anyType()} | additional_gen(AdditionalSchema,N-1)];
         Schema ->
             ?LOG("Not empty schema, type is ~p~n",[Schema]),
             [{randString(),Schema} | additional_gen(AdditionalSchema,N-1)]
