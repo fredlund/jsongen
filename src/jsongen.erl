@@ -226,7 +226,7 @@ gen_typed_schema(Schema,Options) ->
             
       case {PatternProperties,AddP} of
         {undefined,undefined} ->
-          ?LET(N, randInt(MinOpts,length(OptProps)),
+          ?LET(N, randIntPositive(MinOpts,length(OptProps)),
                ?LET(OptPropsGen, choose_n_properties(OptProps,N),
                     begin
                       RawProperties = 
@@ -246,8 +246,8 @@ gen_typed_schema(Schema,Options) ->
                     end));
            
         {PatternProperties, undefined} ->
-          ?LET(N_opt, randInt(0,length(OptProps)),
-               ?LET(N_prop, randInt(MinOpts - N_opt,MaxOpts - N_opt),
+          ?LET(N_opt, randIntPositive(0,length(OptProps)),
+               ?LET(N_prop, randIntPositive(MinOpts - N_opt,MaxOpts - N_opt),
                     ?LET({OptPropsGen, PatPropsGen},
                          {choose_n_properties(OptProps,N_opt),
                           create_patterns(PatternProperties,N_prop)},
@@ -274,8 +274,8 @@ gen_typed_schema(Schema,Options) ->
 
         {undefined,AddP} ->
           ?LOG("{Min,Max}: {~p,~p}~n",[MinOpts,MaxOpts]),
-          ?LET(N_opt, randInt(0,length(OptProps)),
-               ?LET(N_add, randInt(MinOpts - N_opt,MaxOpts - N_opt),
+          ?LET(N_opt, randIntPositive(0,length(OptProps)),
+               ?LET(N_add, randIntPositive(MinOpts - N_opt,MaxOpts - N_opt),
                     ?LET({OptPropsGen, AddPropsGen},
                          {choose_n_properties(OptProps,N_opt),
                           create_additionals(AddP,N_add)},
@@ -299,9 +299,9 @@ gen_typed_schema(Schema,Options) ->
                          end)));
         
         {PatternProperties,AddP} ->
-          ?LET(N_opt, randInt(0,length(OptProps)),
-               ?LET(N_pat, randInt(0, MaxOpts - N_opt),
-                    ?LET(N_add, randInt(MinOpts - N_opt - N_pat, MaxOpts - N_opt - N_pat),
+          ?LET(N_opt, randIntPositive(0,length(OptProps)),
+               ?LET(N_pat, randIntPositive(0, MaxOpts - N_opt),
+                    ?LET(N_add,randIntPositive(MinOpts - N_opt - N_pat, MaxOpts - N_opt - N_pat),
                          ?LET({OptPropsGen,PatPropsGen,AddPropsGen},
                               {choose_n_properties(OptProps,N_opt),
                                create_patterns(PatternProperties,N_pat),
@@ -620,7 +620,12 @@ integerType() ->
 booleanType() ->
     {struct,[{<<"type">>,<<"boolean">>}]}.
 
+objectType() ->
+    {struct,[{<<"type">>,<<"object">>},{<<"properties">>,{struct,[]}}]}.
 
+arrayType() ->
+{struct,[{<<"type">>,<<"array">>},{<<"items">>,{struct,[{<<"type">>,<<"integer">>}]}}]}.
+    
 anyQ() ->
     ?LOG("Choosing random type ('any' keyword)...~n",[]),
      eqc_gen:oneof
@@ -687,6 +692,23 @@ randInt (Min,Max) ->
         {Min,Max} -> 
             eqc_gen:choose(Min,Max)
     end.
+
+randIntPositive(Min,Max) when Min > 0 ->
+       case {Min,Max} of 
+            
+        {undefined,undefined} -> 
+            positive();
+        {undefined,Max} ->
+            eqc_gen:choose(1,Max);
+        {Min,undefined} ->
+            natural_gte(Min);
+        {Min,Max} -> 
+            eqc_gen:choose(Min,Max)
+       end;
+
+randIntPositive(_Min,Max) ->
+    eqc_gen:choose(0,Max).
+
 
 -spec randFlt(float(), float()) -> eqc_gen:gen(float()).
 randFlt (Min, _) ->
@@ -788,14 +810,15 @@ additional_gen(AdditionalSchema,N) when N > 0 ->
 create_additionals({},N) ->
     additional_gen({},N);
 
-create_additionals(AddPropList,N) ->
-    ?LOG("create_additionals with fix value, AdditionalPropList is ~p, and N is ~p~n",
-            [AddPropList, N]),
+create_additionals({struct,AddPropList},N) ->
+    ?LOG("create_additionals with fix value, AdditionalPropList is ~p, and N is ~p and lenght os list is ~p~n",
+            [AddPropList, N, length(AddPropList)]),
     FinalProps = ceiling(N / length(AddPropList)),
+    ?LOG ("Final Props: ~p~n",[FinalProps]),
     io:format("~n** THIS MAY TAKE A WHILE **~n"),
     io:format("~nLOADING..."),
     L = lists:map (fun(X) -> additional_gen(X,FinalProps) end, AddPropList),
-    ?LOG("Final patterns created: ~p~n",[L]),
+    ?LOG("Final additionals created: ~p~n",[L]),
     L.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

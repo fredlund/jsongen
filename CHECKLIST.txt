@@ -10,7 +10,7 @@
 
 	+ Boolean generator: Fully implemented.
 
-	+ Object generator: Additional properties not implemented (We need a generator of random schemas)
+	+ Object generator: Fully implemented.
 
 	+ Array: 'additionalItems' and 'uniqueItems' not implemented yet
 
