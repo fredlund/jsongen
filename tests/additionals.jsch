@@ -2,7 +2,9 @@
     "description" : "An object with no properties. Additional properties are allowed",
     "type":"object",
     "minProperties" : 3,
-
-    "properties": { }		
-	
+    "maxProperties" : 10,
+    "additionalProperties" :
+	{
+		"type" : "boolean"
+	}
 }

@@ -18,15 +18,13 @@ read_file(Filename) ->
     end.
 
 hasType(_Schema={struct,Def}) ->
-      %io:format("Case type, DEF: ~p ~n",[Def]),
   case proplists:lookup(<<"type">>,Def) of
-      {_,Type} ->
-          %io:format("Type found, its: ~p~n",[Type]),
+      {_,_Type} ->
           true;
       none ->
           false
   end;
-hasType(Other) ->
+hasType(_Other) ->
   %io:format("Something other:~p~n",[Other]),
   throw(bad).
 
@@ -59,15 +57,24 @@ enumerated(_Schema={struct, Def}) ->
     Enumerated.
 
 items(_Schema={struct, Def}) ->
-    {_, Items} = proplists:lookup(<<"items">>,Def),
-    case Items of
-        {struct, _} -> {itemSchema, Items};
-        _ -> {itemsTemplate, Items}
+    case proplists:lookup(<<"items">>,Def) of
+        {_,Items} ->
+            case Items of
+                {struct, _} -> {itemSchema, Items};
+       
+                _ -> {itemsTemplate, Items}
+            end;
+        none -> 
+            {empty, no_items}
     end.
 
 properties(_Schema = {struct, Def}) ->
-    {_,{struct, Properties}} = proplists:lookup(<<"properties">>,Def),
-    Properties.
+    case proplists:lookup(<<"properties">>,Def) of
+        {_,{struct, Properties}} ->
+            Properties;
+        none ->
+            []
+    end.
 
 minProperties(Schema,Def) ->
     keyword(Schema,"minProperties",Def).
@@ -85,6 +92,7 @@ keyword(_Schema = {struct, Def}, KeyWord) ->
 keyword(_Schema = {struct, Def}, KeyWord, DefaultValue) ->
     proplists:get_value(list_to_binary(KeyWord),Def,DefaultValue).
 
+
 patternProperties({struct,Schema}) ->
 
     case proplists:lookup(<<"patternProperties">>, Schema) of
@@ -96,4 +104,28 @@ patternProperties({struct,Schema}) ->
             undefined
     end.
 
+additionalProperties({struct,Schema}) ->
+    case proplists:lookup(<<"additionalProperties">>, Schema) of
+        
+       {_, Properties} -> 
+            Properties;
 
+        <<"false">> ->
+            false;
+
+        none -> 
+            true
+    end.
+
+additionalItems({struct,Schema}) ->
+    case proplists:lookup(<<"additionalItems">>, Schema) of
+
+       {struct, Properties} -> 
+            Properties;
+
+        {_,<<"false">>} ->
+            false;
+
+        none -> 
+            true
+    end.
