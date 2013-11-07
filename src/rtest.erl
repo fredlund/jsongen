@@ -28,7 +28,10 @@ schemas_test_() ->
 	 try jsonschema:read_file(SchemaFile) of
 	   {ok,Schema} ->
 	     Basename = filename:rootname(filename:basename(SchemaFile)),
-	     [{"schema \""++Basename++"\"",test_schema(Schema)}|Acc];
+	     [{"schema \""++Basename++"\"",
+	       {timeout,
+		5,
+		test_schema(Schema)}}|Acc];
 	   Other ->
 	     ?debugFmt
 		("Reading schema~n  ~s~nfailed with error ~p~n",
