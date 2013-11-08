@@ -73,10 +73,12 @@ pick_n_values(Generator,N,Schema) when N>0 ->
     true -> ok;
     maybe -> ok;
     Other ->
-      io:format
-	("*** Error: validating the value~n~p~nagainst the schema~n~p~n"++
-	   " fails; validation return value:~n~p~n",
-	 [Value,Schema,Other]),
+      io:fwrite
+	("~n*** ERROR: Validation returns value: ~p~n",[Other]),
+      io:fwrite
+	("~nValue: ~s~n",[json:encode(Value)]),      
+      io:fwrite
+	("~nSchema: ~s~n", [json:encode(Schema)]),
       throw(validation_error)
   end,
   pick_n_values(Generator,N-1,Schema);
