@@ -1,13 +1,8 @@
 {
     "description": "Hungarian notation examples",
     "type":"object",
-    "minProperties" : 40,
+    "minProperties" : 10,
     "additionalProperties" : false,
-    "properties" :
-	{
-	},
-
-
     "patternProperties" :
 	{
 		"^l[A-Z][a-z0-9]*$" : {
