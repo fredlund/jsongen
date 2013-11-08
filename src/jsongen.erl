@@ -47,9 +47,9 @@
 -define(LOG(X,Y),true).
 -endif.
 
--define(MAX_ARRAY_SIZE,100).
--define(MAX_STR_LENGTH,100).
--define(MAX_PROPERTIES,100).
+-define(MAX_ARRAY_SIZE,15).
+-define(MAX_STR_LENGTH,50).
+-define(MAX_PROPERTIES,15).
 
 -include_lib("eqc/include/eqc.hrl").
 
@@ -704,9 +704,12 @@ selectSimpleType() ->
 
 anyType() ->
     ?LOG("'anyType' -> Choosing random type ('any' keyword)...~n",[]),
-     eqc_gen:oneof([stringType(),numberType(),integerType(),booleanType(),
-                    arrayType(),objectType()]).
- %                   objectType(),arrayType()]). 
+     eqc_gen:oneof([stringType(),stringType(),stringType(),
+                    numberType(),numberType(),numberType(),
+                    integerType(),integerType(),integerType(),
+                    booleanType(),booleanType(),booleanType(),
+                    arrayType(),
+                    objectType()]).
 
 %% VV BUCLE VV
 %,objectType()]). %,arrayType()]).
@@ -727,7 +730,7 @@ booleanType() ->
     {struct,[{<<"type">>,<<"boolean">>}]}.
 
 objectType() ->
-  ?LAZY(?LET(RandType, selectSimpleType(),
+  ?LAZY(?LET(RandType, selectType(),
     {struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
                                         {struct,[{<<"type">>,RandType}]}}]})).
 
@@ -735,7 +738,7 @@ objectType() ->
 %{struct,[{<<"type">>,<<"integer">>}]}}]}.
 
 arrayType() ->
-    ?LAZY(?LET(RandType, selectSimpleType(),
+    ?LAZY(?LET(RandType, selectType(),
          {struct,[{<<"type">>,<<"array">>},
                   {<<"additionalItems">>,<<"false">>},
                   {<<"items">>,{struct,[{<<"type">>,RandType}]}}]}
@@ -743,10 +746,12 @@ arrayType() ->
     
 any_schema() ->
     ?LOG("'anySchema' -> Choosing random type ('any' keyword)...~n",[]),
-     eqc_gen:oneof([stringSchema(),numberSchema(),integerSchema(),booleanSchema(),
-                    arraySchema(),objectSchema()]).
- %                   objectSchema(), arraySchema()]).
- 
+     eqc_gen:oneof([stringSchema(),stringSchema(),stringSchema(),
+                    numberSchema(),numberSchema(),numberSchema(),
+                    integerSchema(),integerSchema(),integerSchema(),
+                    booleanSchema(),booleanSchema(),booleanSchema(),
+                    arraySchema(),
+                    objectSchema()]).
 
 %  VV BUCLE VV
 %,objectSchema()]). %,arraySchema(),null()]).
@@ -772,7 +777,7 @@ booleanSchema() ->
 
 objectSchema() ->
     %json(
-      ?LAZY(?LET(RandType, selectSimpleType(),
+      ?LAZY(?LET(RandType, selectType(),
            json({struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
                                                {struct,[{<<"type">>,RandType}]}}]}))
      ).
