@@ -47,9 +47,8 @@
 -define(LOG(X,Y),true).
 -endif.
 
--define(MAX_ARRAY_SIZE,15).
--define(MAX_STR_LENGTH,50).
--define(MAX_PROPERTIES,15).
+-define(MAX_ARRAY_SIZE,10).
+-define(MAX_PROPERTIES,10).
 
 -include_lib("eqc/include/eqc.hrl").
 
@@ -439,28 +438,26 @@ gen_typed_schema(Schema,Options) ->
             
 
            if (Pattern == undefined) ->
-                    case MinLength of 
-                        undefined -> 
-                            Min = 0;
-                        _ -> 
-                            Min = MinLength
-                    end,
-                    
-                    case MaxLength of
-                        undefined ->
-                            Max = ?MAX_STR_LENGTH; 
-                        _ ->  
-                            Max = MaxLength
-                    end,			
-                    
-                    ?LET(Rand,randInt(Min,Max), 
-                         ?LET(S, stringGen(Rand), list_to_binary(S)));
-   
-                
-                true ->
-                    ?LOG("Pattern is: ~p~n",[Pattern]),
-                    property_name(Pattern)
-            end;
+               case MinLength of 
+                 undefined -> 
+                   Min = 0;
+                 _ -> 
+                   Min = MinLength
+               end,               
+               case MaxLength of
+                 undefined ->
+                   ?LET(Max, natural_gte(Min),
+                        ?LET(Rand,randInt(Min,Max), 
+                             ?LET(S, stringGen(Rand), list_to_binary(S))));
+                 _ ->
+                   Max = MaxLength,
+                   ?LET(Rand,randInt(Min,Max), 
+                        ?LET(S, stringGen(Rand), list_to_binary(S)))
+                 end;
+              true ->
+               ?LOG("Pattern is: ~p~n",[Pattern]),
+               property_name(Pattern)
+           end;
         
         %% any
         %%     Any JSON data, including "null".
