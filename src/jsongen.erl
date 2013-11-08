@@ -398,14 +398,13 @@ gen_typed_schema(Schema,Options) ->
                end,               
                case MaxLength of
                  undefined ->
-                   ?LET(Max, natural_gte(Min),
-                        ?LET(Rand,randInt(Min,Max), 
-                             ?LET(S, stringGen(Rand), list_to_binary(S))));
+                   MaxGen = natural_gte(Min);
                  _ ->
-                   Max = MaxLength,
-                   ?LET(Rand,randInt(Min,Max), 
-                        ?LET(S, stringGen(Rand), list_to_binary(S)))
-                 end;
+                   MaxGen = MaxLength
+               end,
+               ?LET(Max, MaxGen,
+                    ?LET(Rand,randInt(Min,Max), 
+                         ?LET(S, stringGen(Rand), list_to_binary(S))));
               true ->
                ?LOG("Pattern is: ~p~n",[Pattern]),
                property_name(Pattern)
