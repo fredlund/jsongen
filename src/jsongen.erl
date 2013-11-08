@@ -47,7 +47,7 @@
 -define(LOG(X,Y),true).
 -endif.
 
--define(MAX_PROPERTIES,10).
+%-define(MAX_PROPERTIES,10). %% TO REMOVE IN NEXT UPDATE
 
 -include_lib("eqc/include/eqc.hrl").
 
@@ -206,19 +206,20 @@ gen_typed_schema(Schema,Options) ->
       Required = jsonschema:keyword(Schema, "required",[]),
       PatternProperties = jsonschema:patternProperties(Schema),
       AdditionalProperties = jsonschema:additionalProperties(Schema),
+      MaxProperties = jsonschema:maxProperties(Schema),
 
-      MaxProperties = jsonschema:maxProperties(Schema,?MAX_PROPERTIES),
-      RawMaxProperties = jsonschema:maxProperties(Schema),
 
-          %% case RawMaxProperties of
-          %%     undefined ->
-          %%         [];
+      % VVV TO REMOVE IN NEXT UPDATE VVV
+      %MaxProperties = jsonschema:maxProperties(Schema,?MAX_PROPERTIES), 
+      
+
+          case MaxProperties of
+              undefined ->
+                  MaxPropsGen = natural_gte(MinProperties);
               
-          %%     Value -> 
-          %%         MaxProperties = Value
-          %% end,
-          
-                               
+              Value -> 
+                  MaxPropsGen = Value
+          end,                            
 
 
       %% RawMaxProperties = jsonschema:maxProperties(Schema),
@@ -239,9 +240,7 @@ gen_typed_schema(Schema,Options) ->
       %%   end,
 
       ReqProps = [{P,S} || {P,S} <- Properties, lists:member(P, Required)],
-      OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],
-
-         
+      OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],       
 
       case AdditionalProperties of 
         false -> 
@@ -259,14 +258,14 @@ gen_typed_schema(Schema,Options) ->
       ?LOG("PatternProperties are: ~p~n",[PatternProperties]),
 
       MinOpts = MinProperties - length(ReqProps),
-      MaxOpts = MaxProperties - length(ReqProps),
+      %MaxOpts = MaxProperties - length(ReqProps), %NOT NEEDED ANYMORE ('N_max' USED NOW)
             
-      case {PatternProperties,AddP} of
-        {undefined,undefined} ->
-          ?LET(N, randIntPositive(MinOpts,length(OptProps)),
-               ?LET(OptPropsGen, choose_n_properties(OptProps,N),
+          case {PatternProperties,AddP} of
+              {undefined,undefined} ->
+                  ?LET(N, randIntPositive(MinOpts,length(OptProps)),
+                   ?LET(OptPropsGen, choose_n_properties(OptProps,N),
                     begin
-                      RawProperties = 
+                        RawProperties = 
                         [{P,json(S,Options)} ||
                           {P,S} <- ReqProps
                             ++ 
@@ -283,8 +282,9 @@ gen_typed_schema(Schema,Options) ->
                     end));
            
         {PatternProperties, undefined} ->
-          ?LET(N_opt, randIntPositive(0,length(OptProps)),
-               ?LET(N_prop, randIntPositive(MinOpts - N_opt,MaxOpts - N_opt),
+          ?LET({N_opt, N_max}, 
+               {randIntPositive(0,length(OptProps)), MaxPropsGen},
+               ?LET(N_prop, randIntPositive(MinOpts - N_opt, (N_max - length(ReqProps)) - N_opt),
                     ?LET({OptPropsGen, PatPropsGen},
                          {choose_n_properties(OptProps,N_opt),
                           create_patterns(PatternProperties,N_prop)},
@@ -310,9 +310,10 @@ gen_typed_schema(Schema,Options) ->
                          end)));
 
         {undefined,AddP} ->
-          ?LOG("{Min,Max}: {~p,~p}, AddP is: ~p~n",[MinOpts,MaxOpts,AddP]),
-          ?LET(N_opt, randIntPositive(0,length(OptProps)),
-               ?LET(N_add, randIntPositive(MinOpts - N_opt,MaxOpts - N_opt),
+          %?LOG("{Min,Max}: {~p,~p}, AddP is: ~p~n",[MinOpts,MaxOpts,AddP]),
+          ?LET({N_opt,N_max},
+               {randIntPositive(0,length(OptProps)), MaxPropsGen},
+               ?LET(N_add, randIntPositive(MinOpts - N_opt,(N_max - length(ReqProps)) - N_opt),
                     ?LET({OptPropsGen, AddPropsGen},
                          {choose_n_properties(OptProps,N_opt),
                           create_additionals(AddP,N_add)},
@@ -339,9 +340,11 @@ gen_typed_schema(Schema,Options) ->
                          end)));
         
         {PatternProperties,AddP} ->
-          ?LET(N_opt, randIntPositive(0,length(OptProps)),
-               ?LET(N_pat, randIntPositive(0, MaxOpts - N_opt),
-                    ?LET(N_add,randIntPositive(MinOpts - N_opt - N_pat, MaxOpts - N_opt - N_pat),
+          ?LET({N_opt, N_max},
+               {randIntPositive(0,length(OptProps)), MaxPropsGen},
+               ?LET(N_pat, randIntPositive(0, (N_max - length(ReqProps)) - N_opt),
+                    ?LET(N_add,randIntPositive(MinOpts - N_opt - N_pat, 
+                                               (N_max - length(ReqProps)) - N_opt - N_pat),
                          ?LET({OptPropsGen,PatPropsGen,AddPropsGen},
                               {choose_n_properties(OptProps,N_opt),
                                create_patterns(PatternProperties,N_pat),
@@ -373,7 +376,7 @@ gen_typed_schema(Schema,Options) ->
         <<"string">> ->
 	    MinLength = jsonschema:keyword(Schema,"minLength"),
 	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
-	    Pattern =  jsonschema:keyword(Schema,"pattern"),  %% to be added later
+	    Pattern =  jsonschema:keyword(Schema,"pattern"), 
             
 	    %% Currently we do not like length specifications 
 	    %% combined with regular expressions. Will this change? 
@@ -687,7 +690,7 @@ nullType() ->
      {struct,[{<<"type">>,<<"null">>}]}.
 
 
-%%%%%%%%% VVVV TO REMOVE VVVVV %%%%%%%%%%
+%%%%%%%%% VVVV TO REMOVE IN NEXT UPDATE VVVVV %%%%%%%%%%
 
    
 %% any_schema() ->
@@ -776,7 +779,7 @@ randInt (Min,Max) ->
             eqc_gen:choose(Min,Max)
     end.
 
-randIntPositive(Min,Max) when Min > 0 ->
+randIntPositive(Min,Max) when (Min > 0) and (Max > 0) ->
        case {Min,Max} of 
             
         {undefined,undefined} -> 
@@ -788,6 +791,9 @@ randIntPositive(Min,Max) when Min > 0 ->
         {Min,Max} -> 
             eqc_gen:choose(Min,Max)
        end;
+
+randIntPositive(_Min,Max) when Max < 0 ->
+    0;
 
 randIntPositive(_Min,Max) ->
     eqc_gen:choose(0,Max).
