@@ -40,6 +40,11 @@ validate(Data,Schema) ->
 		  false -> false;
 		  _ -> true
 		end,
+	      PatternProperties =
+		case jsonschema:keyword(Schema, "patternProperties", {}) of
+		  false -> false;
+		  _ -> true
+		end,
 	      DataPropertiesSet =
 		sets:from_list(proplists:get_keys(DataProperties)),
 	      RequiredPresent =
@@ -50,7 +55,8 @@ validate(Data,Schema) ->
 		sets:size(Additionals),
 	      if
 		not(RequiredPresent) -> false;
-		not(AdditionalProperties), AdditionalsSize>0 -> false;
+                %% TODO: do not ignore patternProperties
+		not(AdditionalProperties), AdditionalsSize>0, not(PatternProperties) -> false;
 		true -> maybe
 	      end;
 	    _ -> false
