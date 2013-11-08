@@ -25,7 +25,6 @@ hasType(_Schema={struct,Def}) ->
           false
   end;
 hasType(_Other) ->
-  %io:format("Something other:~p~n",[Other]),
   throw(bad).
 
 hasEnum(_Schema={struct,Def}) ->

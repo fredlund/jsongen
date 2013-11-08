@@ -47,7 +47,6 @@
 -define(LOG(X,Y),true).
 -endif.
 
--define(MAX_ARRAY_SIZE,10).
 -define(MAX_PROPERTIES,10).
 
 -include_lib("eqc/include/eqc.hrl").
@@ -167,26 +166,26 @@ gen_typed_schema(Schema,Options) ->
     %%     A JSON array. 
     <<"array">> ->
       MaxItems = jsonschema:keyword(Schema,"maxItems"),
-      MinItems = jsonschema:keyword(Schema,"minItems",0),
-         
-      AdditionalItems = jsonschema:additionalItems(Schema), %,"additionalItems",<<"true">>),
-      ?LOG("AdditionalItems: ~p ~n",[AdditionalItems]),
+      MinItems = jsonschema:keyword(Schema,"minItems",0),   
+      AdditionalItems = jsonschema:additionalItems(Schema), 
+
       _UniqueItems = jsonschema:keyword(Schema, "uniqueItems",false),
+      ?LOG("AdditionalItems: ~p ~n",[AdditionalItems]),
       
       case jsonschema:items(Schema) of
 	{itemSchema, ItemSchema} ->
               case AdditionalItems of
                   
                   %% VV THIS CASE BRANCH CAN BE REMOVED VV
-                  {} ->
-                      ?LOG("ArrayOfAny~n",[]),
-                      %arrayOfAny(ItemSchema, {MinItems,MaxItems});
-                      arrayOfAny(MinItems,MaxItems);
-                  %%%% 
+                  %% {} ->
+                  %%     ?LOG("ArrayOfAny~n",[]),
+                  %%     %arrayOfAny(ItemSchema, {MinItems,MaxItems});
+                  %%     arrayOfAny(MinItems,MaxItems);
+                  %% %%%% 
 
                   true ->
-                      %arrayOfAny(ItemSchema, {MinItems,MaxItems});
                       arrayOfAny(MinItems,MaxItems);
+
                   false ->
                       array(ItemSchema, {MinItems,MaxItems})
               end;
@@ -195,7 +194,6 @@ gen_typed_schema(Schema,Options) ->
               arrayOfAny(MinItems,MaxItems);
 
 	{itemsTemplate, ItemsTemplate} ->
-
 	  template(ItemsTemplate)
       end;
     
@@ -208,8 +206,19 @@ gen_typed_schema(Schema,Options) ->
       Required = jsonschema:keyword(Schema, "required",[]),
       PatternProperties = jsonschema:patternProperties(Schema),
       AdditionalProperties = jsonschema:additionalProperties(Schema),
-      %AdditionalProperties = jsonschema:keyword(Schema, "additionalProperties",true),
+
       MaxProperties = jsonschema:maxProperties(Schema,?MAX_PROPERTIES),
+      RawMaxProperties = jsonschema:maxProperties(Schema),
+
+          %% case RawMaxProperties of
+          %%     undefined ->
+          %%         [];
+              
+          %%     Value -> 
+          %%         MaxProperties = Value
+          %% end,
+          
+                               
 
 
       %% RawMaxProperties = jsonschema:maxProperties(Schema),
@@ -358,63 +367,6 @@ gen_typed_schema(Schema,Options) ->
                                 end
                               end))))
           end;
-
-          %% case AdditionalProperties of
-          %%     undefined ->
-
-          %%         ?LET(OptPropsGen, choose_properties(OptProps,MinOpts,MaxOpts),
-          %%              ?LET(PatternGen, create_patterns(PatternProperties, 
-          %%                                               MinOpts - length(OptPropsGen)),
-          %%                   ?LET(PatternPropsGen, choose_properties(lists:concat(PatternGen), 
-          %%                                               MinOpts - length(OptPropsGen), MaxOpts), 
-          %%                        begin
-          %%                           ?LOG("*** FINAL PROPERTIES: ~p***~n",
-          %%                                [length(OptPropsGen ++ PatternPropsGen ++ ReqProps)]),
-          %%                       RawProperties = 
-          %%                           [{P,json(S,Options)} ||
-          %%                               {P,S} <- ReqProps
-          %%                                   ++ 
-          %%                                   OptPropsGen ++ PatternPropsGen
-          %%                           ],
-          %%                       case proplists:get_value(randomize_properties,Options,true) of
-          %%                           true ->
-          %%                               ?LET(Props,
-          %%                                    randomize_list(RawProperties),
-          %%                                    {struct, Props});
-          %%                           false ->
-          %%                               {struct,RawProperties}
-          %%                       end
-          %%                   end)));        
-
-
-
-          %%     %% THIS IMPLEMENTATION HAS TO BE UPDATED
-          %%     _ ->
-          %%   ?LET({PatternGen,AdditionalGen},
-	  %%        {create_patterns(PatternProperties),[]},
-          %%        ?LET(Optionals, 
-          %%             choose_properties
-	  %%       	(OptProps
-	  %%       	 ++ lists:concat(PatternGen)
-	  %%       	 ++ AdditionalGen,
-	  %%       	 MinOpts, MaxOpts),    
-	  %%             begin
-	  %%       	RawProperties = 
-	  %%       	  [{P,json(S,Options)} ||
-	  %%       	    {P,S} <- ReqProps
-	  %%       	      ++ 
-	  %%       	      Optionals
-	  %%       	  ],
-	  %%       	case proplists:get_value(randomize_properties,Options,true) of
-	  %%       	  true ->
-	  %%       	    ?LET(Props,
-	  %%       		 randomize_list(RawProperties),
-	  %%       		 {struct, Props});
-	  %%       	  false ->
-	  %%       	    {struct,RawProperties}
-	  %%       	end
-	  %%             end))
-          %%     end;
         
         %% string
         %%     A JSON string.
@@ -463,7 +415,9 @@ gen_typed_schema(Schema,Options) ->
         %%     Any JSON data, including "null".
         <<"any">> ->
           ?LOG("'any' keyword found",[]),
-	    any_schema();
+          ?LET(TypeGen, anyType(),
+               json(TypeGen));
+	    %any_schema();
 
 
         %% Union types
@@ -487,29 +441,26 @@ array(Schema,{MinItems,MaxItems}) ->
     ?LOG("Array schema is ~p ~n",[Schema]),
     case MaxItems of
 	undefined ->
-	    ?LET(N, eqc_gen:choose(MinItems, ?MAX_ARRAY_SIZE), arrayGen(Schema,N));
-
+            ?LET(Max, natural_gte(MinItems),
+                 ?LET(N, eqc_gen:choose(MinItems, Max), 
+                      arrayGen(Schema,N)));
 	MaxItems ->
 	    ?LET(N, eqc_gen:choose(MinItems,MaxItems), arrayGen(Schema,N))
     end.		   
 
 insertType(Type, {struct,[Types | Rest]}) ->
-%insertType(Type,{struct,Schema}) ->
     ?LOG("insertTypeSchema: ~p",[Types]),
     {<<"type">>, ListOfTypes} = Types,
     ?LOG("Old list of types: ~p ~n",[ListOfTypes]),
     NewListOfTypes = [Type| ListOfTypes],
     ?LOG("New list of types: ~p ~n",[NewListOfTypes]),
-    %NewTypes = [Type | ListOfTypes],
-    %?LOG("Final schema: {struct,[{<<\"type\">>, ~p}, ~p]} ~n",[NewListOfTypes, Rest]),
     ?LOG("Rest: ~p ~n",[Rest]),
-    %{struct,[{<<"type">>, NewTypes}, Rest]};
-    Res ={struct,[ {<<"type">>, NewListOfTypes} , Rest]},
-        ?LOG ("Final res: ~p ~n",[Res]),
-        Res.
+    Res = {struct,[ {<<"type">>, NewListOfTypes} , Rest]},
+    ?LOG ("Final res: ~p ~n",[Res]),
+    Res.
 
 
-
+%%% VVV TO REMOVE IN NEXT UPDATE VVV %%%
 
 %% arrayOfAny(Schema,{MinItems,MaxItems}) ->
 %%     ?LOG("Array schema is ~p ~n",[Schema]),
@@ -536,25 +487,23 @@ insertType(Type, {struct,[Types | Rest]}) ->
 arrayOfAny(MinItems,MaxItems) ->
     case MaxItems of
 	undefined ->
-	    ?LET(N, eqc_gen:choose(MinItems, ?MAX_ARRAY_SIZE),
-                 %% NOT SELECTING COMPLEX TYPES FOR NOW (ITS REALLY SLOW)
-                 ?LET(RandType, selectSimpleType(),
-                      begin
-                          NewSchema =  {struct,[{<<"type">>,RandType}]},
-                          arrayGen(NewSchema,N)
-                      end));
+            ?LET(Max, natural_gte(MinItems),
+                 ?LET(N, eqc_gen:choose(MinItems, Max),
+                      ?LET(RandType, selectType(),
+                           begin
+                               NewSchema =  {struct,[{<<"type">>,RandType}]},
+                               arrayGen(NewSchema,N)
+                           end)));
 
 	MaxItems ->
             ?LET(N, eqc_gen:choose(MinItems, MaxItems),
                  %% NOT SELECTING COMPLEX TYPES FOR NOW (ITS REALLY SLOW)
-                 ?LET(RandType, selectSimpleType(),
+                 ?LET(RandType, selectType(),
                       begin
                           NewSchema =  {struct,[{<<"type">>,RandType}]},
                           arrayGen(NewSchema,N)
                       end))
     end.
-
-
 
 -spec arrayGen (json:json_term(), integer()) -> eqc_gen:gen(json:json_term()).
 arrayGen(_Schema,0) ->
@@ -569,8 +518,6 @@ template(_Template) ->
     %% TODO: generator for template
     null().
 
-null() ->
-    null.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Integer generators
@@ -694,22 +641,22 @@ number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
 
 selectType()->
     eqc_gen:oneof([<<"integer">>,<<"string">>,<<"number">>,<<"boolean">>,
-                 <<"array">>,<<"object">>]).
+                 <<"array">>,<<"object">>,<<"null">>]).
 
 selectSimpleType() ->
     eqc_gen:oneof([<<"integer">>,<<"string">>,<<"number">>,<<"boolean">>]).
 
 anyType() ->
     ?LOG("'anyType' -> Choosing random type ('any' keyword)...~n",[]),
+
+    %% TODO: Use 'frequency' EQC library function instead
      eqc_gen:oneof([stringType(),stringType(),stringType(),
                     numberType(),numberType(),numberType(),
                     integerType(),integerType(),integerType(),
                     booleanType(),booleanType(),booleanType(),
+                    nullType(), nullType(), 
                     arrayType(),
                     objectType()]).
-
-%% VV BUCLE VV
-%,objectType()]). %,arrayType()]).
 
 
 -spec stringType() -> eqc_gen:gen(string()).
@@ -731,69 +678,79 @@ objectType() ->
     {struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
                                         {struct,[{<<"type">>,RandType}]}}]})).
 
-
-%{struct,[{<<"type">>,<<"integer">>}]}}]}.
-
 arrayType() ->
     ?LAZY(?LET(RandType, selectType(),
          {struct,[{<<"type">>,<<"array">>},
                   {<<"additionalItems">>,<<"false">>},
-                  {<<"items">>,{struct,[{<<"type">>,RandType}]}}]}
-      )).
-    
-any_schema() ->
-    ?LOG("'anySchema' -> Choosing random type ('any' keyword)...~n",[]),
-     eqc_gen:oneof([stringSchema(),stringSchema(),stringSchema(),
-                    numberSchema(),numberSchema(),numberSchema(),
-                    integerSchema(),integerSchema(),integerSchema(),
-                    booleanSchema(),booleanSchema(),booleanSchema(),
-                    arraySchema(),
-                    objectSchema()]).
+                  {<<"items">>,{struct,[{<<"type">>,RandType}]}}]})).
 
-%  VV BUCLE VV
-%,objectSchema()]). %,arraySchema(),null()]).
-
--spec stringSchema() -> eqc_gen:gen(string()).
-stringSchema() ->
-    json({struct,[{<<"type">>,<<"string">>}]}).
-    % TODO: generator of valid JSON strings
-    % Its not a good generator. Implementation has to be changed
-    %?LET(Name,name(),list_to_binary(Name)).
-    %?SIZED(Size,list_to_binary(name())).
-
-numberSchema() ->
-    json({struct,[{<<"type">>,<<"number">>}]}).
-
-integerSchema() ->
-    json({struct,[{<<"type">>,<<"integer">>}]}).
-
--spec booleanSchema() -> eqc_gen:gen(boolean()).
-booleanSchema() ->
-    json({struct,[{<<"type">>,<<"boolean">>}]}).
+nullType() ->
+     {struct,[{<<"type">>,<<"null">>}]}.
 
 
-objectSchema() ->
-    %json(
-      ?LAZY(?LET(RandType, selectType(),
-           json({struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
-                                               {struct,[{<<"type">>,RandType}]}}]}))
-     ).
+%%%%%%%%% VVVV TO REMOVE VVVVV %%%%%%%%%%
+
+   
+%% any_schema() ->
+%%     ?LOG("'anySchema' -> Choosing random type ('any' keyword)...~n",[]),
+%%      eqc_gen:oneof([stringSchema(),stringSchema(),stringSchema(),
+%%                     numberSchema(),numberSchema(),numberSchema(),
+%%                     integerSchema(),integerSchema(),integerSchema(),
+%%                     booleanSchema(),booleanSchema(),booleanSchema(),
+%%                     arraySchema(),
+%%                     objectSchema()]).
+
+%% %  VV BUCLE VV
+%% %,objectSchema()]). %,arraySchema(),null()]).
+
+%% -spec stringSchema() -> eqc_gen:gen(string()).
+%% stringSchema() ->
+%%     json({struct,[{<<"type">>,<<"string">>}]}).
+%%     % TODO: generator of valid JSON strings
+%%     % Its not a good generator. Implementation has to be changed
+%%     %?LET(Name,name(),list_to_binary(Name)).
+%%     %?SIZED(Size,list_to_binary(name())).
+
+%% numberSchema() ->
+%%     json({struct,[{<<"type">>,<<"number">>}]}).
+
+%% integerSchema() ->
+%%     json({struct,[{<<"type">>,<<"integer">>}]}).
+
+%% -spec booleanSchema() -> eqc_gen:gen(boolean()).
+%% booleanSchema() ->
+%%     json({struct,[{<<"type">>,<<"boolean">>}]}).
 
 
-%{struct,[{<<"type">>,<<"object">>}]}
+%% objectSchema() ->
+%%     %json(
+%%       ?LAZY(?LET(RandType, selectType(),
+%%            json({struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
+%%                                                {struct,[{<<"type">>,RandType}]}}]}))
+%%      ).
 
-arraySchema() ->
-    %json(
-      ?LAZY(?LET(RandType, selectType(),
-           json({struct,[{<<"type">>,<<"array">>},
-                    {<<"additionalItems">>,<<"false">>},
-                    {<<"items">>,{struct,[{<<"type">>,RandType}]}}]}))
-     ).
 
-nullSchema() ->
-    json({struct,[{<<"type">>,<<"null">>}]}).
+%% %{struct,[{<<"type">>,<<"object">>}]}
+
+%% arraySchema() ->
+%%     %json(
+%%       ?LAZY(?LET(RandType, selectType(),
+%%            json({struct,[{<<"type">>,<<"array">>},
+%%                     {<<"additionalItems">>,<<"false">>},
+%%                     {<<"items">>,{struct,[{<<"type">>,RandType}]}}]}))
+%%      ).
+
+%% nullSchema() ->
+%%     json({struct,[{<<"type">>,<<"null">>}]}).
+
+
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Random functions
+
 randString() ->
     ?LET(N, positive(),
          ?LET(S,stringGen(N), list_to_binary(S))).
@@ -805,12 +762,6 @@ stringGen(0) ->
 stringGen(N) ->
     ?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, [S|G]).
 
-
-%random integer generator between Min and Max values
-
--spec randInt2 (integer(), integer()) -> eqc_gen:gen(integer()).
-randInt2 (Min, Max) ->
-	eqc_gen:choose(Min,Max).
 
 randInt (Min,Max) ->
 
@@ -847,31 +798,67 @@ randIntPositive(_Min,Max) ->
 randFlt (Min, _) ->
     ?LET(Flt, eqc_gen:real(), Min + Flt).
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generators for boolean and null
+
 -spec boolean() -> eqc_gen:gen(boolean()).
 boolean() ->
     eqc_gen:bool().
 
-%% candidate for removal
-propname() ->
-    name().
+
+null() ->
+    null.
 
 
-% candidate for removal
-name() ->
-    eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
+%%% VVV TO REMOVE IN NEXT UPDATE VVV %%%
+
+%% %% candidate for removal
+%% propname() ->
+%%     name().
 
 
-isMultiple(N,Mul) when Mul > 0 ->
-	N rem Mul == 0.
+%% % candidate for removal
+%% name() ->
+%%     eqc_gen:non_empty(eqc_gen:list(eqc_gen:choose($a,$z))).
 
-%test, not implemented yet
-isMultipleFloat(F,Mul) when Mul > 0 ->
-    is_integer(F/Mul).
+
+%% isMultiple(N,Mul) when Mul > 0 ->
+%% 	N rem Mul == 0.
+
+%% %test, not implemented yet
+%% isMultipleFloat(F,Mul) when Mul > 0 ->
+%%     is_integer(F/Mul).
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generators for choosing random properties from a list
+
+%-spec choose_properties([string()],natural(),natural()) -> eqc_gen:gen([string()]).
+choose_properties(P, Min, Max) when Max >= Min -> 
+    ?LOG("Choosing properties: ~p~n",[P]),
+    ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
+    ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_properties(P,N)).
+    
+
+choose_n_properties(L,N) ->
+  randomize_list(L,N,length(L)).
+
+randomize_list(L) ->
+  Length = length(L),
+  randomize_list(L,Length,Length).
+randomize_list([],_,_Length) -> [];
+randomize_list(_List,0,_Length) -> [];
+randomize_list(List, N, Length) ->
+    ?LET(I, eqc_gen:choose(1, Length), 
+    [lists:nth(I,List) |
+     randomize_list(delete_nth_element(I,List), N-1, Length-1)]).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for patternProperties keyword
 
-% <<"i.*">>
 property_name(Pattern) ->
     ?LOG("Pattern name: ~p~n",[Pattern]),
     RegularExpression = binary_to_list(Pattern),
@@ -881,7 +868,6 @@ property_name(Pattern) ->
         gen_string_from_regexp:gen(InternalRegularExpression),
         list_to_binary(String)).
 
-% {<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}
 pattern_gen(_,0) ->
     [];
 pattern_gen({Pattern, Schema},N) when N > 0 ->
@@ -897,10 +883,7 @@ pattern_gen(Pattern_Schema) ->
 pattern_gen_range(Pattern_Schema, Min) ->
     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
     ?LET(N,natural_gte(Min), pattern_gen(Pattern_Schema,N)).
-% { "i.*" : { "type" : "integer" }, "s.*" : { "type" : "string" } }
-% 
 
-%{struct, [{<<"i.*">>, {struct, [{<<"type">>,<<"integer">>}]}}, {<<"s.*">>, {struct, [{ <<"type">>,<<"string">>}]}}]}
 create_patterns(undefined) ->
 [];
 
@@ -926,7 +909,6 @@ create_patterns(PatternPropList, MinimumProps) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for additionalProperties keyword
 
-
 additional_gen (_,0) ->
 [];
 
@@ -940,13 +922,16 @@ additional_gen(AdditionalSchema,N) when N > 0 ->
             ?LOG("Not empty schema, type is {randString(),~p}~n",[Schema]),
             [ {randString(), {struct,[Schema]}} | additional_gen(AdditionalSchema,N-1)]
     end.
-%{struct,[{<<"type">>,<<"string">>}]}.
+
 create_additionals({},N) ->
     additional_gen({},N);
 
 create_additionals({struct,AddPropList},N) ->
-    ?LOG("create_additionals with fix value, AdditionalPropList is ~p, and N is ~p and lenght os list is ~p~n",
+    ?LOG("create_additionals with fix value, 
+AdditionalPropList is ~p, 
+and N is ~p and lenght os list is ~p~n",
             [AddPropList, N, length(AddPropList)]),
+
     FinalProps = ceiling(N / length(AddPropList)),
     ?LOG ("Final Props: ~p~n",[FinalProps]),
     io:format("~n** THIS MAY TAKE A WHILE **~n"),
@@ -955,31 +940,8 @@ create_additionals({struct,AddPropList},N) ->
     ?LOG("Final additionals created: ~p~n",[L]),
     lists:concat(L).
 
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc functions
-
-% -spec choose_properties([string()],natural(),natural()) -> eqc_gen:gen([string()]).
-
-choose_properties(P, Min, Max) when Max >= Min -> 
-    ?LOG("Choosing properties: ~p~n",[P]),
-    ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
-    ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_properties(P,N)).
-    
-
-choose_n_properties(L,N) ->
-  randomize_list(L,N,length(L)).
-
-randomize_list(L) ->
-  Length = length(L),
-  randomize_list(L,Length,Length).
-randomize_list([],_,_Length) -> [];
-randomize_list(_List,0,_Length) -> [];
-randomize_list(List, N, Length) ->
-    ?LET(I, eqc_gen:choose(1, Length), 
-    [lists:nth(I,List) |
-     randomize_list(delete_nth_element(I,List), N-1, Length-1)]).
 
 floor(X) when X < 0 ->
     T = trunc(X),
@@ -1012,11 +974,9 @@ concat_and_reverse([H|T], Res) ->
 ceiling(X) ->
     T = trunc(X),
     case (X - T) of
-
         Negative when Negative < 0 -> T;
         Positive when Positive > 0 -> T + 1;
         _ -> T
-
     end.
 
 

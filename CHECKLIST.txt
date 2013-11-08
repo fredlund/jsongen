@@ -12,12 +12,12 @@
 
 	+ Object generator: Fully implemented.
 
-	+ Array: 'additionalItems' and 'uniqueItems' not implemented yet
+	+ Array: 'uniqueItems' not implemented yet
 
 Ideas
 ------
 
-- We should do a validator as well OR
+- We should do a validator as well ==> *DONE*
 - Are there any usable validators out there? (we should search for them).
 
 - Given a validator we could generate data for some additional types of
