@@ -1,1 +1,14 @@
-{ "type" : "array", "items" : { "type" : "integer" } }
+{ 
+	"type" : "array", 
+	"minItems" : 10,
+	"uniqueItems" : true,
+	"items" : 
+	{ 
+		"type" : "integer" 
+	}, 
+	"additionalItems" :
+	{
+		"type" : "boolean"
+	}
+
+}

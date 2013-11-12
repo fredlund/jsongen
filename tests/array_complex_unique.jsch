@@ -1,0 +1,5 @@
+{
+    "type" : "array",
+    "minItems" : 100,
+    "uniqueItems" : true
+}
