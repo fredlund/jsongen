@@ -1,6 +1,6 @@
 {
   "title" : "Peano's representation (version 2)",
   "$schema": "http://json-schema.org/draft-04/schema#",
-  "oneOf" : [ {"$ref" : "#/definitions/zero"},
-              {"$ref" : "#/definitions/succ"} ],
+  "oneOf" : [ {"type" : "string"},
+              {"type" : "boolean"} ],
 }
