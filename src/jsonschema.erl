@@ -32,6 +32,10 @@ anyOf(Schema) ->
     Schemas = keyword(Schema,"anyOf"),
     Schemas.
 
+oneOf(Schema) ->
+    Schemas = keyword(Schema,"oneOf"),
+    Schemas.
+
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
     Type.

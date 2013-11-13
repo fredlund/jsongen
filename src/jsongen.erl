@@ -57,31 +57,36 @@ json(Schema) ->
 
 json(Schema,Options) ->
   ?LOG("json(~s,~p)",[json:encode(Schema),Options]),
-  case jsonschema:anyOf(Schema) of
+  case jsonschema:oneOf(Schema) of
     undefined ->
-      case jsonschema:isRef(Schema) of
-        true ->
-          RootSchema = proplists:get_value(root,Options),
-          RefSch = jsonref:unref(Schema,RootSchema),
-          % TODO: we need to maintain an environment!!!
-          NewOptions = % [{root,RefSch}|proplists:delete(root,Options)],
-            Options,
-          ?LAZY(jsongen:json(RefSch,NewOptions));
-        false ->  
-          case jsonschema:hasType(Schema) of
+      case jsonschema:anyOf(Schema) of
+        undefined ->
+          case jsonschema:isRef(Schema) of
             true ->
-              gen_typed_schema(Schema,Options);
-            false ->
-              case jsonschema:hasEnum(Schema) of
-                true -> 
-                  eqc_gen:oneof(jsonschema:enumerated(Schema));
+              RootSchema = proplists:get_value(root,Options),
+              RefSch = jsonref:unref(Schema,RootSchema),
+                                                % TODO: we need to maintain an environment!!!
+              NewOptions = % [{root,RefSch}|proplists:delete(root,Options)],
+                Options,
+              ?LAZY(jsongen:json(RefSch,NewOptions));
+            false ->  
+              case jsonschema:hasType(Schema) of
+                true ->
+                  gen_typed_schema(Schema,Options);
                 false ->
-                  throw(bad)
+                  case jsonschema:hasEnum(Schema) of
+                    true -> 
+                      eqc_gen:oneof(jsonschema:enumerated(Schema));
+                    false ->
+                      throw(bad)
+                  end
               end
-          end
+          end;
+        Schemas ->
+          eqc_gen:oneof([json(S,Options) || S <- Schemas])
       end;
-    Schemas ->
-      eqc_gen:oneof([json(S,Options) || S <- Schemas])
+    _ ->
+      throw({not_implemented, oneOf})
   end.
 
 gen_typed_schema(Schema,Options) ->
