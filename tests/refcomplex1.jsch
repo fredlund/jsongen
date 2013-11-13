@@ -1,0 +1,11 @@
+{
+  "title" : "A Complex use of JSON References",
+  "$schema" : "http://json-schema.org/draft-04/schema#",
+  "description" : "{\"a\":{\"b\":{\"a\":{}}}} shouldn't be genarated, just one property a and then b's",
+  "type" : "object",
+  "additionalProperties" : false,
+  "required" : ["a"],
+  "properties" : {
+    "a" : { "$ref" : "tests/refcomplex2.jsch#"}
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "title" : "A Complex use of JSON References",
+  "$schema" : "http://json-schema.org/draft-04/schema#",
+  "type" : "object",
+  "additionalProperties" : false,
+  "properties" : {
+    "b" : { "$ref" : "#"}
+  }
+}
