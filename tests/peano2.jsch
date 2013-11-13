@@ -1,0 +1,17 @@
+{
+  "title" : "Peano's representation (version 2)",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "anyOf" : [ {"$ref" : "#/definitions/zero"},
+              {"$ref" : "#/definitions/succ"} ],
+  "definitions" : {
+    "zero" : { "enum" : ["zero"] },
+    "succ" : {
+      "type" : "object",        
+      "required" : ["s"],
+      "properties" : {
+        "s" : { "$ref" : "#" }
+      },
+      "additionalProperties" : false
+    }
+  }
+}

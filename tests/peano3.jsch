@@ -1,0 +1,6 @@
+{
+  "title" : "Peano's representation (version 3)",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "anyOf" : [ {"$ref" : "tests/peano3-zero.jsch#"},
+              {"$ref" : "tests/peano3-succ.jsch#"} ],
+}

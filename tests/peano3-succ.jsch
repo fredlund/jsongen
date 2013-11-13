@@ -1,0 +1,8 @@
+{       
+  "type" : "object",        
+  "required" : ["s"],
+  "properties" : {
+    "s" : { "$ref" : "tests/peano3.jsch#" }
+  },
+  "additionalProperties" : false
+}

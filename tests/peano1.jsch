@@ -1,0 +1,10 @@
+{
+  "title" : "Peano's representation (version 1)",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type" : ["null", "object"],
+  "required" : ["s"],
+  "properties" : {
+    "s" : { "$ref" : "#" }
+  },
+  "additionalProperties" : false
+}
