@@ -106,9 +106,10 @@ additionalProperties({struct,Schema}) ->
     end.
 
 additionalItems({struct,Schema}) ->
+
     case proplists:lookup(<<"additionalItems">>, Schema) of
 
-       {struct, Properties} -> 
+       {_,{struct, Properties}} -> 
             Properties;
 
         {_,<<"false">>} ->

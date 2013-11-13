@@ -12,7 +12,7 @@
 
 	+ Object generator: Fully implemented.
 
-	+ Array: 'uniqueItems' not implemented yet
+	+ Array: Fully implemented yet
 
 Ideas
 ------
