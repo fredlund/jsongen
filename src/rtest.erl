@@ -25,7 +25,7 @@ schemas_test_() ->
   ?debugFmt("Will test schemas~n~p~n",[Filenames]),
   lists:foldl
     (fun (SchemaFile,Acc) ->
-	 try jsonschema:read_file(SchemaFile) of
+	 try jsonschema:read_schema(SchemaFile) of
 	   {ok,Schema} ->
 	     Basename = filename:rootname(filename:basename(SchemaFile)),
 	     [{"schema \""++Basename++"\"",
@@ -49,7 +49,7 @@ schemas_test_() ->
      end, [], Filenames).
 
 test_schema_file([Filename]) ->
-  {ok,Schema} = jsonschema:read_file(Filename),
+  {ok,Schema} = jsonschema:read_schema(Filename),
   (test_schema(Schema))().
   
 test_schema(Schema) ->

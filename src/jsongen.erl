@@ -38,7 +38,7 @@
 -compile(export_all).
 
 %%LOGS
-%-define(debug,true).
+%%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -55,14 +55,21 @@
 %% Translates a JSON schema into an Erlang QuickCheck generator.
 -spec json(json:json_term()) -> eqc_gen:gen(json:json_term()).
 json(Schema) ->
-  json(Schema,[]).
+  json(Schema,[{root,Schema}]).
 
 json(Schema,Options) ->
-  ?LOG("json(~p)~n",[Schema]),
+  ?LOG("json(~s,~p)",[json:encode(Schema),Options]),
   case jsonschema:anyOf(Schema) of
     undefined ->
-      case jsonschema:ref(Schema) of
-        undefined ->                        
+      case jsonschema:isRef(Schema) of
+        true ->
+          RootSchema = proplists:get_value(root,Options),
+          RefSch = jsonref:unref(Schema,RootSchema),
+          % TODO: we need to maintain an environment!!!
+          NewOptions = % [{root,RefSch}|proplists:delete(root,Options)],
+            Options,
+          ?LAZY(jsongen:json(RefSch,NewOptions));
+        false ->  
           case jsonschema:hasType(Schema) of
             true ->
               gen_typed_schema(Schema,Options);
@@ -73,13 +80,10 @@ json(Schema,Options) ->
                 false ->
                   throw(bad)
               end
-          end;
-        Ref ->
-          {ok, RefSch} = jsonschema:read_file(Ref),
-          ?LAZY(jsongen:json(RefSch))
+          end
       end;
     Schemas ->
-      eqc_gen:oneof([json(S) || S <- Schemas])
+      eqc_gen:oneof([json(S,Options) || S <- Schemas])
   end.
 
 gen_typed_schema(Schema,Options) ->

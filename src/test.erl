@@ -6,7 +6,7 @@
 %% erl -pa ebin -noshell -run test write_instance_of test/in/string.jsch 
 
 write_instance_of(File) ->
-    {ok, Schema} = jsonschema:read_file(File),
+    {ok, Schema} = jsonschema:read_schema(File),
     io:format("RUNNING 1 INSTANCE...~n"),
     JsonGenerator = jsongen:json(Schema),
     JsonInstance = eqc_gen:pick(JsonGenerator),
@@ -25,7 +25,7 @@ gen_instance(_,0) ->
 	halt().
 
 write_X_instances_of([File,N])  ->
-    {ok, Schema} = jsonschema:read_file(File),
+    {ok, Schema} = jsonschema:read_schema(File),
     JsonGenerator = jsongen:json(Schema),
     io:format("RUNNING ~B INSTANCES...~n",[list_to_integer(N)]),
     gen_instance(JsonGenerator,list_to_integer(N)).

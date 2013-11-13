@@ -2,20 +2,9 @@
 
 -compile(export_all).
 
-read_schema(Url) ->    
-    {ok, {{_Version, 200, _ReasonPhrase}, _Headers, JsonString}} =
-        httpc:request(Url),
-    {ok, json:decode(JsonString)}.
-
-read_file(Filename) ->
-    Result = file:read_file(Filename),
-    case Result of
-        {ok, JsonString} ->
-            Schema = json:decode(JsonString),
-            {ok, Schema};
-        _ ->
-            Result
-    end.
+%% URL can be "http:...", "file:..." or directly a filename
+read_schema(URL) ->
+  json:decode_url(URL).
 
 hasType(_Schema={struct,Def}) ->
   case proplists:lookup(<<"type">>,Def) of
@@ -35,9 +24,9 @@ hasEnum(_Schema={struct,Def}) ->
       false
   end.
 
-ref(Schema) ->
+isRef(Schema) ->
     URL = keyword(Schema,"$ref"),
-    URL.
+    URL =/= undefined.
 
 anyOf(Schema) ->
     Schemas = keyword(Schema,"anyOf"),
