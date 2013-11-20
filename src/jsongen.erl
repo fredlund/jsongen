@@ -49,6 +49,8 @@
 
 -include_lib("eqc/include/eqc.hrl").
 
+-type options() :: {root, jsonref:url()}.
+
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
 -spec json(json:json_term()) -> eqc_gen:gen(json:json_term()).
@@ -65,10 +67,13 @@ json(Schema,Options) ->
             true ->
               RootSchema = proplists:get_value(root,Options),
               RefSch = jsonref:unref(Schema,RootSchema),
-                                                % TODO: we need to maintain an environment!!!
-              NewOptions = % [{root,RefSch}|proplists:delete(root,Options)],
+              NewOptions =
+                % We should change the root but at this moment peano2 goes into an inifinite loop.
+                % TODO: do we need to maintain an environment!?
+                % AH: nop, maybe it is enough the root to be a URL instead of a schema
+                % [{root,RefSch}|proplists:delete(root,Options)],
                 Options,
-              ?LAZY(jsongen:json(RefSch,NewOptions));
+              ?LAZY(json(RefSch,NewOptions));
             false ->  
               case jsonschema:hasType(Schema) of
                 true ->
