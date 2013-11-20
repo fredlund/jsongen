@@ -63,6 +63,7 @@ json(Schema,Options) ->
     undefined ->
       case jsonschema:anyOf(Schema) of
         undefined ->
+              %%%%%%%
           case jsonschema:isRef(Schema) of
             true ->
               RootSchema = proplists:get_value(root,Options),
@@ -83,7 +84,7 @@ json(Schema,Options) ->
                     true -> 
                       eqc_gen:oneof(jsonschema:enumerated(Schema));
                     false ->
-                      throw(bad)
+                      throw(bad_schema)
                   end
               end
           end;
@@ -91,7 +92,7 @@ json(Schema,Options) ->
           eqc_gen:oneof([json(S,Options) || S <- Schemas])
       end;
     _ ->
-      throw({not_implemented, oneOf})
+      throw(oneOf_not_implemented)
   end.
 
 gen_typed_schema(Schema,Options) ->
@@ -195,7 +196,6 @@ gen_typed_schema(Schema,Options) ->
                   false ->
                       array(ItemSchema, {MinItems,MaxItems},UniqueItems);
 
-                  %% THIS HAS TO BE IMPLEMENTED
                    AdditionalSchema ->
                       ?LOG("AdditionalSchema is ~p~n",[AdditionalSchema]),
                       {struct, Schemas} = ItemSchema,
@@ -387,13 +387,12 @@ gen_typed_schema(Schema,Options) ->
 	    %% Currently we do not like length specifications 
 	    %% combined with regular expressions. Will this change? 
 	    %% Maybe, it is not easy to do.
+
 	    if
                 ((MinLength=/=undefined) orelse (MaxLength=/=undefined)) andalso
                 (Pattern=/=undefined) ->
-                    io:format
-                      ("Specifying both minimum or maximum string lengths "++
-                       "and a regular expression is not currently supported"),
-                    throw(nyi);
+
+                    throw(regular_expressions_for_strings_with_fixed_length);
                 true -> ok
 	    end,
             

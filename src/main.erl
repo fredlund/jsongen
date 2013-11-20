@@ -1,4 +1,4 @@
--module(test).
+-module(main).
 
 -compile(export_all).
 
@@ -8,11 +8,29 @@
 write_instance_of(File) ->
     {ok, Schema} = jsonschema:read_schema(File),
     io:format("RUNNING 1 INSTANCE...~n"),
-    JsonGenerator = jsongen:json(Schema),
-    JsonInstance = eqc_gen:pick(JsonGenerator),
-    JsonString = json:encode(JsonInstance),
-    io:format("~n~n~s~n", [JsonString]),
-    halt().
+
+    try jsongen:json(Schema) of
+    
+        JsonGenerator ->
+            JsonInstance = eqc_gen:pick(JsonGenerator),
+            JsonString = json:encode(JsonInstance),
+            io:format("~n~n~s~n", [JsonString])
+
+    catch
+        Throw ->
+            io:format("~n****EXCEPTION. REASON: ~p~n",[Throw]);
+            %{throw,caught};
+        error:Error ->
+            io:format("~n****ERROR. REASON: ~p~n",[Error]);
+            %{error,Error};
+        exit:Exit ->
+            io:format("~n*****EXIT. REASON: ~p~n",[Exit])
+            %{exit, Exit}
+
+    after
+        halt()
+    end.
+
 
 
 gen_instance(Generator,N) when N > 0 ->
