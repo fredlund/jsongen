@@ -3,29 +3,43 @@
 -compile(export_all).
 
 %% Run it using, for example,
-%% erl -pa ebin -noshell -run test write_instance_of test/in/string.jsch 
+%% erl -pa ebin -noshell -run main write_X_instances_of tests/string_simple.jsch 1 
 
 write_instance_of(File) ->
-    {ok, Schema} = jsonschema:read_schema(File),
-    io:format("RUNNING 1 INSTANCE...~n"),
 
-    try jsongen:json(Schema) of
-    
-        JsonGenerator ->
-            JsonInstance = eqc_gen:pick(JsonGenerator),
-            JsonString = json:encode(JsonInstance),
-            io:format("~n~n~s~n", [JsonString])
+    %% This is for testing. 'write_X_instances_of' should be used from now on
+    try
+        io:format("~n+OPENING FILE ~p~n~n",[File]),
+        {ok, Schema} = jsonschema:read_schema(File),
+        io:format("RUNNING 1 INSTANCE...~n"),
+        JsonGenerator = jsongen:json(Schema),
+        JsonInstance = eqc_gen:pick(JsonGenerator),
+        JsonString = json:encode(JsonInstance),
+        io:format("~n~n~s~n", [JsonString])
 
+    of 
+        _ -> 
+            io:format("~n+JSON INSTANCE GENERATED SUCESFULLY~n~n"),
+            halt()
     catch
-        Throw ->
-            io:format("~n****EXCEPTION. REASON: ~p~n",[Throw]);
-            %{throw,caught};
+        exception:Throw ->
+            
+            case Throw of
+                regExp_with_length ->
+                    io:format("~n****EXCEPTION: 'pattern' keyword and 'minLenght' or 'maxLength' can't be used together~n",[]);
+                _ ->
+                    io:format("Exception thrown: ~p~n",[Throw]),
+                    io:format("~n****EXCEPTION. REASON: ~p~n",[Throw])
+            end;
         error:Error ->
-            io:format("~n****ERROR. REASON: ~p~n",[Error]);
-            %{error,Error};
+            case Error of
+                {badmatch,{error,enoent}} ->
+                    io:format("~n****ERROR. FILE ~p COULDN'T BE OPENED~n",[File]);
+                _ ->
+                    io:format("~n****ERROR. REASON: ~p~n",[Error])
+            end;
         exit:Exit ->
             io:format("~n*****EXIT. REASON: ~p~n",[Exit])
-            %{exit, Exit}
 
     after
         halt()
@@ -40,10 +54,30 @@ gen_instance(Generator,N) when N > 0 ->
     gen_instance(Generator,N-1);
 
 gen_instance(_,0) ->
-	halt().
+	ok.
 
 write_X_instances_of([File,N])  ->
-    {ok, Schema} = jsonschema:read_schema(File),
-    JsonGenerator = jsongen:json(Schema),
-    io:format("RUNNING ~B INSTANCES...~n",[list_to_integer(N)]),
-    gen_instance(JsonGenerator,list_to_integer(N)).
+    try
+        io:format("~n+OPENING FILE ~p~n~n",[File]),
+        {ok, Schema} = jsonschema:read_schema(File),
+        JsonGenerator = jsongen:json(Schema),
+        io:format("RUNNING ~B INSTANCES...~n",[list_to_integer(N)]),
+        gen_instance(JsonGenerator,list_to_integer(N))
+    of
+        ok ->
+            io:format("~n~n+PROCESS FINISHED SUCESFULLY~n~n",[]),
+            halt()
+    catch
+        Throw ->     
+            case Throw of
+                regExp_with_length ->
+                    io:format("~n****EXCEPTION: 'pattern' keyword and either 'minLenght' or 'maxLength' keywords can't be used together~n",[]);
+                _ ->
+                    io:format("Exception thrown: ~p~n",[Throw]),
+                    io:format("~n****EXCEPTION. REASON: ~p~n",[Throw])
+            end;
+        exit:Exit ->
+            io:format("~n*****EXIT. REASON: ~p~n",[Exit])     
+    after
+        halt()           
+    end.

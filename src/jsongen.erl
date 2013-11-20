@@ -63,7 +63,6 @@ json(Schema,Options) ->
     undefined ->
       case jsonschema:anyOf(Schema) of
         undefined ->
-              %%%%%%%
           case jsonschema:isRef(Schema) of
             true ->
               RootSchema = proplists:get_value(root,Options),
@@ -392,7 +391,7 @@ gen_typed_schema(Schema,Options) ->
                 ((MinLength=/=undefined) orelse (MaxLength=/=undefined)) andalso
                 (Pattern=/=undefined) ->
 
-                    throw(regular_expressions_for_strings_with_fixed_length);
+                    throw(regExp_with_length);
                 true -> ok
 	    end,
             
