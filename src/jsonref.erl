@@ -145,9 +145,17 @@ deref([Key|Pointer],JsonTerm) when is_list(JsonTerm) -> %% Array
       deref(Pointer,lists:nth(Index + 1,JsonTerm))
   end;
 deref([Key|Pointer],{struct, JSON_dict}) -> %% Object
-  Key_bin = list_to_binary(Key),
+  Key_decoded = decode_escaped(Key),
+  Key_bin = list_to_binary(Key_decoded),
   JsonTerm = proplists:get_value(Key_bin,JSON_dict),
   deref(Pointer,JsonTerm).
+
+%% @doc Decodes any escaped character.
+-spec decode_escaped(string()) -> string().
+decode_escaped([]) -> [];
+decode_escaped([$~,$1|S]) -> [$/|decode_escaped(S)];
+decode_escaped([$~,$0|S]) -> [$~|decode_escaped(S)];
+decode_escaped([C|S]) when C =/= $~ -> [C|decode_escaped(S)].
 
 %% @doc Decides if a list represent an integer.
 -spec list_is_integer(string()) -> boolean().

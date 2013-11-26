@@ -1,0 +1,20 @@
+{
+  "title" : "Just to test our implementation of jsonpointer",
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "anyOf" : [ {"$ref" : "#/definitions/1"},
+              {"$ref" : "#/definitions/a~0b"},
+              {"$ref" : "#/definitions/a~01b"},
+              {"$ref" : "#/definitions/a~00b"},
+              {"$ref" : "#/definitions/a~1b"},
+              {"$ref" : "#/definitions/a~10b"},
+              {"$ref" : "#/definitions/a~11b"} ],
+  "definitions" : {
+    "1" : { "enum" : ["1"] },
+    "a~b" : { "enum" : ["a~b"] },
+    "a~0b" : { "enum" : ["a~0b"] },
+    "a~1b" : { "enum" : ["a~1b"] },
+    "a/b" : { "enum" : ["a/b"] },
+    "a/0b" : { "enum" : ["a/0b"] },
+    "a/1b" : { "enum" : ["a/1b"] }
+  }
+}
