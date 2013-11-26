@@ -2,8 +2,8 @@
 
 -compile(export_all).
 
-%% Run it using, for example,
-%% erl -pa ebin -noshell -run main write_X_instances_of tests/string_simple.jsch 1 
+%% Run it using, for example, to generate 10 samples of string_simple.jsch:
+%% erl -pa ebin -noshell -run main write_X_instances_of 10 tests/string_simple.jsch
 
 write_instance_of(File) ->
 
@@ -56,7 +56,7 @@ gen_instance(Generator,N) when N > 0 ->
 gen_instance(_,0) ->
 	ok.
 
-write_X_instances_of([File,N])  ->
+write_X_instances_of([N,File])  ->
     try
         io:format("~n+OPENING FILE ~p~n~n",[File]),
         {ok, Schema} = jsonschema:read_schema(File),
