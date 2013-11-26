@@ -168,3 +168,26 @@ url_pointer(URI) ->
               [Fragment] -> string:tokens(Fragment,"/")
             end,
   {URL,Pointer}.
+
+%% @doc Evaluates the json pointer Pointer in the json value JsonTerm and 
+%% substitutes the json value by a new value
+
+-spec subst(Pointer::jsonpointer(),
+            JsonTerm::json:json_term(),
+            NewValue::json:json_term()) -> json:json_term().
+subst([],JsonTerm,NewValue) -> NewValue;
+subst([Key|Pointer],JsonTerm,NewValue) when is_list(JsonTerm) -> %% Array
+  case list_is_integer(Key) of
+    true ->
+      Index = list_to_integer(Key),
+      substl(Index,Pointer,JsonTerm,NewValue)
+  end;
+subst([Key|Pointer],{struct, JSON_dict},NewValue) -> %% Object
+  Key_bin = list_to_binary(Key),
+  JsonTerm = proplists:get_value(Key_bin,JSON_dict),
+  subst(Pointer,JsonTerm,NewValue).
+
+substl(1,Pointer,[H|T],NewValue) -> 
+  [subst(Pointer,H,NewValue)|T];
+substl(Pos,Pointer,[H|T],NewValue) -> 
+  [H|substl(Pos-1,Pointer,T,NewValue)].
