@@ -1,0 +1,22 @@
+{
+    "type": "object",
+    "properties": {
+        "A": {
+            "type": "boolean"
+        },
+        "B": {
+            "type": "boolean"
+        }
+    },
+    "additionalProperties": false,
+    "oneOf": [
+        {
+            "title": "A required",
+	    "type" : "string"
+        },
+        {
+            "title": "B required",
+	    "type" : "integer"
+        }
+    ]
+}

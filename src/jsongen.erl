@@ -38,7 +38,7 @@
 -compile(export_all).
 
 %%LOGS
-%%-define(debug,true).
+%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -58,41 +58,153 @@ json(Schema) ->
   json(Schema,[{root,Schema}]).
 
 json(Schema,Options) ->
-  ?LOG("json(~s,~p)",[json:encode(Schema),Options]),
-  case jsonschema:oneOf(Schema) of
-    undefined ->
-      case jsonschema:anyOf(Schema) of
-        undefined ->
-          case jsonschema:isRef(Schema) of
-            true ->
-              RootSchema = proplists:get_value(root,Options),
-              RefSch = jsonref:unref(Schema,RootSchema),
-              NewOptions =
+    ?LOG("json(~s,~p)",[json:encode(Schema),Options]),
+    case jsonschema:hasOneOf(Schema) of
+        false ->
+            case jsonschema:anyOf(Schema) of
+                undefined ->
+                    ?LOG("AnyOf returned undefined. Schema is ~p~n",[Schema]),
+                    case jsonschema:allOf(Schema) of
+                        undefined ->
+                            case jsonschema:notFrom(Schema) of
+                                undefined ->
+                                    case jsonschema:isRef(Schema) of
+                                        true ->
+                                            RootSchema = proplists:get_value(root,Options),
+                                            RefSch = jsonref:unref(Schema,RootSchema),
+                                            NewOptions =
                 % We should change the root but at this moment peano2 goes into an inifinite loop.
                 % TODO: do we need to maintain an environment!?
                 % AH: nop, maybe it is enough the root to be a URL instead of a schema
                 % [{root,RefSch}|proplists:delete(root,Options)],
-                Options,
-              ?LAZY(json(RefSch,NewOptions));
-            false ->  
-              case jsonschema:hasType(Schema) of
-                true ->
-                  gen_typed_schema(Schema,Options);
-                false ->
-                  case jsonschema:hasEnum(Schema) of
-                    true -> 
-                      eqc_gen:oneof(jsonschema:enumerated(Schema));
-                    false ->
-                      throw(bad_schema)
-                  end
-              end
-          end;
-        Schemas ->
-          eqc_gen:oneof([json(S,Options) || S <- Schemas])
-      end;
-    _ ->
-      throw(oneOf_not_implemented)
-  end.
+                                                Options,
+                                            ?LAZY(json(RefSch,NewOptions));
+                                        false ->  
+                                            case jsonschema:hasType(Schema) of
+                                                true ->
+                                                    gen_typed_schema(Schema,Options);
+                                                false ->
+                                                    case jsonschema:hasEnum(Schema) of
+                                                        true -> 
+                                                            eqc_gen:oneof(jsonschema:enumerated(Schema));
+                                                        false ->
+                                                            throw({bad_schema,?LINE})
+                                                    end
+                                            end
+                                    end;
+                                Schemas ->
+                                    throw(not_not_implemented)
+                            end;
+                        Schemas ->
+                            throw(allOf_not_implemented)
+                    end;
+                %%% anyOf V
+                {struct,Schemas} ->
+                    ?LOG("AnyOf branch ==> ~p~n",[Schema]),
+                    choose_from_list(
+                      [json(S,Options) || S <- Schemas],
+                      1,
+                      length(Schemas))
+
+%% begin
+%%                         RawProperties = 
+%%                         [{P,json(S,Options)} ||
+%%                           {P,S} <- ReqProps
+%%                             ++ 
+%%                             OptPropsGen
+%%                         ],
+%%                       case proplists:get_value(randomize_properties,Options,true) of
+%%                         true ->
+%%                           ?LET(Props,
+%%                                randomize_list(RawProperties),
+%%                                {struct, Props});
+%%                         false ->
+%%                           {struct,RawProperties}
+%%                       end
+
+
+            end;
+
+
+
+
+
+        true ->
+            Schemas = jsonschema:oneOf(Schema),
+            ?LOG("OneOf when true. Schemas are ~p~n",[Schemas]),
+            generate_oneOf(Schemas,Options)
+     
+    end.
+
+
+
+generate_oneOf(Schemas,Options) ->
+    ?SUCHTHAT(ValRet,
+              ?LET(I, eqc_gen:choose(1, length(Schemas)),
+                   ?LET(Value, json(lists:nth(I,Schemas),Options),
+                        begin                
+                            case validate_against(Value, delete_nth_element(I,Schemas)) of
+                                true ->
+                                    ?LOG("Validate returned true~n",[]),
+                                    Value;
+                                false ->
+                                    ?LOG("Validate returned false~n",[]),
+                                    false;
+                                maybe ->
+                                    ?LOG("Validate returned maybe~n",[]),
+                                    throw(maybe_returned_by_validator)
+                            end
+                        end)),
+              ValRet =/= false).
+
+
+validate_against(Value, [H | T]) ->
+    ?LOG("Value: ~p, Schemas: ~p~n",[Value, H]),
+    case json_validate:validate(Value,H) of
+        true -> 
+            false;
+        false ->
+            validate_against(Value,T)
+    end;
+
+validate_against(_Value,[]) ->
+    true.
+
+generate_oneOf_value({Schemas,Options},N) when N > 0 ->
+    %[H|T] = [?LET(Gen_values, json(S,Options), Gen_values) || S <- Schemas],
+    [H|T] = [json(S,Options) || S <- Schemas],
+    
+    ?LOG("Head: ~p~n",[H]),
+
+    %[H|T] = json(S,Options) || S <- Schemas],
+    case compare_with_rest([H|T]) of
+        equals ->
+            H;
+        false -> generate_oneOf_value({Schemas,Options},N-1)
+    end;
+
+generate_oneOf_value({_Schemas,_Options}, 0) ->
+    throw(oneOf_failed_after_100_attempts).
+
+        
+compare_with_rest([H|T]) ->                                
+    compare_with_rest(H,T).
+
+compare_with_rest(Head,[H|T]) ->
+    ?LOG("Head: ~p, H: ~p~n",[Head,H]),
+    case Head == H of
+        true ->
+            equals;
+        false ->
+            compare_with_rest(Head,T)
+    end;
+
+compare_with_rest(_Head,[]) ->
+    true.
+
+test({struct,S}) ->
+    ?LOG("S is ~p~n",[S]),
+        json({struct,S}).
 
 gen_typed_schema(Schema,Options) ->
   case jsonschema:type(Schema) of
@@ -269,7 +381,7 @@ gen_typed_schema(Schema,Options) ->
           case {PatternProperties,AddP} of
               {undefined,undefined} ->
                   ?LET(N, randIntPositive(MinOpts,length(OptProps)),
-                   ?LET(OptPropsGen, choose_n_properties(OptProps,N),
+                   ?LET(OptPropsGen, choose_n_from_list(OptProps,N),
                     begin
                         RawProperties = 
                         [{P,json(S,Options)} ||
@@ -292,7 +404,7 @@ gen_typed_schema(Schema,Options) ->
                {randIntPositive(0,length(OptProps)), MaxPropsGen},
                ?LET(N_prop, randIntPositive(MinOpts - N_opt, (N_max - length(ReqProps)) - N_opt),
                     ?LET({OptPropsGen, PatPropsGen},
-                         {choose_n_properties(OptProps,N_opt),
+                         {choose_n_from_list(OptProps,N_opt),
                           create_patterns(PatternProperties,N_prop)},
                          begin
                            ?LOG("**FINAL PROPS: ~p~n",
@@ -320,7 +432,7 @@ gen_typed_schema(Schema,Options) ->
                {randIntPositive(0,length(OptProps)), MaxPropsGen},
                ?LET(N_add, randIntPositive(MinOpts - N_opt,(N_max - length(ReqProps)) - N_opt),
                     ?LET({OptPropsGen, AddPropsGen},
-                         {choose_n_properties(OptProps,N_opt),
+                         {choose_n_from_list(OptProps,N_opt),
                           create_additionals(AddP,N_add)},
                          begin
                              ?LOG("**FINAL PROPS: ~p~n",
@@ -351,7 +463,7 @@ gen_typed_schema(Schema,Options) ->
                     ?LET(N_add,randIntPositive(MinOpts - N_opt - N_pat, 
                                                (N_max - length(ReqProps)) - N_opt - N_pat),
                          ?LET({OptPropsGen,PatPropsGen,AddPropsGen},
-                              {choose_n_properties(OptProps,N_opt),
+                              {choose_n_from_list(OptProps,N_opt),
                                create_patterns(PatternProperties,N_pat),
                                create_additionals(AddP,N_add)},
                               begin
@@ -798,14 +910,14 @@ null() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for choosing random properties from a list
 
-%-spec choose_properties([string()],natural(),natural()) -> eqc_gen:gen([string()]).
-choose_properties(P, Min, Max) when Max >= Min -> 
+%-spec choose_from_list([string()],natural(),natural()) -> eqc_gen:gen([string()]).
+choose_from_list(P, Min, Max) when Max >= Min -> 
     ?LOG("Choosing properties: ~p~n",[P]),
     ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
-    ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_properties(P,N)).
+    ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_from_list(P,N)).
     
 
-choose_n_properties(L,N) ->
+choose_n_from_list(L,N) ->
   randomize_list(L,N,length(L)).
 
 randomize_list(L) ->
@@ -839,8 +951,8 @@ pattern_gen({Pattern, Schema},N) when N > 0 ->
 
 pattern_gen(Pattern_Schema) ->
     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
-    io:format("~n** THIS MAY TAKE A WHILE **~n"),
-    io:format("~nLOADING..."),
+    %io:format("~n** THIS MAY TAKE A WHILE **~n"),
+    %io:format("~nLOADING..."),
     ?LET(N,natural(), pattern_gen(Pattern_Schema,N)).
 
 pattern_gen_range(Pattern_Schema, Min) ->
@@ -863,8 +975,8 @@ create_patterns(PatternPropList, MinimumProps) ->
     ?LOG("create_patterns with minmum, PatternPropList is ~p, and Min is ~p~n",
          [PatternPropList, MinimumProps]),
     Min = ceiling(MinimumProps / length(PatternPropList)),
-    io:format("~n** THIS MAY TAKE A WHILE **~n"),
-    io:format("~nLOADING..."),
+    %io:format("~n** THIS MAY TAKE A WHILE **~n"),
+    %io:format("~nLOADING..."),
     L = lists:map (fun(X) -> pattern_gen_range(X,Min) end, PatternPropList),
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
@@ -897,8 +1009,8 @@ and N is ~p and lenght os list is ~p~n",
 
     FinalProps = ceiling(N / length(AddPropList)),
     ?LOG ("Final Props: ~p~n",[FinalProps]),
-    io:format("~n** THIS MAY TAKE A WHILE **~n"),
-    io:format("~nLOADING..."),
+    %io:format("~n** THIS MAY TAKE A WHILE **~n"),
+    %io:format("~nLOADING..."),
     L = lists:map (fun(X) -> additional_gen(X,FinalProps) end, AddPropList),
     ?LOG("Final additionals created: ~p~n",[L]),
     lists:concat(L).
@@ -918,7 +1030,7 @@ floor(X) ->
 
 delete_nth_element(N, List) ->
     ?LOG("Removing ~p element from list -> ~p~n",[N,List]),
-    io:format("."),
+    %io:format("."),
     delete_nth_element(N-1,List, []).
 
 delete_nth_element(0, [_nthEl|T], Res) ->
@@ -928,7 +1040,7 @@ delete_nth_element(N, [H|T], Res) ->
     delete_nth_element(N-1, T, [H|Res]).
 
 concat_and_reverse([],Res) ->
-    io:format("."),
+    %io:format("."),
     lists:reverse(Res);
 
 concat_and_reverse([H|T], Res) ->

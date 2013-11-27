@@ -32,9 +32,35 @@ anyOf(Schema) ->
     Schemas = keyword(Schema,"anyOf"),
     Schemas.
 
-oneOf(Schema) ->
-    Schemas = keyword(Schema,"oneOf"),
-    Schemas.
+
+%% oneOf(_Schema={struct, Def}) ->
+%%     io:format("OneOf in jsonSchema: ~p~n",[Def]),
+%%     case proplists:lookup(<<"oneOf">>,Def) of
+%%         {_,Schemas} ->
+%%             Schemas;
+%%         _ -> undefined
+%%     end.
+
+hasOneOf(_Schema = {struct,Def}) ->
+  case proplists:lookup(<<"oneOf">>,Def) of
+    {_,_Def} ->
+      true;
+    none ->
+      false
+  end.
+
+
+oneOf(_Schema = {struct, Def}) ->
+    {_,Schemas} = proplists:lookup(<<"oneOf">>,Def),
+     io:format("Giving back ~p~n",[Schemas]),
+      Schemas.
+
+
+allOf(Schema) ->
+    undefined.
+
+notFrom(Schema) ->
+    undefined.
 
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
