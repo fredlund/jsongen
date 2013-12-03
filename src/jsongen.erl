@@ -94,23 +94,38 @@ json(Schema,Options) ->
                                             end
                                     end;
 
-                                %%ot_keyword
-                                _Schemas ->
-                                    throw(not_not_implemented)
+
+                                %%not_keyword
+                                SingleSchema ->
+                                    case jsonschema:hasType(Schema) of
+                                        true ->
+                                            ?SUCHTHAT(ValidationResult,
+                                             ?LET(Value, gen_typed_schema(Schema,Options),
+                                               begin
+                                                case valid_schemas(Value,[SingleSchema]) of
+                                                    0 -> Value;
+                                                    _ -> error
+                                                end
+                                               end),
+                                     ValidationResult =/= error);
+
+                                false ->
+                                            throw(not_keyword_with_no_schemas)
+                                    end
+                                
+                                        
                             end;
 
                         %%alloF
-                       
-
-                        Schemas ->
+                        ListOfSchemas ->
                             case jsonschema:hasType(Schema) of
                                 true ->
                                     ?SUCHTHAT(ValidationResult,
                                       ?LET(Value, gen_typed_schema(Schema,Options),
                                       begin
-                                          N = valid_schemas(Value,Schemas),
+                                          N = valid_schemas(Value,ListOfSchemas),
                                           if
-                                              N == length(Schemas) -> Value;
+                                              N == length(ListOfSchemas) -> Value;
                                               true -> error
                                           end
                                       end),
@@ -118,13 +133,13 @@ json(Schema,Options) ->
 
                                 false ->
                                     ?SUCHTHAT(ValidationResult,
-                                       ?LET(I, eqc_gen:choose(1,length(Schemas)),
-                                          ?LET(Value, json(lists:nth(I,Schemas),Options),
+                                       ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
+                                          ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
                                              begin
                                                 N = valid_schemas(Value,
-                                                         delete_nth_element(I,Schemas)),
+                                                         delete_nth_element(I,ListOfSchemas)),
                                                if
-                                                 N > (length(Schemas) -1) -> Value;
+                                                 N > (length(ListOfSchemas) -1) -> Value;
                                                  true -> error
                                                end
                                              end)),
@@ -132,20 +147,14 @@ json(Schema,Options) ->
                             end
                     end;
 
-                %%% anyOf V
-
-
-
-
-
                 %anyOf
-                Schemas ->
+                ListOfSchemas ->
                     case jsonschema:hasType(Schema) of
                         true ->
                             ?SUCHTHAT(ValidationResult,
                                       ?LET(Value, gen_typed_schema(Schema,Options),
                                       begin
-                                          N = valid_schemas(Value,Schemas),
+                                          N = valid_schemas(Value,ListOfSchemas),
                                           if
                                               N > 0 -> Value;
                                               true -> error
@@ -155,10 +164,10 @@ json(Schema,Options) ->
 
                         false ->
                             ?SUCHTHAT(ValidationResult,
-                              ?LET(I, eqc_gen:choose(1,length(Schemas)),
-                                   ?LET(Value, json(lists:nth(I,Schemas),Options),
+                              ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
+                                   ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
                                    begin
-                                       N = valid_schemas(Value,delete_nth_element(I,Schemas)),
+                                    N = valid_schemas(Value,delete_nth_element(I,ListOfSchemas)),
                                           if
                                               N > 0 -> Value;
                                               true -> error
@@ -167,30 +176,15 @@ json(Schema,Options) ->
                               ValidationResult =/= error)
                     end
             end;
-                 
-
-
-
-
-            %%     {struct,Schemas} ->
-            %%         ?LOG("AnyOf branch ==> ~p~n",[Schema]),
-            %%         choose_from_list(
-            %%           [json(S,Options) || S <- Schemas],
-            %%           1,
-            %%           length(Schemas))
-            %% end;
-
-
-
 
         %%oneOf
-        Schemas ->
+        ListOfSchemas ->
             case jsonschema:hasType(Schema) of
                 true ->
                     ?SUCHTHAT(ValidationResult,
                               ?LET(Value, gen_typed_schema(Schema,Options),
                                    begin
-                                       case valid_schemas(Value,Schemas) of
+                                       case valid_schemas(Value,ListOfSchemas) of
                                            1 -> Value;
                                            _ -> error
                                        end
@@ -198,10 +192,10 @@ json(Schema,Options) ->
                               ValidationResult =/= error);
                 false ->
                     ?SUCHTHAT(ValidationResult,
-                              ?LET(I, eqc_gen:choose(1,length(Schemas)),
-                                   ?LET(Value, json(lists:nth(I,Schemas),Options),
+                              ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
+                                   ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
                                    begin
-                                       case valid_schemas(Value,delete_nth_element(I,Schemas)) of
+                                 case valid_schemas(Value,delete_nth_element(I,ListOfSchemas)) of
                                            0 -> Value;
                                            _ -> error
                                        end
@@ -211,31 +205,6 @@ json(Schema,Options) ->
      
     end.
 
-
-
-%% TO REMOVE IN NEXT UPDATE
-
-%% generate_oneOf(Schemas,Options) when length(Schemas) > 1->
-%%     ?SUCHTHAT(ValRet,
-%%               ?LET(I, eqc_gen:choose(1, length(Schemas)),
-%%                    ?LET(Value, json(lists:nth(I,Schemas),Options),
-%%                         begin                
-%%                             case validate_against(Value, delete_nth_element(I,Schemas)) of
-%%                                 different ->
-%%                                     ?LOG("Validation failed (That means it is correct)~n",[]),
-%%                                     Value;
-%%                                 equals ->
-%%                                     ?LOG("Validator sucess against the other schemas (error)~n",[]),
-%%                                     false;
-%%                                 maybe ->
-%%                                     ?LOG("Validator returned maybe~n",[]),
-%%                                     throw(maybe_returned_by_validator)
-%%                             end
-%%                         end)),
-%%               ValRet =/= false);
-
-%% generate_oneOf(Schema,Options) ->
-%%     ?LET(Value, json(Schema,Options), Value).
 
 valid_schemas(Value,Schemas) ->
     lists:foldl(fun (Schema,N) ->
