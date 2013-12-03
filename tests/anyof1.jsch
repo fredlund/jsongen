@@ -9,18 +9,14 @@
         }
     },
     "additionalProperties": false,
-    "oneOf": [
+    "anyOf": [
         {
-            "title": "A string",
-	    "type" : "string"
-        },
-        {
-            "title": "An integer",
-	    "type" : "integer"
-        },
-	{
-	    "title": "An object type",
+            "title": "A required",
 	    "type" : "object"
-	}
+        },
+        {
+            "title": "B required",
+	    "type" : "integer"
+        }
     ]
 }

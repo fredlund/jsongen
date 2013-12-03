@@ -32,35 +32,46 @@ anyOf(Schema) ->
     Schemas = keyword(Schema,"anyOf"),
     Schemas.
 
-
-%% oneOf(_Schema={struct, Def}) ->
-%%     io:format("OneOf in jsonSchema: ~p~n",[Def]),
-%%     case proplists:lookup(<<"oneOf">>,Def) of
-%%         {_,Schemas} ->
-%%             Schemas;
-%%         _ -> undefined
-%%     end.
-
-hasOneOf(_Schema = {struct,Def}) ->
+oneOf(_Schema = {struct,Def}) ->
   case proplists:lookup(<<"oneOf">>,Def) of
-    {_,_Def} ->
-      true;
+    {_,Schemas} ->
+      Schemas;
     none ->
-      false
+      undefined
   end.
 
 
-oneOf(_Schema = {struct, Def}) ->
-    {_,Schemas} = proplists:lookup(<<"oneOf">>,Def),
-     io:format("Giving back ~p~n",[Schemas]),
-      Schemas.
+%% oneOf(_Schema = {struct, Def}) ->
+%%     {_,Schemas} = proplists:lookup(<<"oneOf">>,Def),
+%%     Schemas;
+
+%% oneOf(_) ->
+%%     undefined.
+
+allOf(_Schema = {struct,Def}) ->
+  case proplists:lookup(<<"allOf">>,Def) of
+    {_,Schemas} ->
+      Schemas;
+    none ->
+      undefined
+  end.
 
 
-allOf(Schema) ->
-    undefined.
+%% allOf(_Schema = {struct, Def}) ->
+%%     {_,Schemas} = proplists:lookup(<<"allOf">>,Def),
+%%     Schemas.
 
-notFrom(Schema) ->
-    undefined.
+notKeyword(_Schema = {struct,Def}) ->
+  case proplists:lookup(<<"not">>,Def) of
+    {_,Schemas} ->
+      Schemas;
+    none ->
+      undefined
+  end.
+
+%% notKeyword(_Schema = {struct, Def}) ->
+%%     {_,Schemas} = proplists:lookup(<<"not">>,Def),
+%%     Schemas.
 
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),

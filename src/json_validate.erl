@@ -93,12 +93,13 @@ validate(Data,Schema) ->
 	      String ->
 	      MaxLength = jsonschema:keyword(Schema,"maxLength"),
 	      MinLength = jsonschema:keyword(Schema,"minLength"),
-	      Pattern = jsonschema:keyword(Schema,"pattern"),
+	      _Pattern = jsonschema:keyword(Schema,"pattern"),
 	      Length = length(String),
 	      if
 		MaxLength=/=undefined, Length>MaxLength -> false;
 		MinLength=/=undefined, Length<MinLength -> false;
 		true -> maybe
+                %%% mejorar el validador aqui arriba. Intentar quitar el 'maybe'
 	      end
 	  catch _:_ -> false end;
 	_ -> maybe
