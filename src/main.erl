@@ -3,7 +3,7 @@
 -compile(export_all).
 
 %% Run it using, for example,
-%% erl -pa ebin -noshell -run main write_X_instances_of tests/string_simple.jsch 1 
+%% erl -pa ebin -noshell -run main write_X_instances_of 10 tests/string_simple.jsch
 
 write_instance_of(File) ->
 write_X_instances_of([1,File]).
