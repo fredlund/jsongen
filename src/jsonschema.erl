@@ -28,9 +28,17 @@ isRef(Schema) ->
     URL = keyword(Schema,"$ref"),
     URL =/= undefined.
 
-anyOf(Schema) ->
-    Schemas = keyword(Schema,"anyOf"),
-    Schemas.
+%% anyOf(Schema) ->
+%%     Schemas = keyword(Schema,<<"anyOf">>),
+%%     Schemas.
+
+anyOf(_Schema = {struct,Def}) ->
+  case proplists:lookup(<<"anyOf">>,Def) of
+    {_,Schemas} ->
+      Schemas;
+    none ->
+      undefined
+  end.
 
 oneOf(_Schema = {struct,Def}) ->
   case proplists:lookup(<<"oneOf">>,Def) of

@@ -64,7 +64,6 @@ json(Schema,Options) ->
         undefined ->
             case jsonschema:anyOf(Schema) of
                 undefined ->
-                    ?LOG("AnyOf returned undefined. Schema is ~p~n",[Schema]),
                     case jsonschema:allOf(Schema) of
                         undefined ->
                             case jsonschema:notKeyword(Schema) of
@@ -149,6 +148,7 @@ json(Schema,Options) ->
 
                 %anyOf
                 ListOfSchemas ->
+                    ?LOG("AnyOf with List of Schemas: ~p~n",[ListOfSchemas]),
                     case jsonschema:hasType(Schema) of
                         true ->
                             ?SUCHTHAT(ValidationResult,
@@ -220,55 +220,64 @@ valid_schemas(Value,Schemas) ->
                 end, 0, Schemas).
 
 
-validate_against(Value, [H | T]) ->
-    ?LOG("Value: ~p, Schemas: ~p~n",[Value, H]),
-    case json_validate:validate(Value,H) of
-        true -> 
-            equals;
-        false ->
-            validate_against(Value,T);
-        maybe ->
-            equals  %%FOR NOW
-    end;
 
-validate_against(_Value,[]) ->
-    different.
 
-generate_oneOf_value({Schemas,Options},N) when N > 0 ->
-    %[H|T] = [?LET(Gen_values, json(S,Options), Gen_values) || S <- Schemas],
-    [H|T] = [json(S,Options) || S <- Schemas],
+
+%%% VVV TO REMOVE IN NEXT UPDATE VVV
+
+
+%% validate_against(Value, [H | T]) ->
+%%     ?LOG("Value: ~p, Schemas: ~p~n",[Value, H]),
+%%     case json_validate:validate(Value,H) of
+%%         true -> 
+%%             equals;
+%%         false ->
+%%             validate_against(Value,T);
+%%         maybe ->
+%%             equals  %%FOR NOW
+%%     end;
+
+%% validate_against(_Value,[]) ->
+%%     different.
+
+
+%% generate_oneOf_value({Schemas,Options},N) when N > 0 ->
+%%     %[H|T] = [?LET(Gen_values, json(S,Options), Gen_values) || S <- Schemas],
+%%     [H|T] = [json(S,Options) || S <- Schemas],
     
-    ?LOG("Head: ~p~n",[H]),
+%%     ?LOG("Head: ~p~n",[H]),
 
-    %[H|T] = json(S,Options) || S <- Schemas],
-    case compare_with_rest([H|T]) of
-        equals ->
-            H;
-        false -> generate_oneOf_value({Schemas,Options},N-1)
-    end;
+%%     %[H|T] = json(S,Options) || S <- Schemas],
+%%     case compare_with_rest([H|T]) of
+%%         equals ->
+%%             H;
+%%         false -> generate_oneOf_value({Schemas,Options},N-1)
+%%     end;
 
-generate_oneOf_value({_Schemas,_Options}, 0) ->
-    throw(oneOf_failed_after_100_attempts).
+%% generate_oneOf_value({_Schemas,_Options}, 0) ->
+%%     throw(oneOf_failed_after_100_attempts).
 
         
-compare_with_rest([H|T]) ->                                
-    compare_with_rest(H,T).
+%% compare_with_rest([H|T]) ->                                
+%%     compare_with_rest(H,T).
 
-compare_with_rest(Head,[H|T]) ->
-    ?LOG("Head: ~p, H: ~p~n",[Head,H]),
-    case Head == H of
-        true ->
-            equals;
-        false ->
-            compare_with_rest(Head,T)
-    end;
+%% compare_with_rest(Head,[H|T]) ->
+%%     ?LOG("Head: ~p, H: ~p~n",[Head,H]),
+%%     case Head == H of
+%%         true ->
+%%             equals;
+%%         false ->
+%%             compare_with_rest(Head,T)
+%%     end;
 
-compare_with_rest(_Head,[]) ->
-    true.
+%% compare_with_rest(_Head,[]) ->
+%%     true.
 
-test({struct,S}) ->
-    ?LOG("S is ~p~n",[S]),
-        json({struct,S}).
+%% test({struct,S}) ->
+%%     ?LOG("S is ~p~n",[S]),
+%%         json({struct,S}).
+
+
 
 gen_typed_schema(Schema,Options) ->
   case jsonschema:type(Schema) of
@@ -1015,8 +1024,6 @@ pattern_gen({Pattern, Schema},N) when N > 0 ->
 
 pattern_gen(Pattern_Schema) ->
     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
-    %io:format("~n** THIS MAY TAKE A WHILE **~n"),
-    %io:format("~nLOADING..."),
     ?LET(N,natural(), pattern_gen(Pattern_Schema,N)).
 
 pattern_gen_range(Pattern_Schema, Min) ->
@@ -1039,8 +1046,6 @@ create_patterns(PatternPropList, MinimumProps) ->
     ?LOG("create_patterns with minmum, PatternPropList is ~p, and Min is ~p~n",
          [PatternPropList, MinimumProps]),
     Min = ceiling(MinimumProps / length(PatternPropList)),
-    %io:format("~n** THIS MAY TAKE A WHILE **~n"),
-    %io:format("~nLOADING..."),
     L = lists:map (fun(X) -> pattern_gen_range(X,Min) end, PatternPropList),
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
@@ -1066,15 +1071,8 @@ create_additionals({},N) ->
     additional_gen({},N);
 
 create_additionals({struct,AddPropList},N) ->
-    ?LOG("create_additionals with fix value, 
-AdditionalPropList is ~p, 
-and N is ~p and lenght os list is ~p~n",
-            [AddPropList, N, length(AddPropList)]),
-
     FinalProps = ceiling(N / length(AddPropList)),
     ?LOG ("Final Props: ~p~n",[FinalProps]),
-    %io:format("~n** THIS MAY TAKE A WHILE **~n"),
-    %io:format("~nLOADING..."),
     L = lists:map (fun(X) -> additional_gen(X,FinalProps) end, AddPropList),
     ?LOG("Final additionals created: ~p~n",[L]),
     lists:concat(L).
@@ -1094,7 +1092,6 @@ floor(X) ->
 
 delete_nth_element(N, List) ->
     ?LOG("Removing ~p element from list -> ~p~n",[N,List]),
-    %io:format("."),
     delete_nth_element(N-1,List, []).
 
 delete_nth_element(0, [_nthEl|T], Res) ->
@@ -1104,7 +1101,6 @@ delete_nth_element(N, [H|T], Res) ->
     delete_nth_element(N-1, T, [H|Res]).
 
 concat_and_reverse([],Res) ->
-    %io:format("."),
     lists:reverse(Res);
 
 concat_and_reverse([H|T], Res) ->

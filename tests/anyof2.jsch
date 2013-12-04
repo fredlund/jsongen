@@ -1,0 +1,26 @@
+{
+    "type": "object",
+    "properties": {
+        "A": {
+            "type": "boolean"
+        },
+        "B": {
+            "type": "boolean"
+        }
+    },
+    "additionalProperties": false,
+    "anyOf": [
+        {
+            "title": "A",
+	    "type" : "object"
+        },
+        {
+            "title": "B",
+	    "type" : "integer"
+        },
+	{
+	    "title": "C",
+	    "type" : "object"
+	}
+    ]
+}
