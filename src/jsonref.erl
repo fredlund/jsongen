@@ -145,9 +145,46 @@ deref([Key|Pointer],JsonTerm) when is_list(JsonTerm) -> %% Array
       deref(Pointer,lists:nth(Index + 1,JsonTerm))
   end;
 deref([Key|Pointer],{struct, JSON_dict}) -> %% Object
-  Key_bin = list_to_binary(Key),
+  Key_decoded = decode_escaped(Key),
+  Key_bin = list_to_binary(Key_decoded),
   JsonTerm = proplists:get_value(Key_bin,JSON_dict),
   deref(Pointer,JsonTerm).
+
+
+%% CBE
+%% @doc Evaluates the json pointer Pointer in the json value JsonTerm and 
+%% substitutes the json value by a new value
+
+-spec subst(Pointer::jsonpointer(),
+            JsonTerm::json:json_term(),
+            NewValue::json:json_term()) -> json:json_term().
+subst([],JsonTerm,NewValue) -> NewValue;
+subst([Key|Pointer],JsonTerm,NewValue) when is_list(JsonTerm) -> %% Array
+  case list_is_integer(Key) of
+    true ->
+      Index = list_to_integer(Key),
+      substl(Index,Pointer,JsonTerm,NewValue)
+  end;
+subst([Key|Pointer],{struct, JSON_dict},NewValue) -> %% Object
+  Key_bin = list_to_binary(Key),
+  JsonTerm = proplists:get_value(Key_bin,JSON_dict),
+  JSON_dict2 = proplists:delete(Key_bin,JSON_dict),
+  {struct,[{Key,subst(Pointer,JsonTerm,NewValue)}|JSON_dict2]}.
+
+substl(1,Pointer,[H|T],NewValue) -> 
+  [subst(Pointer,H,NewValue)|T];
+substl(Pos,Pointer,[H|T],NewValue) -> 
+  [H|substl(Pos-1,Pointer,T,NewValue)].
+
+
+%% CBE
+
+%% @doc Decodes any escaped character.
+-spec decode_escaped(string()) -> string().
+decode_escaped([]) -> [];
+decode_escaped([$~,$1|S]) -> [$/|decode_escaped(S)];
+decode_escaped([$~,$0|S]) -> [$~|decode_escaped(S)];
+decode_escaped([C|S]) when C =/= $~ -> [C|decode_escaped(S)].
 
 %% @doc Decides if a list represent an integer.
 -spec list_is_integer(string()) -> boolean().
@@ -168,3 +205,82 @@ url_pointer(URI) ->
               [Fragment] -> string:tokens(Fragment,"/")
             end,
   {URL,Pointer}.
+
+
+
+%% @doc Generates all valid pairs {P,V} where P is a JSON Pointer and
+%% V is its derreferenced value in a given JSON value.
+%% angel@angel-laptop:~/projects/sci/prowess/code/jsongen$ erl -pa ebin
+%% Eshell V5.10.3  (abort with ^G)
+%% 1>  {ok,JT} = json:decode_url("test/in/users.json").
+%% {ok,{struct,[{<<"users">>,
+%%               [{struct,[{<<"id">>,1},
+%%                         {<<"username">>,<<"davidwalsh">>},
+%%                         {<<"numPosts">>,404},
+%%                         {<<"realName">>,<<"David Walsh">>}]},
+%%                {struct,[{<<"id">>,2},
+%%                         {<<"username">>,<<"russianprince">>},
+%%                         {<<"numPosts">>,12},
+%%                         {<<"realName">>,<<"Andrei Arshavin">>}]}]}]}}
+%% 2>  jsonref:gen(JT).
+%% [{[],
+%%   {struct,[{<<"users">>,
+%%             [{struct,[{<<"id">>,1},
+%%                       {<<"username">>,<<"davidwalsh">>},
+%%                       {<<"numPosts">>,404},
+%%                       {<<"realName">>,<<"David Walsh">>}]},
+%%              {struct,[{<<"id">>,2},
+%%                       {<<"username">>,<<"russianprince">>},
+%%                       {<<"numPosts">>,12},
+%%                       {<<"realName">>,<<"Andrei Arshavin">>}]}]}]}},
+%%  {[<<"users">>],
+%%   [{struct,[{<<"id">>,1},
+%%             {<<"username">>,<<"davidwalsh">>},
+%%             {<<"numPosts">>,404},
+%%             {<<"realName">>,<<"David Walsh">>}]},
+%%    {struct,[{<<"id">>,2},
+%%             {<<"username">>,<<"russianprince">>},
+%%             {<<"numPosts">>,12},
+%%             {<<"realName">>,<<"Andrei Arshavin">>}]}]},
+%%  {[<<"users">>,"0"],
+%%   {struct,[{<<"id">>,1},
+%%            {<<"username">>,<<"davidwalsh">>},
+%%            {<<"numPosts">>,404},
+%%            {<<"realName">>,<<"David Walsh">>}]}},
+%%  {[<<"users">>,"0",<<"id">>],1},
+%%  {[<<"users">>,"0",<<"username">>],<<"davidwalsh">>},
+%%  {[<<"users">>,"0",<<"numPosts">>],404},
+%%  {[<<"users">>,"0",<<"realName">>],<<"David Walsh">>},
+%%  {[<<"users">>,"1"],
+%%   {struct,[{<<"id">>,2},
+%%            {<<"username">>,<<"russianprince">>},
+%%            {<<"numPosts">>,12},
+%%            {<<"realName">>,<<"Andrei Arshavin">>}]}},
+%%  {[<<"users">>,"1",<<"id">>],2},
+%%  {[<<"users">>,"1",<<"username">>],<<"russianprince">>},
+%%  {[<<"users">>,"1",<<"numPosts">>],12},
+%%  {[<<"users">>,"1",<<"realName">>],<<"Andrei Arshavin">>}]
+%% 3>  [ {P,V} || {P,V} <- jsonref:gen(JT), V == <<"davidwalsh">> ].
+%% [{[<<"users">>,"0",<<"username">>],<<"davidwalsh">>}]
+-spec gen(json:json_term()) -> [{jsonpointer(),json:json_term()}].
+gen(JsonTerm) when is_list(JsonTerm) -> % Array
+  Indices = lists:map(fun erlang:integer_to_list/1,
+                      lists:seq(0,length(JsonTerm)-1)),
+  PVss = lists:map(fun gen/1,JsonTerm),
+  % PVss = [[{P11,V11},...],
+  %         [{P21,V21},...]...]
+  [ {[], JsonTerm}
+    | lists:concat(
+        lists:zipwith(
+          fun (I,PVs) -> [{[I|P],V} || {P,V} <- PVs] end,
+          Indices,
+          PVss)) ];
+gen(JsonTerm = {struct, JsonDict}) -> % Object
+  [ {[], JsonTerm}
+    | lists:concat(
+        lists:map(
+          fun ({Key,Value}) -> [ {[Key|P],V} || {P,V} <- gen(Value) ] end,
+          JsonDict)) ];
+gen(JsonTerm) ->
+  [ {[], JsonTerm} ].
+                                    
