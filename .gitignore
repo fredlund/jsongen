@@ -4,3 +4,4 @@ deps
 *.beam
 *.plt
 *~
+src/regexp_parser.erl
