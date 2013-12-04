@@ -42,4 +42,4 @@ otra vez usando "schema : true.
    Excerpt from: http://stackoverflow.com/questions/7202477/are-double-definitions-allowed-in-json-and-if-so-how-should-they-be-interprete
 
 
-- Dependencies
+- Dependencies (mochijson2) must be automatically solved (rebar?).
