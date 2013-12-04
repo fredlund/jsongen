@@ -158,7 +158,7 @@ deref([Key|Pointer],{struct, JSON_dict}) -> %% Object
 -spec subst(Pointer::jsonpointer(),
             JsonTerm::json:json_term(),
             NewValue::json:json_term()) -> json:json_term().
-subst([],JsonTerm,NewValue) -> NewValue;
+subst([],_JsonTerm,NewValue) -> NewValue;
 subst([Key|Pointer],JsonTerm,NewValue) when is_list(JsonTerm) -> %% Array
   case list_is_integer(Key) of
     true ->
