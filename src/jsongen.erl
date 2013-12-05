@@ -94,7 +94,7 @@ json(Schema,Options) ->
                                     end;
 
 
-                                %%not_keyword
+                                %%not
                                 SingleSchema ->
                                     case jsonschema:hasType(Schema) of
                                         true ->
@@ -115,7 +115,7 @@ json(Schema,Options) ->
                                         
                             end;
 
-                        %%alloF
+                        %%allOf
                         ListOfSchemas ->
                             case jsonschema:hasType(Schema) of
                                 true ->
@@ -218,65 +218,6 @@ valid_schemas(Value,Schemas) ->
                         end,
                         Res + N
                 end, 0, Schemas).
-
-
-
-
-
-%%% VVV TO REMOVE IN NEXT UPDATE VVV
-
-
-%% validate_against(Value, [H | T]) ->
-%%     ?LOG("Value: ~p, Schemas: ~p~n",[Value, H]),
-%%     case json_validate:validate(Value,H) of
-%%         true -> 
-%%             equals;
-%%         false ->
-%%             validate_against(Value,T);
-%%         maybe ->
-%%             equals  %%FOR NOW
-%%     end;
-
-%% validate_against(_Value,[]) ->
-%%     different.
-
-
-%% generate_oneOf_value({Schemas,Options},N) when N > 0 ->
-%%     %[H|T] = [?LET(Gen_values, json(S,Options), Gen_values) || S <- Schemas],
-%%     [H|T] = [json(S,Options) || S <- Schemas],
-    
-%%     ?LOG("Head: ~p~n",[H]),
-
-%%     %[H|T] = json(S,Options) || S <- Schemas],
-%%     case compare_with_rest([H|T]) of
-%%         equals ->
-%%             H;
-%%         false -> generate_oneOf_value({Schemas,Options},N-1)
-%%     end;
-
-%% generate_oneOf_value({_Schemas,_Options}, 0) ->
-%%     throw(oneOf_failed_after_100_attempts).
-
-        
-%% compare_with_rest([H|T]) ->                                
-%%     compare_with_rest(H,T).
-
-%% compare_with_rest(Head,[H|T]) ->
-%%     ?LOG("Head: ~p, H: ~p~n",[Head,H]),
-%%     case Head == H of
-%%         true ->
-%%             equals;
-%%         false ->
-%%             compare_with_rest(Head,T)
-%%     end;
-
-%% compare_with_rest(_Head,[]) ->
-%%     true.
-
-%% test({struct,S}) ->
-%%     ?LOG("S is ~p~n",[S]),
-%%         json({struct,S}).
-
 
 
 gen_typed_schema(Schema,Options) ->
@@ -413,24 +354,6 @@ gen_typed_schema(Schema,Options) ->
               Value -> 
                   MaxPropsGen = Value
           end,                            
-
-
-      %% RawMaxProperties = jsonschema:maxProperties(Schema),
-      %% MaxProperties =
-      %%   if
-      %%     RawMaxProperties==undefined,
-      %%     PatternProperties==undefined,
-      %%     AdditionalProperties==false ->
-      %%       %% The following if is wrong in that it does not handle
-      %%       %% the case when there are required properties which are not
-      %%       %% in properties.
-      %%       if
-      %%         Properties==[] -> 0;
-      %%         true -> length(Properties)
-      %%       end;
-      %%     true ->
-      %%       ?MAX_PROPERTIES
-      %%   end,
 
       ReqProps = [{P,S} || {P,S} <- Properties, lists:member(P, Required)],
       OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],       
@@ -663,31 +586,6 @@ insertType(Type, {struct,[Types | Rest]}) ->
     Res = {struct,[ {<<"type">>, NewListOfTypes} , Rest]},
     ?LOG ("Final res: ~p ~n",[Res]),
     Res.
-
-
-%%% VVV TO REMOVE IN NEXT UPDATE VVV %%%
-
-%% arrayOfAny(Schema,{MinItems,MaxItems}) ->
-%%     ?LOG("Array schema is ~p ~n",[Schema]),
-%%     case MaxItems of
-%% 	undefined ->
-%%             ?LOG("Schema: ~p",[Schema]),
-%%             NewSchema = insertType(<<"any">>,Schema),
-%% 	    ?LET(N, eqc_gen:choose(MinItems, ?MAX_ARRAY_SIZE), 
-%%                  arrayGen(NewSchema,N));
-
-%% 	MaxItems ->
-%%             ?LOG("Schema: ~p",[Schema]),
-%%             NewSchema = insertType(<<"any">>,Schema),
-%% 	    ?LET(N, eqc_gen:choose(MinItems,MaxItems), 
-%%                  arrayGen(NewSchema,N))
-%%     end.
-%% objectType() ->
-%%   ?LAZY(?LET(RandType, selectSimpleType(),
-%%     {struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
-%%                                         {struct,[{<<"type">>,RandType}]}}]})).
-
-
 
 arrayOfAny(MinItems,MaxItems,Unique) ->
     case MaxItems of
