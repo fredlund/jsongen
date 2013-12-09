@@ -1,18 +1,15 @@
 ** JSONGEN CHECKLIST **
 
-	+ Array type: template type not implemented (do we need it?)
-
 	+ Array type: 'unique' keyword is implemented but json specification is not very clear describing its behaviour. 
 	  Maybe it doesn't do what is really inteded to do
 
-	+ Use 'frequency' EQC library function in anyType() function call (jsongen module). Right now its a mess
+	+ Improve validator
 
 	+ Documentation and specification
 
 Ideas
 ------
 
-- We should do a validator as well ==> *DONE*
 - Are there any usable validators out there? (we should search for them).
 
 - Given a validator we could generate data for some additional types of

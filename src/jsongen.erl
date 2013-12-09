@@ -205,7 +205,7 @@ json(Schema,Options) ->
      
     end.
 
-
+-spec valid_schemas(json:json_term(),[json:json_term()]) -> [json:json_term()].
 valid_schemas(Value,Schemas) ->
     lists:foldl(fun (Schema,N) ->
                         case json_validate:validate(Value,Schema) of
@@ -220,6 +220,7 @@ valid_schemas(Value,Schemas) ->
                 end, 0, Schemas).
 
 
+-spec gen_typed_schema(json:json_term(), options()) -> json:json_term().
 gen_typed_schema(Schema,Options) ->
   case jsonschema:type(Schema) of
     
@@ -332,8 +333,9 @@ gen_typed_schema(Schema,Options) ->
           {empty,no_items} ->
               arrayOfAny(MinItems,MaxItems,UniqueItems);
 
-	{itemsTemplate, ItemsTemplate} ->
-	  template(ItemsTemplate)
+	{error, bad_items_schema} ->
+              throw({bad_items_schema_in_array})
+	  %template(ItemsTemplate)
       end;
     
     
@@ -576,6 +578,7 @@ array(Schema,{MinItems,MaxItems},Unique) ->
                  end)
     end.		   
 
+% -spec
 insertType(Type, {struct,[Types | Rest]}) ->
     ?LOG("insertTypeSchema: ~p",[Types]),
     {<<"type">>, ListOfTypes} = Types,
@@ -587,6 +590,7 @@ insertType(Type, {struct,[Types | Rest]}) ->
     ?LOG ("Final res: ~p ~n",[Res]),
     Res.
 
+-spec arrayOfAny(integer(), integer(), boolean()) -> json:json_term().
 arrayOfAny(MinItems,MaxItems,Unique) ->
     case MaxItems of
 	undefined ->
@@ -634,14 +638,14 @@ arrayGenUnique(Schema,N) when N > 0->
     ?LOG("arrayGenUnique: ~p ~n",[Schema]),
     [ json(Schema) | arrayGenUnique(Schema, N-1)].
 
-
+-spec selectSchema([json:json_term()]) -> json:json_term().
 selectSchema({struct, Schemas}) ->
     ?LOG("Array: Selecting type from ~p ~n",[Schemas]),
     eqc_gen:oneof(Schemas).
 
-template(_Template) ->
-    %% TODO: generator for template
-    null().
+%% template(_Template) ->
+%%     %% TODO: generator for template
+%%     null().
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -773,15 +777,23 @@ selectSimpleType() ->
 
 anyType() ->
     ?LOG("'anyType' -> Choosing random type ('any' keyword)...~n",[]),
+    eqc_gen:frequency([{3,stringType()},
+                    {3,numberType()},
+                    {3,integerType()},
+                    {3,booleanType()},
+                    {2,nullType()}, 
+                    {1,arrayType()},
+                    {1,objectType()}]).
 
+%% VV TO REMOVE IN NEXT UPDATE VV %
     %% TODO: Use 'frequency' EQC library function instead
-     eqc_gen:oneof([stringType(),stringType(),stringType(),
-                    numberType(),numberType(),numberType(),
-                    integerType(),integerType(),integerType(),
-                    booleanType(),booleanType(),booleanType(),
-                    nullType(), nullType(), 
-                    arrayType(),
-                    objectType()]).
+     %% eqc_gen:oneof([stringType(),stringType(),stringType(),
+     %%                numberType(),numberType(),numberType(),
+     %%                integerType(),integerType(),integerType(),
+     %%                booleanType(),booleanType(),booleanType(),
+     %%                nullType(), nullType(), 
+     %%                arrayType(),
+     %%                objectType()]).
 
 
 -spec stringType() -> eqc_gen:gen(string()).

@@ -28,10 +28,6 @@ isRef(Schema) ->
     URL = keyword(Schema,"$ref"),
     URL =/= undefined.
 
-%% anyOf(Schema) ->
-%%     Schemas = keyword(Schema,<<"anyOf">>),
-%%     Schemas.
-
 anyOf(_Schema = {struct,Def}) ->
   case proplists:lookup(<<"anyOf">>,Def) of
     {_,Schemas} ->
@@ -48,14 +44,6 @@ oneOf(_Schema = {struct,Def}) ->
       undefined
   end.
 
-
-%% oneOf(_Schema = {struct, Def}) ->
-%%     {_,Schemas} = proplists:lookup(<<"oneOf">>,Def),
-%%     Schemas;
-
-%% oneOf(_) ->
-%%     undefined.
-
 allOf(_Schema = {struct,Def}) ->
   case proplists:lookup(<<"allOf">>,Def) of
     {_,Schemas} ->
@@ -64,11 +52,6 @@ allOf(_Schema = {struct,Def}) ->
       undefined
   end.
 
-
-%% allOf(_Schema = {struct, Def}) ->
-%%     {_,Schemas} = proplists:lookup(<<"allOf">>,Def),
-%%     Schemas.
-
 notKeyword(_Schema = {struct,Def}) ->
   case proplists:lookup(<<"not">>,Def) of
     {_,Schemas} ->
@@ -76,10 +59,6 @@ notKeyword(_Schema = {struct,Def}) ->
     none ->
       undefined
   end.
-
-%% notKeyword(_Schema = {struct, Def}) ->
-%%     {_,Schemas} = proplists:lookup(<<"not">>,Def),
-%%     Schemas.
 
 type(_Schema={struct, Def}) ->
     {_,Type} = proplists:lookup(<<"type">>,Def),
@@ -99,7 +78,7 @@ items(_Schema={struct, Def}) ->
             case Items of
                 {struct, _} -> {itemSchema, Items};
        
-                _ -> {itemsTemplate, Items}
+                _ -> {error, bad_items_schema}
             end;
         none -> 
             {empty, no_items}
