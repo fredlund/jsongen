@@ -768,13 +768,16 @@ number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Basic schema generators for additional types
 
+-spec selectType() -> eqc_gen:gen(binary()).
 selectType()->
     eqc_gen:oneof([<<"integer">>,<<"string">>,<<"number">>,<<"boolean">>,
                  <<"array">>,<<"object">>,<<"null">>]).
 
+-spec selectSimpleType() -> eqc_gen:gen(binary()).
 selectSimpleType() ->
     eqc_gen:oneof([<<"integer">>,<<"string">>,<<"number">>,<<"boolean">>]).
 
+-spec anyType() -> eqc_gen:gen(json:json_term()).
 anyType() ->
     ?LOG("'anyType' -> Choosing random type ('any' keyword)...~n",[]),
     eqc_gen:frequency([{3,stringType()},
@@ -796,31 +799,36 @@ anyType() ->
      %%                objectType()]).
 
 
--spec stringType() -> eqc_gen:gen(string()).
+-spec stringType() -> json:json_term().
 stringType() ->
     {struct,[{<<"type">>,<<"string">>}]}.
 
+-spec numberType() -> json:json_term().
 numberType() ->
     {struct,[{<<"type">>,<<"number">>}]}.
 
+-spec integerType() -> json:json_term().
 integerType() ->
     {struct,[{<<"type">>,<<"integer">>}]}.
 
--spec booleanType() -> eqc_gen:gen(boolean()).
+-spec booleanType() -> json:json_term().
 booleanType() ->
     {struct,[{<<"type">>,<<"boolean">>}]}.
 
+-spec objectType() -> json:json_term().
 objectType() ->
   ?LAZY(?LET(RandType, selectType(),
     {struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
                                         {struct,[{<<"type">>,RandType}]}}]})).
 
+-spec arrayType() -> json:json_term().
 arrayType() ->
     ?LAZY(?LET(RandType, selectType(),
          {struct,[{<<"type">>,<<"array">>},
                   {<<"additionalItems">>,<<"false">>},
                   {<<"items">>,{struct,[{<<"type">>,RandType}]}}]})).
 
+-spec nullType() -> json:json_term().
 nullType() ->
      {struct,[{<<"type">>,<<"null">>}]}.
 
@@ -839,6 +847,7 @@ stringGen(N) ->
     ?LET({S,G},{eqc_gen:choose($a,$z), stringGen(N-1)}, [S|G]).
 
 
+-spec randInt(integer(),integer()) -> eqc_gen:gen(integer()).
 randInt (Min,Max) ->
 
     case {Min,Max} of 
@@ -853,6 +862,7 @@ randInt (Min,Max) ->
             eqc_gen:choose(Min,Max)
     end.
 
+-spec randIntPositive(integer(), integer()) -> eqc_gen:gen(integer()).
 randIntPositive(Min,Max) when (Min > 0) and (Max > 0) ->
        case {Min,Max} of 
             
@@ -885,7 +895,7 @@ randFlt (Min, _) ->
 boolean() ->
     eqc_gen:bool().
 
-
+-spec null() -> atom().
 null() ->
     null.
 
