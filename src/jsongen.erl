@@ -788,17 +788,6 @@ anyType() ->
                     {1,arrayType()},
                     {1,objectType()}]).
 
-%% VV TO REMOVE IN NEXT UPDATE VV %
-    %% TODO: Use 'frequency' EQC library function instead
-     %% eqc_gen:oneof([stringType(),stringType(),stringType(),
-     %%                numberType(),numberType(),numberType(),
-     %%                integerType(),integerType(),integerType(),
-     %%                booleanType(),booleanType(),booleanType(),
-     %%                nullType(), nullType(), 
-     %%                arrayType(),
-     %%                objectType()]).
-
-
 -spec stringType() -> json:json_term().
 stringType() ->
     {struct,[{<<"type">>,<<"string">>}]}.
@@ -903,16 +892,17 @@ null() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for choosing random properties from a list
 
-%-spec choose_from_list([string()],natural(),natural()) -> eqc_gen:gen([string()]).
+-spec choose_from_list([string()],integer(),integer()) -> eqc_gen:gen([string()]).
 choose_from_list(P, Min, Max) when Max >= Min -> 
     ?LOG("Choosing properties: ~p~n",[P]),
     ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
     ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_from_list(P,N)).
     
-
+-spec choose_n_from_list([json:json_term()], integer()) -> [json:json_term()].
 choose_n_from_list(L,N) ->
   randomize_list(L,N,length(L)).
 
+-spec randomize_list([json:json_term()]) -> [json:json_term()].
 randomize_list(L) ->
   Length = length(L),
   randomize_list(L,Length,Length).
@@ -927,6 +917,7 @@ randomize_list(List, N, Length) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for patternProperties keyword
 
+-spec property_name(string()) -> eqc_gen:gen(string()).
 property_name(Pattern) ->
     ?LOG("Pattern name: ~p~n",[Pattern]),
     RegularExpression = binary_to_list(Pattern),
@@ -936,6 +927,7 @@ property_name(Pattern) ->
         gen_string_from_regexp:gen(InternalRegularExpression),
         list_to_binary(String)).
 
+-spec pattern_gen({string(), json:json_term()}, integer()) -> [{string(), json:json_term()}].
 pattern_gen(_,0) ->
     [];
 pattern_gen({Pattern, Schema},N) when N > 0 ->
@@ -946,10 +938,12 @@ pattern_gen(Pattern_Schema) ->
     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
     ?LET(N,natural(), pattern_gen(Pattern_Schema,N)).
 
+-spec pattern_gen_range([string()], integer()) -> eqc_gen:gen([string()]). 
 pattern_gen_range(Pattern_Schema, Min) ->
     ?LOG("{Pattern_schema} = ~p~n", [Pattern_Schema]),
     ?LET(N,natural_gte(Min), pattern_gen(Pattern_Schema,N)).
 
+-spec create_patterns(undefined | [string()])-> ([string] | []).
 create_patterns(undefined) ->
 [];
 
@@ -959,6 +953,7 @@ create_patterns(PatternPropList) ->
     ?LOG("Final patterns created: ~p~n",[L]),
     L.
 
+-spec create_patterns((undefined | [string()]), integer()) -> [string()].
 create_patterns(undefined,_) ->
 [];
 
@@ -973,6 +968,7 @@ create_patterns(PatternPropList, MinimumProps) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for additionalProperties keyword
 
+-spec additional_gen (json:json_term() , integer()) -> string().
 additional_gen (_,0) ->
 [];
 
@@ -987,6 +983,7 @@ additional_gen(AdditionalSchema,N) when N > 0 ->
             [ {randString(), {struct,[Schema]}} | additional_gen(AdditionalSchema,N-1)]
     end.
 
+-spec create_additionals(json:json_term(), integer()) -> [string()].
 create_additionals({},N) ->
     additional_gen({},N);
 
@@ -1000,6 +997,7 @@ create_additionals({struct,AddPropList},N) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc functions
 
+-spec floor((integer() | float())) -> integer().
 floor(X) when X < 0 ->
     T = trunc(X),
     case X - T == 0 of
@@ -1010,6 +1008,7 @@ floor(X) when X < 0 ->
 floor(X) ->
     trunc(X).
 
+-spec delete_nth_element(integer(), [string()]) -> [string()].
 delete_nth_element(N, List) ->
     ?LOG("Removing ~p element from list -> ~p~n",[N,List]),
     delete_nth_element(N-1,List, []).
@@ -1020,12 +1019,14 @@ delete_nth_element(0, [_nthEl|T], Res) ->
 delete_nth_element(N, [H|T], Res) ->
     delete_nth_element(N-1, T, [H|Res]).
 
+-spec concat_and_reverse(List, List) -> List.  %% mejor dejar lista a secas sin especificar??
 concat_and_reverse([],Res) ->
     lists:reverse(Res);
 
 concat_and_reverse([H|T], Res) ->
     concat_and_reverse(T, [H|Res]).
 
+-spec ceiling(integer() | float()) -> integer().
 ceiling(X) ->
     T = trunc(X),
     case (X - T) of
