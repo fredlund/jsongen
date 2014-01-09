@@ -1,5 +1,7 @@
 Ideas:
 
+- We should support format (predefined email, uri, etc, recognizers).
+
 - Generadores QuickCheck dentro JSON schemas:
 
 Propongo que permitimos que se especifica una funcion erlang como
