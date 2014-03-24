@@ -1,0 +1,8 @@
+@title Welcome to the pulse-time library.
+@author Lars-Ake Fredlund (lfredlund@fi.upm.es)
+@doc pulse_time is a modified version of the user-level scheduler PULSE
+ that attempts to facilitate the testing of timed Erlang software.
+@end
+
+
+

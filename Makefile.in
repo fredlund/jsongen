@@ -1,3 +1,5 @@
+JSONGEN_VERSION = @PACKAGE_VERSION@
+
 SOURCES = $(notdir $(wildcard src/*.erl)) regexp_parser.erl
 BEAMS = $(patsubst %.erl,ebin/%.beam,$(SOURCES))
 
@@ -17,11 +19,19 @@ ebin/%.beam: src/%.erl
 ebin:
 	mkdir -p ebin
 
+docs:
+	make edoc
+
 edoc: 
-	erl -noshell -run edoc_run files '["src/jsongen.erl", "src/json_validate.erl"]' '[{sort_functions,false},{dir,"doc"}]'
+	mkdir -p doc/doc
+	cp doc/overview.edoc doc/doc
+	erl -noshell -run edoc_run files '["src/jsongen.erl", "src/json_validate.erl"]' '[{sort_functions,false},{dir,"doc/doc"}]'
 
 dialyzer:
 	dialyzer ebin/*beam
+
+release: main docs examples
+	@ scripts/mkrelease "." release $(JSONGEN_VERSION)
 
 dotest:
 	erl -pa ebin -noshell -run rtest test -run erlang halt

@@ -1,0 +1,89 @@
+#!/bin/bash
+
+confirm() {
+	while true
+	do
+		read CONFIRM
+		case $CONFIRM in
+			y|Y|YES|yes|Yes) break ;;
+			n|N|no|NO|No)
+				echo Aborting
+				exit
+				;;
+			*) echo Please enter only y or n
+		esac
+	done
+}
+
+if [ $# -ne 3 ]
+then
+	echo "Usage: $0 <compiled-pulse_time-dir> <target-dir> <version>"
+	exit 0
+fi
+
+# Source distribution
+SRC=$1
+
+# Target
+TRG=$2
+
+# Version
+VER=$3
+
+if [ ! -d $SRC ]
+then
+	echo "$SRC does not exist, aborting!"
+	exit 0
+fi
+
+TRGDIR="$TRG/pulse_time_version_$VER"
+echo "Will assemble release in $TRGDIR"
+
+if [ -d $TRGDIR ]
+then 
+	echo -n "Warning: $TRGDIR already exists, overwrite [y/N]? "
+	confirm
+	rm -rf $TRGDIR
+fi
+
+mkdir -p $TRGDIR
+if [ ! -d $TRGDIR ]
+then 
+	echo "Could not create $TRGDIR, aborting!"
+	exit 1
+fi
+
+pushd $SRC
+ABSSRCDIR=`pwd`
+popd
+
+pushd $TRGDIR
+ABSTRGDIR=`pwd`
+TRGDIR2=pulse_time-$VER
+mkdir $TRGDIR2
+pushd $TRGDIR2
+ABSTRGDIR2=`pwd`
+
+mkdir ebin
+mkdir doc
+mkdir examples
+mkdir examples/ebin
+
+cp ${ABSSRCDIR}/ebin/pulse_time*.beam ebin
+cp ${ABSSRCDIR}/examples/ebin/*.beam examples/ebin
+cp -r ${ABSSRCDIR}/examples/* examples/
+cp ${ABSSRCDIR}/examples/README examples/README
+
+pushd $ABSSRCDIR/doc/doc
+find . | grep -v '/\.svn' | cpio -dump $ABSTRGDIR2/doc
+popd
+
+popd
+
+cp $ABSSRCDIR/README $ABSTRGDIR2
+cp $ABSSRCDIR/LICENCE $ABSTRGDIR2
+cp $ABSSRCDIR/bininst/INSTALLATION .
+cp $ABSSRCDIR/ebin/pulse_time_install.beam .
+cp /home/fred/svns/svnwork/papers/d4.4/Template.pdf Deliverable_4_4_Report.pdf
+
+echo "Done!"
