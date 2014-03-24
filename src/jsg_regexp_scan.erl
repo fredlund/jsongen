@@ -1,4 +1,4 @@
--module(regexp_scan).
+-module(jsg_regexp_scan).
 -export([scan/1]).
 
 scan([]) ->

@@ -1,4 +1,4 @@
--module(urigen).
+-module(jsg_urigen).
 
 -compile(export_all).
 

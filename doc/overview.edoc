@@ -1,7 +1,6 @@
-@title Welcome to the pulse-time library.
-@author Lars-Ake Fredlund (lfredlund@fi.upm.es)
-@doc pulse_time is a modified version of the user-level scheduler PULSE
- that attempts to facilitate the testing of timed Erlang software.
+@title Welcome to the jsongen library.
+@author Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)
+@doc Jsongen is a library for generating QuickCheck (quviq.com) generators from descriptions of JSON data using JSON schemas.
 @end
 
 

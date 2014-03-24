@@ -1,4 +1,4 @@
--module(main).
+-module(jsg_main).
 
 -compile(export_all).
 

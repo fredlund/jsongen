@@ -1,0 +1,33 @@
+To compile the pulse_time library it normally suffices to execute 
+``configure" and then ``make'' in the main directory.  In the following 
+we assume that you are using a UNIX based system:
+
+$ ./configure; make; make examples
+
+===============================================
+
+Installation as a normal Erlang library:
+
+===============================================
+
+As an alternative to including the path to the pulse_time ebin
+directory in calls to erlang (e.g., erl -pa pulse_time/ebin), or
+adding the pulse_time directory to the environment variable ERL_LIBS,
+one can install pulse_time as a normal Erlang library. Steps:
+
+1. Compile pulse_time as above, and then
+   make release
+
+2. Install pulse_time as a library:
+   cd release/pulse_time_version*
+
+   erl
+   1> pulse_time_install:install().
+
+For the last step to work, it may be necessary to start Erlang (erl)
+with super-user rights (under Unix) or administrator rights (Windows).
+
+More information regarding how to install pulse_time as a library,
+including from a pre-compiled pulse_time distribution, can be found in
+the file bininst/INSTALLATION.
+

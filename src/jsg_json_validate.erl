@@ -1,4 +1,4 @@
--module(json_validate).
+-module(jsg_json_validate).
 
 -export([validate/2]).
 

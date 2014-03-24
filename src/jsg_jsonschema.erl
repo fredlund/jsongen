@@ -1,4 +1,4 @@
--module(jsonschema).
+-module(jsg_jsonschema).
 
 -compile(export_all).
 

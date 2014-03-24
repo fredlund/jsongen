@@ -1,0 +1,39 @@
+INSTALLATION
+============
+
+The easiest way of using the pulse_time library is by installing it as
+a normal Erlang library. A good alternative is to add the directory
+to the environment variable (under UNIX) ERL_LIBS. Note that this verson
+of pulse_time was compiled using Erlang R16B02; you may encounter problems
+running it under an earlier version of Erlang. For source code access, 
+please send an email to lfredlund@fi.upm.es.
+
+To install pulse_time in the normal Erlang directory structure
+type the line
+
+``pulse_time_install:install().''
+
+to the Erlang shell. Erlang should be started from the same directory
+as this file ("INSTALLATION"). That is,
+
+> erl
+
+Erlang R14B03 (erts-5.8.4) [source] [smp:2:2] [rq:2] [async-threads:0] [hipe] [kernel-poll:false]
+
+Eshell V5.8.4  (abort with ^G)
+1> pulse_time_install:install().
+...
+
+You will probably have to run erlang with super-user privileges 
+(under Unix/Linux) or administrator privileges (Windows) for
+the installation to succeed.       
+
+After restarting Erlang, you can verify the status of the 
+pulse_time installation by typing:
+
+> pulse_time_version:version().
+
+in the Erlang shell.
+
+
+

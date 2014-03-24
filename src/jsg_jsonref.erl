@@ -1,4 +1,4 @@
--module(jsonref).
+-module(jsg_jsonref).
 
 -compile(export_all).
 

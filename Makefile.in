@@ -1,6 +1,6 @@
 JSONGEN_VERSION = @PACKAGE_VERSION@
 
-SOURCES = $(notdir $(wildcard src/*.erl)) regexp_parser.erl
+SOURCES = $(notdir $(wildcard src/*.erl)) jsg_regexp_parser.erl
 BEAMS = $(patsubst %.erl,ebin/%.beam,$(SOURCES))
 
 EFLAGS = +debug_info
@@ -10,8 +10,8 @@ all: ebin $(BEAMS)
 clean:
 	rm ebin/*.beam
 
-src/regexp_parser.erl: src/regexp_parser.yrl
-	(cd src; erl -noshell -run yecc file regexp_parser.yrl -run erlang halt)
+src/jsg_regexp_parser.erl: src/jsg_regexp_parser.yrl
+	(cd src; erl -noshell -run yecc file jsg_regexp_parser.yrl -run erlang halt)
 
 ebin/%.beam: src/%.erl
 	erlc $(EFLAGS) -o ebin $<
@@ -25,7 +25,7 @@ docs:
 edoc: 
 	mkdir -p doc/doc
 	cp doc/overview.edoc doc/doc
-	erl -noshell -run edoc_run files '["src/jsongen.erl", "src/json_validate.erl"]' '[{sort_functions,false},{dir,"doc/doc"}]'
+	erl -noshell -run edoc_run files '["src/jsongen.erl", "src/jsg_json_validate.erl"]' '[{sort_functions,false},{dir,"doc/doc"}]'
 
 dialyzer:
 	dialyzer ebin/*beam

@@ -1,4 +1,4 @@
--module(regexp_parse).
+-module(jsg_regexp_parse).
 -export([string/1]).
 
 %%-define(debug,true).

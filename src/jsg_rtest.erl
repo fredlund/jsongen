@@ -1,4 +1,4 @@
--module(rtest).
+-module(jsg_rtest).
 
 -export([check/0,test_schema_file/1]).
 

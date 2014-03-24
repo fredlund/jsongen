@@ -1,4 +1,4 @@
--module(json).
+-module(jsg_json).
 
 -export([decode/1, decode_url/1,
          encode/1]).

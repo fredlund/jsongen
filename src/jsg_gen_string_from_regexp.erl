@@ -1,4 +1,4 @@
--module(gen_string_from_regexp).
+-module(jsg_gen_string_from_regexp).
 
 -compile(export_all).
 
