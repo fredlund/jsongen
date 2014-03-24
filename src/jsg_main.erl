@@ -10,7 +10,7 @@ write_X_instances_of([1,File]).
 
 gen_instance(Generator,N,Count) when N > 0 ->
     JsonInstance = eqc_gen:pick(Generator),
-    JsonString = json:encode(JsonInstance),
+    JsonString = jsg_json:encode(JsonInstance),
     io:format("~n+INSTANCE ~B GENERATED:~n~s~n", [Count,JsonString]),
     gen_instance(Generator,N-1,Count + 1);
 
@@ -20,7 +20,7 @@ gen_instance(_,0,_) ->
 write_X_instances_of([N,File])  ->
     try
         io:format("~n+OPENING FILE ~p~n~n",[File]),
-        {ok, Schema} = jsonschema:read_schema(File),
+        {ok, Schema} = jsg_jsonschema:read_schema(File),
         JsonGenerator = jsongen:json(Schema),
         io:format("GENERATING ~B INSTANCES...~n",[list_to_integer(N)]),
         gen_instance(JsonGenerator,list_to_integer(N),1)

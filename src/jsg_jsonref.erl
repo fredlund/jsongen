@@ -118,8 +118,8 @@
 %% @doc Returns the json value indicated by the JsonRef using
 %% RootJsonTerm as root document in case no URL part exists in the
 %% URI.
--spec unref(JsonRef :: json:jsonterm(),
-            RootJsonTerm :: json:jsonterm()) -> json:json_term().
+-spec unref(JsonRef :: jsg_json:jsonterm(),
+            RootJsonTerm :: jsg_json:jsonterm()) -> jsg_json:json_term().
 unref({struct, JsonDict}, RootJsonTerm) ->
   URI_bin = proplists:get_value(<<"$ref">>,JsonDict),
   if is_binary(URI_bin) -> % Otherwise unref breaks
@@ -128,15 +128,15 @@ unref({struct, JsonDict}, RootJsonTerm) ->
       % io:format("Split ~p into ~p, ~p~n",[URI,URL,Pointer]),
       case URL of
         undefined -> JsonTerm = RootJsonTerm;
-        _ -> {ok, JsonTerm} = json:decode_url(URL)
+        _ -> {ok, JsonTerm} = jsg_json:decode_url(URL)
       end,
-      % io:format("Dereferencing ~p on ~s~n",[Pointer,json:encode(JsonTerm)]),
+      % io:format("Dereferencing ~p on ~s~n",[Pointer,jsg_json:encode(JsonTerm)]),
       deref(Pointer,JsonTerm)
   end.
 
 %% @doc Evaluates the json pointer Pointer in the json value JsonTerm.
 -spec deref(Pointer::jsonpointer(),
-            JsonTerm::json:json_term()) -> json:json_term().
+            JsonTerm::jsg_json:json_term()) -> jsg_json:json_term().
 deref([],JsonTerm) -> JsonTerm;
 deref([Key|Pointer],JsonTerm) when is_list(JsonTerm) -> %% Array
   case list_is_integer(Key) of
@@ -156,8 +156,8 @@ deref([Key|Pointer],{struct, JSON_dict}) -> %% Object
 %% substitutes the json value by a new value
 
 -spec subst(Pointer::jsonpointer(),
-            JsonTerm::json:json_term(),
-            NewValue::json:json_term()) -> json:json_term().
+            JsonTerm::jsg_jsg_json:json_term(),
+            NewValue::jsg_jsg_json:json_term()) -> jsg_jsg_json:json_term().
 subst([],_JsonTerm,NewValue) -> NewValue;
 subst([Key|Pointer],JsonTerm,NewValue) when is_list(JsonTerm) -> %% Array
   case list_is_integer(Key) of
@@ -212,7 +212,7 @@ url_pointer(URI) ->
 %% V is its derreferenced value in a given JSON value.
 %% angel@angel-laptop:~/projects/sci/prowess/code/jsongen$ erl -pa ebin
 %% Eshell V5.10.3  (abort with ^G)
-%% 1>  {ok,JT} = json:decode_url("test/in/users.json").
+%% 1>  {ok,JT} = jsg_jsg_json:decode_url("test/in/users.json").
 %% {ok,{struct,[{<<"users">>,
 %%               [{struct,[{<<"id">>,1},
 %%                         {<<"username">>,<<"davidwalsh">>},
@@ -262,7 +262,7 @@ url_pointer(URI) ->
 %%  {[<<"users">>,"1",<<"realName">>],<<"Andrei Arshavin">>}]
 %% 3>  [ {P,V} || {P,V} <- jsonref:gen(JT), V == <<"davidwalsh">> ].
 %% [{[<<"users">>,"0",<<"username">>],<<"davidwalsh">>}]
--spec gen(json:json_term()) -> [{jsonpointer(),json:json_term()}].
+-spec gen(jsg_jsg_json:json_term()) -> [{jsonpointer(),jsg_jsg_json:json_term()}].
 gen(JsonTerm) when is_list(JsonTerm) -> % Array
   Indices = lists:map(fun erlang:integer_to_list/1,
                       lists:seq(0,length(JsonTerm)-1)),

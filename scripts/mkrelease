@@ -17,7 +17,7 @@ confirm() {
 
 if [ $# -ne 3 ]
 then
-	echo "Usage: $0 <compiled-pulse_time-dir> <target-dir> <version>"
+	echo "Usage: $0 <compiled-jsongen-dir> <target-dir> <version>"
 	exit 0
 fi
 
@@ -36,7 +36,7 @@ then
 	exit 0
 fi
 
-TRGDIR="$TRG/pulse_time_version_$VER"
+TRGDIR="$TRG/jsongen_version_$VER"
 echo "Will assemble release in $TRGDIR"
 
 if [ -d $TRGDIR ]
@@ -59,20 +59,17 @@ popd
 
 pushd $TRGDIR
 ABSTRGDIR=`pwd`
-TRGDIR2=pulse_time-$VER
+TRGDIR2=jsongen-$VER
 mkdir $TRGDIR2
 pushd $TRGDIR2
 ABSTRGDIR2=`pwd`
 
 mkdir ebin
 mkdir doc
-mkdir examples
-mkdir examples/ebin
+mkdir tests
 
-cp ${ABSSRCDIR}/ebin/pulse_time*.beam ebin
-cp ${ABSSRCDIR}/examples/ebin/*.beam examples/ebin
-cp -r ${ABSSRCDIR}/examples/* examples/
-cp ${ABSSRCDIR}/examples/README examples/README
+cp ${ABSSRCDIR}/ebin/*.beam ebin
+cp -r ${ABSSRCDIR}/tests/* tests/
 
 pushd $ABSSRCDIR/doc/doc
 find . | grep -v '/\.svn' | cpio -dump $ABSTRGDIR2/doc
@@ -83,7 +80,6 @@ popd
 cp $ABSSRCDIR/README $ABSTRGDIR2
 cp $ABSSRCDIR/LICENCE $ABSTRGDIR2
 cp $ABSSRCDIR/bininst/INSTALLATION .
-cp $ABSSRCDIR/ebin/pulse_time_install.beam .
-cp /home/fred/svns/svnwork/papers/d4.4/Template.pdf Deliverable_4_4_Report.pdf
+cp $ABSSRCDIR/ebin/jsongen_install.beam .
 
 echo "Done!"

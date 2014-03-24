@@ -12,9 +12,9 @@
 -endif.
 
 string(S) ->
-  Tokens = regexp_scan:scan(S),
+  Tokens = jsg_regexp_scan:scan(S),
   ?LOG("tokens are~n~p~n",[Tokens]),
-  case regexp_parser:parse(Tokens) of
+  case jsg_regexp_parser:parse(Tokens) of
     {ok,Result} ->
       Canonical = canonical(Result),
       ?LOG("Canonical result:~n~p~n",[Canonical]),

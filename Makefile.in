@@ -7,8 +7,10 @@ EFLAGS = +debug_info
 
 all: ebin $(BEAMS)
 
+main: ${BEAMS}
+
 clean:
-	rm ebin/*.beam
+	rm -f ebin/*.beam src/regexp_parser.erl
 
 src/jsg_regexp_parser.erl: src/jsg_regexp_parser.yrl
 	(cd src; erl -noshell -run yecc file jsg_regexp_parser.yrl -run erlang halt)
@@ -25,13 +27,13 @@ docs:
 edoc: 
 	mkdir -p doc/doc
 	cp doc/overview.edoc doc/doc
-	erl -noshell -run edoc_run files '["src/jsongen.erl", "src/jsg_json_validate.erl"]' '[{sort_functions,false},{dir,"doc/doc"}]'
+	erl -noshell -run edoc_run files '["src/jsongen.erl", "src/jsg_json_validate.erl","src/jsg_json.erl","src/jsg_jsonschema.erl"]' '[{sort_functions,false},{dir,"doc/doc"}]'
 
 dialyzer:
 	dialyzer ebin/*beam
 
-release: main docs examples
+release: main docs
 	@ scripts/mkrelease "." release $(JSONGEN_VERSION)
 
 dotest:
-	erl -pa ebin -noshell -run rtest test -run erlang halt
+	erl -pa ebin -noshell -run jsg_rtest test -run erlang halt

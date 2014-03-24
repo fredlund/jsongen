@@ -40,7 +40,7 @@ decode_url(URL = [$h,$t,$t,$p,$:|_]) ->
     {ok, {{_Version, 200, _ReasonPhrase},
           _Headers,
           JsonString}} ->
-      JsonTerm = json:decode(JsonString),
+      JsonTerm = ?MODULE:decode(JsonString),
       {ok, JsonTerm};
     _ ->
       Result
@@ -49,7 +49,7 @@ decode_url([$f,$i,$l,$e,$:|Filename]) ->
   Result = file:read_file(Filename),
   case Result of
     {ok, JsonString} ->
-      JsonTerm = json:decode(JsonString),
+      JsonTerm = ?MODULE:decode(JsonString),
       {ok, JsonTerm};
     _ ->
       Result

@@ -4,7 +4,7 @@
 
 %% URL can be "http:...", "file:..." or directly a filename
 read_schema(URL) ->
-  json:decode_url(URL).
+  jsg_json:decode_url(URL).
 
 hasType(_Schema={struct,Def}) ->
   case proplists:lookup(<<"type">>,Def) of

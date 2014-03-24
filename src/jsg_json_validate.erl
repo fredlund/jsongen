@@ -11,20 +11,20 @@
 -define(LOG(X,Y),true).
 -endif.
 
--spec validate(json:json_term(),json:json_term()) -> boolean() | maybe.
+-spec validate(jsg_json:json_term(),jsg_json:json_term()) -> boolean() | maybe.
 
 validate(Data,Schema) ->
   ?LOG("validate(~p,~n         ~p)~n",[Data,Schema]),
-  case jsonschema:hasType(Schema) of
+  case jsg_jsonschema:hasType(Schema) of
     true ->
-      case jsonschema:type(Schema) of
+      case jsg_jsonschema:type(Schema) of
 	<<"object">> ->
 	  case Data of
 	    {struct,DataProperties} ->
 	      Properties =
-		proplists:get_keys(jsonschema:properties(Schema)),
+		proplists:get_keys(jsg_jsonschema:properties(Schema)),
 	      Required =
-		jsonschema:keyword(Schema, "required",[]),
+		jsg_jsonschema:keyword(Schema, "required",[]),
 	      RequiredSet =
 		if
 		  Required==undefined -> sets:new();
@@ -36,12 +36,12 @@ validate(Data,Schema) ->
 		  true -> sets:from_list(Properties)
 		end,
 	      AdditionalProperties =
-		case jsonschema:keyword(Schema, "additionalProperties", {}) of
+		case jsg_jsonschema:keyword(Schema, "additionalProperties", {}) of
 		  false -> false;
 		  _ -> true
 		end,
 	      PatternProperties =
-		case jsonschema:keyword(Schema, "patternProperties", {}) of
+		case jsg_jsonschema:keyword(Schema, "patternProperties", {}) of
 		  false -> false;
 		  _ -> true
 		end,
@@ -67,11 +67,11 @@ validate(Data,Schema) ->
 	    false ->
 	      false;
 	    true ->
-	      MaxScanned = jsonschema:keyword(Schema,"maximum"),
-	      ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum",false),
-	      MinScanned = jsonschema:keyword(Schema,"minimum"),
-	      ExcMinScanned = jsonschema:keyword(Schema,"exclusiveMinimum",false),
-	      Multiple = jsonschema:keyword(Schema,"multipleOf",1),
+	      MaxScanned = jsg_jsonschema:keyword(Schema,"maximum"),
+	      ExcMaxScanned = jsg_jsonschema:keyword(Schema,"exclusiveMaximum",false),
+	      MinScanned = jsg_jsonschema:keyword(Schema,"minimum"),
+	      ExcMinScanned = jsg_jsonschema:keyword(Schema,"exclusiveMinimum",false),
+	      Multiple = jsg_jsonschema:keyword(Schema,"multipleOf",1),
 	      if
 		MaxScanned=/=undefined, Data>MaxScanned ->
 		  false;
@@ -91,9 +91,9 @@ validate(Data,Schema) ->
 	<<"string">> ->
 	  try binary_to_list(Data) of
 	      String ->
-	      MaxLength = jsonschema:keyword(Schema,"maxLength"),
-	      MinLength = jsonschema:keyword(Schema,"minLength"),
-	      _Pattern = jsonschema:keyword(Schema,"pattern"),
+	      MaxLength = jsg_jsonschema:keyword(Schema,"maxLength"),
+	      MinLength = jsg_jsonschema:keyword(Schema,"minLength"),
+	      _Pattern = jsg_jsonschema:keyword(Schema,"pattern"),
 	      Length = length(String),
 	      if
 		MaxLength=/=undefined, Length>MaxLength -> false;

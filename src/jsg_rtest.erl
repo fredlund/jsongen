@@ -25,7 +25,7 @@ schemas_test_() ->
   ?debugFmt("Will test schemas~n~p~n",[Filenames]),
   lists:foldl
     (fun (SchemaFile,Acc) ->
-	 try jsonschema:read_schema(SchemaFile) of
+	 try jsg_jsonschema:read_schema(SchemaFile) of
 	   {ok,Schema} ->
 	     Basename = filename:rootname(filename:basename(SchemaFile)),
 	     [{"schema \""++Basename++"\"",
@@ -49,11 +49,11 @@ schemas_test_() ->
      end, [], Filenames).
 
 test_schema_file([Filename]) ->
-  {ok,Schema} = jsonschema:read_schema(Filename),
+  {ok,Schema} = jsg_jsonschema:read_schema(Filename),
   (test_schema(Schema))().
   
 test_schema(Schema) ->
-  IsEmpty = jsonschema:keyword(Schema,"empty",false),
+  IsEmpty = jsg_jsonschema:keyword(Schema,"empty",false),
   fun () ->
       Generator = jsongen:json(Schema),
       if
@@ -69,16 +69,16 @@ test_schema(Schema) ->
 
 pick_n_values(Generator,N,Schema) when N>0 ->      
   Value = eqc_gen:pick(Generator),
-  case json_validate:validate(Value,Schema) of
+  case jsg_json_validate:validate(Value,Schema) of
     true -> ok;
     maybe -> ok;
     Other ->
       io:fwrite
 	("~n*** ERROR: Validation returns value: ~p~n",[Other]),
       io:fwrite
-	("~nValue: ~s~n",[json:encode(Value)]),      
+	("~nValue: ~s~n",[jsg_json:encode(Value)]),      
       io:fwrite
-	("~nSchema: ~s~n", [json:encode(Schema)]),
+	("~nSchema: ~s~n", [jsg_json:encode(Schema)]),
       throw(validation_error)
   end,
   pick_n_values(Generator,N-1,Schema);

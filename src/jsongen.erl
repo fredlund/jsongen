@@ -49,29 +49,29 @@
 
 -include_lib("eqc/include/eqc.hrl").
 
--type options() :: {root, jsonref:url()}.
+-type options() :: {root, jsg_jsonref:url()}.
 
 %% @doc
 %% Translates a JSON schema into an Erlang QuickCheck generator.
--spec json(json:json_term()) -> eqc_gen:gen(json:json_term()).
+-spec json(jsg_json:json_term()) -> eqc_gen:gen(jsg_json:json_term()).
 json(Schema) ->
   json(Schema,[{root,Schema}]).
 
--spec json(json:json_term(),options()) -> eqc_gen:gen(json:json_term()).
+-spec json(jsg_json:json_term(),options()) -> eqc_gen:gen(jsg_json:json_term()).
 json(Schema,Options) ->
-    ?LOG("json(~s,~p)",[json:encode(Schema),Options]),
-    case jsonschema:oneOf(Schema) of
+    ?LOG("json(~s,~p)",[jsg_json:encode(Schema),Options]),
+    case jsg_jsonschema:oneOf(Schema) of
         undefined ->
-            case jsonschema:anyOf(Schema) of
+            case jsg_jsonschema:anyOf(Schema) of
                 undefined ->
-                    case jsonschema:allOf(Schema) of
+                    case jsg_jsonschema:allOf(Schema) of
                         undefined ->
-                            case jsonschema:notKeyword(Schema) of
+                            case jsg_jsonschema:notKeyword(Schema) of
                                 undefined ->
-                                    case jsonschema:isRef(Schema) of
+                                    case jsg_jsonschema:isRef(Schema) of
                                         true ->
                                             RootSchema = proplists:get_value(root,Options),
-                                            RefSch = jsonref:unref(Schema,RootSchema),
+                                            RefSch = jsg_jsonref:unref(Schema,RootSchema),
                                             NewOptions =
                 % We should change the root but at this moment peano2 goes into an inifinite loop.
                 % TODO: do we need to maintain an environment!?
@@ -80,13 +80,13 @@ json(Schema,Options) ->
                                                 Options,
                                             ?LAZY(json(RefSch,NewOptions));
                                         false ->  
-                                            case jsonschema:hasType(Schema) of
+                                            case jsg_jsonschema:hasType(Schema) of
                                                 true ->
                                                     gen_typed_schema(Schema,Options);
                                                 false ->
-                                                    case jsonschema:hasEnum(Schema) of
+                                                    case jsg_jsonschema:hasEnum(Schema) of
                                                         true -> 
-                                                            eqc_gen:oneof(jsonschema:enumerated(Schema));
+                                                            eqc_gen:oneof(jsg_jsonschema:enumerated(Schema));
                                                         false ->
                                                             throw({bad_schema,?LINE})
                                                     end
@@ -96,7 +96,7 @@ json(Schema,Options) ->
 
                                 %%not
                                 SingleSchema ->
-                                    case jsonschema:hasType(Schema) of
+                                    case jsg_jsonschema:hasType(Schema) of
                                         true ->
                                             ?SUCHTHAT(ValidationResult,
                                              ?LET(Value, gen_typed_schema(Schema,Options),
@@ -117,7 +117,7 @@ json(Schema,Options) ->
 
                         %%allOf
                         ListOfSchemas ->
-                            case jsonschema:hasType(Schema) of
+                            case jsg_jsonschema:hasType(Schema) of
                                 true ->
                                     ?SUCHTHAT(ValidationResult,
                                       ?LET(Value, gen_typed_schema(Schema,Options),
@@ -149,7 +149,7 @@ json(Schema,Options) ->
                 %anyOf
                 ListOfSchemas ->
                     ?LOG("AnyOf with List of Schemas: ~p~n",[ListOfSchemas]),
-                    case jsonschema:hasType(Schema) of
+                    case jsg_jsonschema:hasType(Schema) of
                         true ->
                             ?SUCHTHAT(ValidationResult,
                                       ?LET(Value, gen_typed_schema(Schema,Options),
@@ -179,7 +179,7 @@ json(Schema,Options) ->
 
         %%oneOf
         ListOfSchemas ->
-            case jsonschema:hasType(Schema) of
+            case jsg_jsonschema:hasType(Schema) of
                 true ->
                     ?SUCHTHAT(ValidationResult,
                               ?LET(Value, gen_typed_schema(Schema,Options),
@@ -205,10 +205,10 @@ json(Schema,Options) ->
      
     end.
 
--spec valid_schemas(json:json_term(),[json:json_term()]) -> [json:json_term()].
+-spec valid_schemas(jsg_json:json_term(),[jsg_json:json_term()]) -> [jsg_json:json_term()].
 valid_schemas(Value,Schemas) ->
     lists:foldl(fun (Schema,N) ->
-                        case json_validate:validate(Value,Schema) of
+                        case jsg_json_validate:validate(Value,Schema) of
                             true ->
                                 Res = 1;
                             false ->
@@ -220,9 +220,9 @@ valid_schemas(Value,Schemas) ->
                 end, 0, Schemas).
 
 
--spec gen_typed_schema(json:json_term(), options()) -> json:json_term().
+-spec gen_typed_schema(jsg_json:json_term(), options()) -> jsg_json:json_term().
 gen_typed_schema(Schema,Options) ->
-  case jsonschema:type(Schema) of
+  case jsg_jsonschema:type(Schema) of
     
 
     %% boolean
@@ -235,11 +235,11 @@ gen_typed_schema(Schema,Options) ->
     %%     A JSON number without a fraction or exponent part. 
     <<"integer">> ->
       
-      MaxScanned = jsonschema:keyword(Schema,"maximum"),
-      ExcMaxScanned = jsonschema:keyword(Schema,"exclusiveMaximum",false),
-      MinScanned = jsonschema:keyword(Schema,"minimum"),
-      ExcMinScanned = jsonschema:keyword(Schema,"exclusiveMinimum",false),
-      Multiple = jsonschema:keyword(Schema,"multipleOf",1),
+      MaxScanned = jsg_jsonschema:keyword(Schema,"maximum"),
+      ExcMaxScanned = jsg_jsonschema:keyword(Schema,"exclusiveMaximum",false),
+      MinScanned = jsg_jsonschema:keyword(Schema,"minimum"),
+      ExcMinScanned = jsg_jsonschema:keyword(Schema,"exclusiveMinimum",false),
+      Multiple = jsg_jsonschema:keyword(Schema,"multipleOf",1),
       
       % Setting up keywords
       case MaxScanned of
@@ -272,11 +272,11 @@ gen_typed_schema(Schema,Options) ->
     %% Number
     %%     Any JSON number. Number includes integer.
     <<"number">> ->
-      Max = jsonschema:keyword(Schema,"maximum"),
-      ExcMax = jsonschema:keyword(Schema,"exclusiveMaximum",false),
-      Min = jsonschema:keyword(Schema,"minimum"),
-      ExcMin = jsonschema:keyword(Schema,"exclusiveMinimum",false),
-      Mul = jsonschema:keyword(Schema,"multipleOf",1),
+      Max = jsg_jsonschema:keyword(Schema,"maximum"),
+      ExcMax = jsg_jsonschema:keyword(Schema,"exclusiveMaximum",false),
+      Min = jsg_jsonschema:keyword(Schema,"minimum"),
+      ExcMin = jsg_jsonschema:keyword(Schema,"exclusiveMinimum",false),
+      Mul = jsg_jsonschema:keyword(Schema,"multipleOf",1),
       
       
       case {Min, Max} of
@@ -304,15 +304,15 @@ gen_typed_schema(Schema,Options) ->
     %% array
     %%     A JSON array. 
     <<"array">> ->
-      MaxItems = jsonschema:keyword(Schema,"maxItems"),
-      MinItems = jsonschema:keyword(Schema,"minItems",0),   
-      AdditionalItems = jsonschema:additionalItems(Schema), 
+      MaxItems = jsg_jsonschema:keyword(Schema,"maxItems"),
+      MinItems = jsg_jsonschema:keyword(Schema,"minItems",0),   
+      AdditionalItems = jsg_jsonschema:additionalItems(Schema), 
 
-      UniqueItems = jsonschema:keyword(Schema, "uniqueItems",false),
+      UniqueItems = jsg_jsonschema:keyword(Schema, "uniqueItems",false),
       ?LOG("AdditionalItems: ~p ~n",[AdditionalItems]),
       ?LOG("UniqueItems: ~p ~n",[UniqueItems]),
-      ?LOG("Items: ~p ~n",[jsonschema:items(Schema)]),
-      case jsonschema:items(Schema) of
+      ?LOG("Items: ~p ~n",[jsg_jsonschema:items(Schema)]),
+      case jsg_jsonschema:items(Schema) of
 	{itemSchema, ItemSchema} ->
               case AdditionalItems of
                   
@@ -342,12 +342,12 @@ gen_typed_schema(Schema,Options) ->
     %% object
     %%     A JSON object.
     <<"object">> ->
-      Properties = jsonschema:properties(Schema),
-      MinProperties = jsonschema:minProperties(Schema, 0),
-      Required = jsonschema:keyword(Schema, "required",[]),
-      PatternProperties = jsonschema:patternProperties(Schema),
-      AdditionalProperties = jsonschema:additionalProperties(Schema),
-      MaxProperties = jsonschema:maxProperties(Schema),
+      Properties = jsg_jsonschema:properties(Schema),
+      MinProperties = jsg_jsonschema:minProperties(Schema, 0),
+      Required = jsg_jsonschema:keyword(Schema, "required",[]),
+      PatternProperties = jsg_jsonschema:patternProperties(Schema),
+      AdditionalProperties = jsg_jsonschema:additionalProperties(Schema),
+      MaxProperties = jsg_jsonschema:maxProperties(Schema),
 
           case MaxProperties of
               undefined ->
@@ -489,9 +489,9 @@ gen_typed_schema(Schema,Options) ->
         %% string
         %%     A JSON string.
         <<"string">> ->
-	    MinLength = jsonschema:keyword(Schema,"minLength"),
-	    MaxLength = jsonschema:keyword(Schema,"maxLength"),
-	    Pattern =  jsonschema:keyword(Schema,"pattern"), 
+	    MinLength = jsg_jsonschema:keyword(Schema,"minLength"),
+	    MaxLength = jsg_jsonschema:keyword(Schema,"maxLength"),
+	    Pattern =  jsg_jsonschema:keyword(Schema,"pattern"), 
             
 	    %% Currently we do not like length specifications 
 	    %% combined with regular expressions. Will this change? 
@@ -541,7 +541,7 @@ gen_typed_schema(Schema,Options) ->
 	    eqc_gen:oneof
               (lists:map
                  (fun (Type) ->
-                          ConcreteSchema = jsonschema:set_type(Schema,Type),
+                          ConcreteSchema = jsg_jsonschema:set_type(Schema,Type),
                           json(ConcreteSchema,Options)
                   end,
                   Types))
@@ -551,7 +551,7 @@ gen_typed_schema(Schema,Options) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Array gen
 
--spec array(json:json_term(),{integer(),integer()},boolean()) -> eqc_gen:gen(json:json_term()).
+-spec array(jsg_json:json_term(),{integer(),integer()},boolean()) -> eqc_gen:gen(jsg_json:json_term()).
 array(Schema,{MinItems,MaxItems},Unique) ->
     ?LOG("Array schema is ~p ~n with Unique: ~p~n",[Schema,Unique]),
     case MaxItems of
@@ -590,7 +590,7 @@ insertType(Type, {struct,[Types | Rest]}) ->
     ?LOG ("Final res: ~p ~n",[Res]),
     Res.
 
--spec arrayOfAny(integer(), integer(), boolean()) -> json:json_term().
+-spec arrayOfAny(integer(), integer(), boolean()) -> jsg_json:json_term().
 arrayOfAny(MinItems,MaxItems,Unique) ->
     case MaxItems of
 	undefined ->
@@ -621,7 +621,7 @@ arrayOfAny(MinItems,MaxItems,Unique) ->
                       end))
     end.
 
--spec arrayGen (json:json_term(), integer()) -> eqc_gen:gen(json:json_term()).
+-spec arrayGen (jsg_json:json_term(), integer()) -> eqc_gen:gen(jsg_json:json_term()).
 arrayGen(_Schema,0) ->
     [];
 
@@ -630,7 +630,7 @@ arrayGen(Schema,N) when N > 0->
     ?LET(Sch, selectSchema(Schema),
          [json({struct,[Sch]}) | arrayGen(Schema,N-1) ]).
 
--spec arrayGenUnique (json:json_term(), integer()) -> eqc_gen:gen(json:json_term()).
+-spec arrayGenUnique (jsg_json:json_term(), integer()) -> eqc_gen:gen(jsg_json:json_term()).
 arrayGenUnique(_Schema,0) ->
     [];
 
@@ -638,7 +638,7 @@ arrayGenUnique(Schema,N) when N > 0->
     ?LOG("arrayGenUnique: ~p ~n",[Schema]),
     [ json(Schema) | arrayGenUnique(Schema, N-1)].
 
--spec selectSchema([json:json_term()]) -> json:json_term().
+-spec selectSchema([jsg_json:json_term()]) -> jsg_json:json_term().
 selectSchema({struct, Schemas}) ->
     ?LOG("Array: Selecting type from ~p ~n",[Schemas]),
     eqc_gen:oneof(Schemas).
@@ -777,7 +777,7 @@ selectType()->
 selectSimpleType() ->
     eqc_gen:oneof([<<"integer">>,<<"string">>,<<"number">>,<<"boolean">>]).
 
--spec anyType() -> eqc_gen:gen(json:json_term()).
+-spec anyType() -> eqc_gen:gen(jsg_json:json_term()).
 anyType() ->
     ?LOG("'anyType' -> Choosing random type ('any' keyword)...~n",[]),
     eqc_gen:frequency([{3,stringType()},
@@ -788,36 +788,36 @@ anyType() ->
                     {1,arrayType()},
                     {1,objectType()}]).
 
--spec stringType() -> json:json_term().
+-spec stringType() -> jsg_json:json_term().
 stringType() ->
     {struct,[{<<"type">>,<<"string">>}]}.
 
--spec numberType() -> json:json_term().
+-spec numberType() -> jsg_json:json_term().
 numberType() ->
     {struct,[{<<"type">>,<<"number">>}]}.
 
--spec integerType() -> json:json_term().
+-spec integerType() -> jsg_json:json_term().
 integerType() ->
     {struct,[{<<"type">>,<<"integer">>}]}.
 
--spec booleanType() -> json:json_term().
+-spec booleanType() -> jsg_json:json_term().
 booleanType() ->
     {struct,[{<<"type">>,<<"boolean">>}]}.
 
--spec objectType() -> json:json_term().
+-spec objectType() -> jsg_json:json_term().
 objectType() ->
   ?LAZY(?LET(RandType, selectType(),
     {struct,[{<<"type">>,<<"object">>},{<<"additionalProperties">>,
                                         {struct,[{<<"type">>,RandType}]}}]})).
 
--spec arrayType() -> json:json_term().
+-spec arrayType() -> jsg_json:json_term().
 arrayType() ->
     ?LAZY(?LET(RandType, selectType(),
          {struct,[{<<"type">>,<<"array">>},
                   {<<"additionalItems">>,<<"false">>},
                   {<<"items">>,{struct,[{<<"type">>,RandType}]}}]})).
 
--spec nullType() -> json:json_term().
+-spec nullType() -> jsg_json:json_term().
 nullType() ->
      {struct,[{<<"type">>,<<"null">>}]}.
 
@@ -898,11 +898,11 @@ choose_from_list(P, Min, Max) when Max >= Min ->
     ?LOG("Min, Max: ~p,~p~n",[Min,Max]),
     ?LET(N, eqc_gen:choose (max(0,Min),Max), choose_n_from_list(P,N)).
     
--spec choose_n_from_list([json:json_term()], integer()) -> [json:json_term()].
+-spec choose_n_from_list([jsg_json:json_term()], integer()) -> [jsg_json:json_term()].
 choose_n_from_list(L,N) ->
   randomize_list(L,N,length(L)).
 
--spec randomize_list([json:json_term()]) -> [json:json_term()].
+-spec randomize_list([jsg_json:json_term()]) -> [jsg_json:json_term()].
 randomize_list(L) ->
   Length = length(L),
   randomize_list(L,Length,Length).
@@ -921,13 +921,13 @@ randomize_list(List, N, Length) ->
 property_name(Pattern) ->
     ?LOG("Pattern name: ~p~n",[Pattern]),
     RegularExpression = binary_to_list(Pattern),
-    InternalRegularExpression = regexp_parse:string(RegularExpression),
+    InternalRegularExpression = jsg_regexp_parse:string(RegularExpression),
     ?LET
        (String,
-        gen_string_from_regexp:gen(InternalRegularExpression),
+        jsg_gen_string_from_regexp:gen(InternalRegularExpression),
         list_to_binary(String)).
 
--spec pattern_gen({string(), json:json_term()}, integer()) -> [{string(), json:json_term()}].
+-spec pattern_gen({string(), jsg_json:json_term()}, integer()) -> [{string(), jsg_json:json_term()}].
 pattern_gen(_,0) ->
     [];
 pattern_gen({Pattern, Schema},N) when N > 0 ->
@@ -968,7 +968,7 @@ create_patterns(PatternPropList, MinimumProps) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Generators for additionalProperties keyword
 
--spec additional_gen (json:json_term() , integer()) -> string().
+-spec additional_gen (jsg_json:json_term() , integer()) -> string().
 additional_gen (_,0) ->
 [];
 
@@ -983,7 +983,7 @@ additional_gen(AdditionalSchema,N) when N > 0 ->
             [ {randString(), {struct,[Schema]}} | additional_gen(AdditionalSchema,N-1)]
     end.
 
--spec create_additionals(json:json_term(), integer()) -> [string()].
+-spec create_additionals(jsg_json:json_term(), integer()) -> [string()].
 create_additionals({},N) ->
     additional_gen({},N);
 
