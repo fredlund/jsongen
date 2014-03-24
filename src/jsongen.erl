@@ -1035,4 +1035,7 @@ ceiling(X) ->
         _ -> T
     end.
 
+version() ->
+  ?JSONGEN_VERSION.
+  
 

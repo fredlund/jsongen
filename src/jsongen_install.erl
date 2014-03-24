@@ -106,11 +106,11 @@ find_jsongen_distribution() ->
 version(Dir) ->
   case code:is_loaded(jsongen) of
     {file,_} ->
-      jsongen_scheduler:version();
+      jsongen:version();
     false ->
-      case code:load_abs(Dir++"/ebin/jsongen_scheduler") of
+      case code:load_abs(Dir++"/ebin/jsongen") of
 	{module,_} ->
-	  jsongen_scheduler:version();
+	  jsongen:version();
 	{error,_} ->
 	  throw(unknown_version)
       end

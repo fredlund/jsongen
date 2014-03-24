@@ -3,7 +3,7 @@ JSONGEN_VERSION = @PACKAGE_VERSION@
 SOURCES = $(notdir $(wildcard src/*.erl)) jsg_regexp_parser.erl
 BEAMS = $(patsubst %.erl,ebin/%.beam,$(SOURCES))
 
-EFLAGS = +debug_info
+EFLAGS = +debug_info -D JSONGEN_VERSION=\"$(JSONGEN_VERSION)\"
 
 all: ebin $(BEAMS)
 

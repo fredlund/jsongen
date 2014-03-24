@@ -4,6 +4,8 @@ jsongen
 A library for generating JSON data from descriptions of data
 in the JSON Schema format. 
 
-See http://babel.ls.fi.upm.es/~fred/jsongen/
-for API information.
+See http://babel.ls.fi.upm.es/~fred/jsongen/ for API information.
+
+For questions or to submit comments regarding the tool please send an email
+to lfredlund@fi.upm.es or aherranz@fi.upm.es
 
