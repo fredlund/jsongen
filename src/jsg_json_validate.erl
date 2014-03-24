@@ -1,3 +1,8 @@
+%% @doc This module validates JSON data against JSON Schemas.
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
+%% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
+%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
+
 -module(jsg_json_validate).
 
 -export([validate/2]).
@@ -11,6 +16,12 @@
 -define(LOG(X,Y),true).
 -endif.
 
+%% @doc 
+%% Validates a JSON value against a JSON Schema.
+%% WARNING. The function is not yet finished.
+%% Returns true if the schema validates, false if it does not,
+%% of maybe (due to unfinished implementation), if the validation 
+%% status is unknown.
 -spec validate(jsg_json:json_term(),jsg_json:json_term()) -> boolean() | maybe.
 
 validate(Data,Schema) ->

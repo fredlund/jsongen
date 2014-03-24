@@ -1,8 +1,20 @@
+%% @doc This module contains functions for parsing a JSON schema.
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
+%% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
+%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
+
 -module(jsg_jsonschema).
+
+-export([read_schema/1]).
 
 -compile(export_all).
 
-%% URL can be "http:...", "file:..." or directly a filename
+%% @doc
+%% Reads a JSON schema in textual format, converting it into
+%% a mochijson2 Erlang term. 
+%% The function argument can either 
+%% be on the form "http:...", "file:..." or a filename.
+-spec read_schema(string()) -> {ok, jsg_json:json_term()} | {error, any()}.
 read_schema(URL) ->
   jsg_json:decode_url(URL).
 
