@@ -1,0 +1,23 @@
+{ 
+	"type" : "array", 
+	"additionalItems" : false,
+	"items" : 
+	{ 
+		"type" : "object" ,
+		"additionalProperties" : false,
+		"required" : ["name", "age"],
+		"properties" : {
+        	"name": {
+			"type":"string",
+			"maxLength" : 10,
+			"minLength" : 3
+			},
+
+        	"age" : {
+            		"type":"integer",
+            		"maximum": 120,
+            		"minimum": 15
+        		}
+		}
+	}
+}
