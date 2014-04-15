@@ -37,7 +37,7 @@ the installation to succeed.
 After restarting Erlang, you can verify the status of the 
 jsongen installation by typing:
 
-> jsongen_version:version().
+> jsongen:version().
 
 in the Erlang shell.
 
