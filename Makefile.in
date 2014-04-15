@@ -35,5 +35,8 @@ dialyzer:
 release: main docs
 	@ scripts/mkrelease "." release $(JSONGEN_VERSION)
 
+install: release
+	@ scripts/dorelease "." release $(JSONGEN_VERSION)
+
 dotest:
 	erl -pa ebin -noshell -run jsg_rtest test -run erlang halt

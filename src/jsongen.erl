@@ -38,7 +38,7 @@
 -compile(export_all).
 
 %%LOGS
-%-define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -88,7 +88,7 @@ json(Schema,Options) ->
                                                         true -> 
                                                             eqc_gen:oneof(jsg_jsonschema:enumerated(Schema));
                                                         false ->
-                                                            throw({bad_schema,?LINE})
+							throw({bad_schema,Schema,?LINE})
                                                     end
                                             end
                                     end;
@@ -320,12 +320,11 @@ gen_typed_schema(Schema,Options) ->
                       arrayOfAny(MinItems,MaxItems,UniqueItems);
 
                   false ->
-                      array(ItemSchema, {MinItems,MaxItems},UniqueItems);
+                      array([ItemSchema], {MinItems,MaxItems},UniqueItems);
 
                    AdditionalSchema ->
                       ?LOG("AdditionalSchema is ~p~n",[AdditionalSchema]),
-                      {struct, Schemas} = ItemSchema,
-                      array({struct,lists:append(Schemas,AdditionalSchema)}, 
+		      array([ItemSchema,AdditionalSchema], 
                             {MinItems,MaxItems},UniqueItems)
                           
               end;
@@ -627,8 +626,13 @@ arrayGen(_Schema,0) ->
 
 arrayGen(Schema,N) when N > 0->
     ?LOG("arrayGen: ~p ~n",[Schema]),
-    ?LET(Sch, selectSchema(Schema),
-         [json({struct,[Sch]}) | arrayGen(Schema,N-1) ]).
+   if
+     is_list(Schema) ->
+       ?LET(Sch, selectSchema(Schema),
+	    [json(Sch) | arrayGen(Schema,N-1) ]);
+     true ->
+       [json(Schema) | arrayGen(Schema,N-1)]
+   end.
 
 -spec arrayGenUnique (jsg_json:json_term(), integer()) -> eqc_gen:gen(jsg_json:json_term()).
 arrayGenUnique(_Schema,0) ->
@@ -636,10 +640,16 @@ arrayGenUnique(_Schema,0) ->
 
 arrayGenUnique(Schema,N) when N > 0->
     ?LOG("arrayGenUnique: ~p ~n",[Schema]),
-    [ json(Schema) | arrayGenUnique(Schema, N-1)].
+  if
+    is_list(Schema) ->
+       ?LET(Sch, selectSchema(Schema),
+	    [json(Sch) | arrayGenUnique(Schema,N-1) ]);
+    true ->
+      [ json(Schema) | arrayGenUnique(Schema, N-1)]
+  end.
 
 -spec selectSchema([jsg_json:json_term()]) -> jsg_json:json_term().
-selectSchema({struct, Schemas}) ->
+selectSchema(Schemas) ->
     ?LOG("Array: Selecting type from ~p ~n",[Schemas]),
     eqc_gen:oneof(Schemas).
 
@@ -814,7 +824,7 @@ objectType() ->
 arrayType() ->
     ?LAZY(?LET(RandType, selectType(),
          {struct,[{<<"type">>,<<"array">>},
-                  {<<"additionalItems">>,<<"false">>},
+                  {<<"additionalItems">>,false},
                   {<<"items">>,{struct,[{<<"type">>,RandType}]}}]})).
 
 -spec nullType() -> jsg_json:json_term().
