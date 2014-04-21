@@ -157,3 +157,10 @@ additionalItems({struct,Schema}) ->
         none -> 
             true
     end.
+
+links({struct,Schema}) ->
+  proplists:get_value(<<"links">>,Schema).
+
+propertyValue({struct,Schema},PropertyName) ->
+  proplists:get_value(list_to_binary(PropertyName),Schema).
+  

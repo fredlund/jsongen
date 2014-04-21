@@ -1,0 +1,11 @@
+{"type" : "object",
+ "definitions" : 
+  {"small_nat" :
+    {"type" : "integer", "minimum" : 1, "maximum" : 40}},
+ "required" : [ "qid", "statement" ],
+ "additionalProperties" : false,
+ "properties" : {
+      "qid"    : {"$ref" : "#/definitions/small_nat"},
+      "statement" : {"type" : "string" }
+ }
+}
