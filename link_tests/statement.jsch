@@ -7,8 +7,8 @@
    {"rel" : "question",
     "href" : "http://127.0.0.1:8000/q",
     "method" : "POST",
-    "schema" : "#",
-    "targetSchema" : "question.jsch#"
+    "schema" : { "$ref" : "#" },
+    "targetSchema" : { "$ref" : "question.jsch#" }
    }
  ]
 }

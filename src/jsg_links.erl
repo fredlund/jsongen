@@ -88,11 +88,14 @@ extract_dynamic_links(Link={link,LinkData},JSONBody) ->
     SchemaDesc ->
       Schema = get_schema(SchemaDesc,S),
       Links = collect_schema_links(Schema,true),
-      lists:map(fun ({lnk,Props}) -> {lnk,[{object,JSONBody}|Props]} end,Links)
+      io:format("schema links are:~n~p~n",[Links]),
+      lists:map
+	(fun ({link,Props}) -> {link,[{object,JSONBody}|Props]} end,
+	 Links)
   end.
 
-get_schema(Value,Root) ->
-  case proplists:get_value(<<"$ref">>,Value) of
+get_schema(Value={struct,Proplist},Root) ->
+  case proplists:get_value(<<"$ref">>,Proplist) of
     undefined ->
       Value;
     Ref ->

@@ -47,15 +47,17 @@ postcondition(State,Call,Result) ->
 
 next_state(State,Result,Call) ->
   case Call of
-    {_, ?MODULE, follow_link, [Link]} ->
+    {_, ?MODULE, follow_link, [Link], _} ->
+      io:format("result is ~p~n",[Result]),
       case Result of
 	{normal,{200,Body}} -> 
+	  io:format("normal result: extracting links~n",[]),
 	  NewLinks =
 	    jsg_links:extract_dynamic_links(Link,mochijson2:decode(Body)),
 	  State#state{links=NewLinks++State#state.links};
 	_ -> State
       end;
-    _ -> State
+    _ -> io:format("Call was~n~p~n",[Call]), State
   end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -107,7 +109,9 @@ init_table(PrivateModule,Links) ->
   end,
   spawn
     (fun () ->
-	 ets:new(js_links_machine_data,[named_table,public]), wait_forever()
+	 ets:new(js_links_machine_data,[named_table,public]),
+	 ets:insert(js_links_machine_data,{pid,self()}),
+	 wait_forever()
      end),
   wait_until_stable(),
   ets:insert(js_links_machine_data,{private_module,PrivateModule}),
@@ -129,11 +133,17 @@ wait_forever() ->
 
 prop_ok() ->
   ?FORALL(Cmds, eqc_dynamic_cluster:dynamic_commands(?MODULE),
-	  ?CHECK_COMMANDS({H, DS, Res}, ?MODULE, Cmds,
-	  begin
-	    pretty_commands(?MODULE, Cmds, {H, DS, Res},
-			    Res == ok)
-	  end)).
+	  ?CHECK_COMMANDS
+	     ({H, DS, Res},
+	      ?MODULE,
+	      Cmds,
+	      begin
+		pretty_commands
+		  (?MODULE,
+		   Cmds,
+		   {H, DS, Res},
+		   Res == ok)
+	      end)).
 
 test() ->
   case eqc:quickcheck(prop_ok()) of

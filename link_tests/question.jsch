@@ -9,12 +9,12 @@
       "statement" : {"type" : "string" }
  },
  "links" : [
-   {"rel" : "answer_put",
-    "href" : "http://127.0.0.1:8000/q/{qid}",
-    "schema" : {
-    "method" : "PUT",
-    "targetSchema" : {"$ref" : "answer.jsch#"} }
-   }  
+   {"rel" : "answer_post",
+    "href" : "http://127.0.0.1:8000/a/{qid}",
+    "schema" : { "type" : "integer" },
+    "method" : "POST",
+    "targetSchema" : {"$ref" : "answer.jsch#"} 
+   }
  ]
 }
 
