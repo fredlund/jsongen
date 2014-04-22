@@ -58,18 +58,26 @@ compute_uri(Link={link,LinkData}) ->
     case proplists:get_value(object,LinkData) of
       undefined ->
 	[];
-      Object ->
-	Object
+      {struct,Proplist} ->
+	lists:map
+	  (fun ({Key,Value}) ->
+	       {list_to_atom(binary_to_list(Key)),Value}
+	   end, Proplist)
     end,
-  uri_template:sub(Variables,Template).
+  io:format("Variables are ~p~n",[Variables]),
+  uri_template:sub(Variables,binary_to_list(Href)).
 
 generate_argument(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
   S = proplists:get_value(schema,LinkData),
-  ArgumentSchema = jsg_jsonschema:propertyValue(L,"schema"),
-  Schema = get_schema(ArgumentSchema,S),
-  Gen = jsongen:json(Schema),
-  eqc_gen:pick(Gen).
+  case jsg_jsonschema:propertyValue(L,"schema") of
+    undefined ->
+      undefined;
+    ArgumentSchema ->
+      Schema = get_schema(ArgumentSchema,S),
+      Gen = jsongen:json(Schema),
+      {ok,eqc_gen:pick(Gen)}
+  end.
 
 request_type(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
@@ -86,12 +94,38 @@ extract_dynamic_links(Link={link,LinkData},JSONBody) ->
     undefined ->
       [];
     SchemaDesc ->
-      Schema = get_schema(SchemaDesc,S),
-      Links = collect_schema_links(Schema,true),
-      io:format("schema links are:~n~p~n",[Links]),
-      lists:map
-	(fun ({link,Props}) -> {link,[{object,JSONBody}|Props]} end,
-	 Links)
+      %%io:format("Schema is ~p~n",[SchemaDesc]),
+      Schema = {struct,Proplist} = get_schema(SchemaDesc,S),
+      case proplists:get_value(<<"type">>,Proplist) of
+	undefined ->
+	  %% Could be a union schema; we don't handle this yet
+	  throw(bad);
+	Type ->
+	  case Type of
+	    <<"object">> ->
+	      Links = collect_schema_links(Schema,true),
+	      %%io:format("schema links are:~n~p~n",[Links]),
+	      lists:map
+		(fun ({link,Props}) -> {link,[{object,JSONBody}|Props]} end,
+		 Links);
+	    <<"array">> ->
+	      case proplists:get_value(<<"additionalItems">>,Proplist) of
+		false ->
+		  ItemSchemaDesc = proplists:get_value(<<"items">>,Proplist),
+		  %%io:format("itemSchema is ~p~n",[ItemSchemaDesc]),
+		  ItemSchema = get_schema(ItemSchemaDesc,S),
+		  Links = collect_schema_links(ItemSchema,true),
+		  %%io:format("schema links are:~n~p~n",[Links]),
+		  lists:flatmap
+		    (fun ({link,Props}) ->
+			 lists:map
+			   (fun (Item) ->
+				{link,[{object,Item}|Props]}
+			    end, JSONBody)
+		     end, Links)
+	      end
+	  end
+      end
   end.
 
 get_schema(Value={struct,Proplist},Root) ->
@@ -99,6 +133,7 @@ get_schema(Value={struct,Proplist},Root) ->
     undefined ->
       Value;
     Ref ->
+      %%io:format("Ref is ~p Root is~n~p~n",[Ref,Root]),
       jsg_jsonref:unref(Value,Root)
   end.
 
@@ -115,7 +150,7 @@ run_statem(PrivateModule,Files) ->
   end.
 
 test() ->
-  jsg_links:run_statem(test,["question.jsch","answer.jsch","statement.jsch"]).
+  jsg_links:run_statem(test,["question.jsch","answer.jsch","statement.jsch","reset.jsch"]).
 
   
   

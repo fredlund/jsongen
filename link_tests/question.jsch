@@ -9,11 +9,19 @@
       "statement" : {"type" : "string" }
  },
  "links" : [
-   {"rel" : "answer_post",
-    "href" : "http://127.0.0.1:8000/a/{qid}",
-    "schema" : { "type" : "integer" },
-    "method" : "POST",
-    "targetSchema" : {"$ref" : "answer.jsch#"} 
+   {"rel" : "question_get",
+    "href" : "http://127.0.0.1:8000/q/{qid}",
+    "method" : "GET",
+    "targetSchema" : {"$ref" : "question.jsch#"}
+   },
+   {"rel" : "questions_get",
+    "href" : "http://127.0.0.1:8000/q",
+    "method" : "GET",
+    "targetSchema" :
+    {"type" : "array",
+     "additionalItems" : false,
+     "items" : {"$ref" : "question.jsch#"}
+    }
    }
  ]
 }

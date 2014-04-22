@@ -6,7 +6,7 @@
 -include_lib("eqc/include/eqc_component.hrl").
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
 
--record(state,{links=[],private_state=void}).
+-record(state,{links,private_state=void}).
 
 
 %% We assume an ets table initialised with links
@@ -21,12 +21,12 @@ initial_state() ->
     Module:initial_state(),
   [{initial_links,Links}] =
     ets:lookup(js_links_machine_data,initial_links),
-  #state{links=Links,private_state=PrivateState}.
+  #state{links=sets:from_list(Links),private_state=PrivateState}.
 
 command(State) ->
   eqc_gen:oneof
   ([
-    {call, ?MODULE, follow_link, [Link]} || Link <- State#state.links
+    {call, ?MODULE, follow_link, [Link]} || Link <- sets:to_list(State#state.links)
    ]).
 
 callouts(_,_) ->
@@ -34,10 +34,12 @@ callouts(_,_) ->
 
 precondition(State,Call) ->
   case Call of
-    {_, _, follow_link, [Link], _} -> lists:member(Link,State#state.links)
+    {_, _, follow_link, [Link], _} ->
+      sets:is_element(Link,State#state.links)
   end.
 
 postcondition(State,Call,Result) ->
+  io:format("result is ~p~n",[Result]),
   case Result of
     {normal,{200,_}} ->
       true;
@@ -48,13 +50,12 @@ postcondition(State,Call,Result) ->
 next_state(State,Result,Call) ->
   case Call of
     {_, ?MODULE, follow_link, [Link], _} ->
-      io:format("result is ~p~n",[Result]),
       case Result of
 	{normal,{200,Body}} -> 
-	  io:format("normal result: extracting links~n",[]),
+	  %%io:format("normal result: extracting links~n",[]),
 	  NewLinks =
 	    jsg_links:extract_dynamic_links(Link,mochijson2:decode(Body)),
-	  State#state{links=NewLinks++State#state.links};
+	  State#state{links=sets:union(sets:from_list(NewLinks),State#state.links)};
 	_ -> State
       end;
     _ -> io:format("Call was~n~p~n",[Call]), State
@@ -64,22 +65,51 @@ next_state(State,Result,Call) ->
 
 follow_link(Link) ->
   URI = jsg_links:compute_uri(Link),
-  io:format("URI is ~p~n",[URI]),
+  io:format("~nfollow_link: URI is ~p~n",[URI]),
   RequestType = jsg_links:request_type(Link),
   Argument = jsg_links:generate_argument(Link),
-  Result = http_request(URI,RequestType,mochijson2:encode(Argument)),
+  Result =
+    case Argument of
+      {ok,Body} ->
+	case RequestType of
+	  get ->
+	    http_request_with_headers(URI,RequestType,encode_headers(Body));
+	  _ ->
+	    http_request_with_body(URI,RequestType,mochijson2:encode(Body))
+	end;
+      _ ->
+	http_request(URI,RequestType)
+    end,
   analyze_http_result(Result).
+
+encode_headers(X) ->
+  X.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-http_request(URI,Type,Argument) ->
+http_request_with_body(URI,Type,Body) ->
   httpc:request
     (Type,
      {URI,
       [],
       "application/json",
-      iolist_to_binary(Argument)},
+      iolist_to_binary(Body)},
+     [{timeout,1500}],
+     []).
+
+http_request_with_headers(URI,Type,Headers) ->
+  httpc:request
+    (Type,
+     {URI,
+      Headers},
+     [{timeout,1500}],
+     []).
+
+http_request(URI,Type) ->
+  httpc:request
+    (Type,
+     {URI,[]},
      [{timeout,1500}],
      []).
   
@@ -155,3 +185,4 @@ test() ->
       io:format
 	("~n~nPASSED~n",[])
   end.
+

@@ -125,7 +125,7 @@ unref({struct, JsonDict}, RootJsonTerm) ->
   if is_binary(URI_bin) -> % Otherwise unref breaks
       URI = binary_to_list(URI_bin),
       {URL,Pointer} = url_pointer(URI),
-      % io:format("Split ~p into ~p, ~p~n",[URI,URL,Pointer]),
+      %%io:format("Split ~p into ~p, ~p~n",[URI,URL,Pointer]),
       case URL of
         undefined -> JsonTerm = RootJsonTerm;
         _ -> {ok, JsonTerm} = jsg_json:decode_url(URL)
