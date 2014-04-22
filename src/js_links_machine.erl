@@ -38,28 +38,72 @@ precondition(State,Call) ->
   end.
 
 postcondition(State,Call,Result) ->
-  true.
+  case Result of
+    {normal,{200,_}} ->
+      true;
+    _ ->
+      false
+  end.
 
 next_state(State,Result,Call) ->
-  State.
+  case Call of
+    {_, ?MODULE, follow_link, [Link]} ->
+      case Result of
+	{normal,{200,Body}} -> 
+	  NewLinks =
+	    jsg_links:extract_dynamic_links(Link,mochijson2:decode(Body)),
+	  State#state{links=NewLinks++State#state.links};
+	_ -> State
+      end;
+    _ -> State
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 follow_link(Link) ->
-  io:format
-    ("will follow ~p~n",
-     [Link]).
+  URI = jsg_links:compute_uri(Link),
+  io:format("URI is ~p~n",[URI]),
+  RequestType = jsg_links:request_type(Link),
+  Argument = jsg_links:generate_argument(Link),
+  Result = http_request(URI,RequestType,Argument),
+  analyze_http_result(Result).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+http_request(URI,Type,Argument) ->
+  httpc:request
+    (Type,
+     {URI,
+      [],
+      "application/json",
+      iolist_to_binary(Argument)},
+     [{timeout,1500}],
+     []).
+  
+analyze_http_result(Result) ->
+  case Result of 
+    {ok,{StatusLine,_Headers,RespBody}} ->
+      case StatusLine of
+	{_,ResponseCode,_} ->
+	  {normal,{ResponseCode,RespBody}};
+	_ ->
+	  {other,Result}
+      end;
+    _ -> 
+      {other,Result}
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init_table(PrivateModule,Links) ->
   case ets:info(js_links_machine_data) of
-    true ->
+    undefined ->
+      ok;
+    _ ->
       [{pid,Pid}] = ets:lookup(js_links_machine_data,pid),
       exit(Pid,kill),
-      ets:delete(js_links_machine_data);
-    undefined ->
-      ok
+      ets:delete(js_links_machine_data)
   end,
   spawn
     (fun () ->

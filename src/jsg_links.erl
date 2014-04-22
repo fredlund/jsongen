@@ -13,7 +13,7 @@ collect_links(Files) ->
 
 collect_links_from_file(File) ->
   try jsg_jsonschema:read_schema(File) of
-      {ok,Schema} -> collect_schema_links(Schema, File)
+      {ok,Schema} -> collect_schema_links(Schema,false)
   catch Class:Reason ->
       Stacktrace = erlang:get_stacktrace(),
       io:format
@@ -22,7 +22,7 @@ collect_links_from_file(File) ->
       erlang:raise(Class,Reason,Stacktrace)
   end.
 
-collect_schema_links(Schema, File) ->
+collect_schema_links(Schema, DependsOnObject) ->
   %% Find all schemas, and retrieve links
   case jsg_jsonschema:links(Schema) of
     undefined ->
@@ -32,9 +32,13 @@ collect_schema_links(Schema, File) ->
 	(fun (Link,Ls) ->
 	     case jsg_jsonschema:propertyValue(Link,"href") of
 	       Value when is_binary(Value) ->
-		 case depends_on_object_properties(binary_to_list(Value)) of
-		   true -> Ls;
-		   false -> [{Link,Schema,File}|Ls]
+		Dependency =
+		   depends_on_object_properties(binary_to_list(Value)),
+		 if
+		   Dependency==DependsOnObject ->
+		     [{link,[{link,Link},{schema,Schema}]}|Ls];
+		   true ->
+		     Ls
 		 end
 	     end
 	 end, [], Links)
@@ -45,6 +49,50 @@ depends_on_object_properties(Href) ->
   lists:any(fun ({var, _, _}) -> true;
 		(_) -> false
 	    end, Template).
+
+compute_uri(Link={link,LinkData}) ->
+  L = proplists:get_value(link,LinkData),
+  Href = jsg_jsonschema:propertyValue(L,"href"),
+  Template = uri_template:parse(binary_to_list(Href)),
+  Variables = 
+    case proplists:get_value(object,LinkData) of
+      undefined ->
+	[];
+      Object ->
+	Object
+    end,
+  uri_template:sub(Variables,Template).
+
+generate_argument(_) ->
+  "".
+
+request_type(Link={link,LinkData}) ->
+  L = proplists:get_value(link,LinkData),
+  RequestType = jsg_jsonschema:propertyValue(L,"method"),
+  case RequestType of
+    undefined -> get;
+    Other -> list_to_atom(string:to_lower(binary_to_list(Other)))
+  end.
+
+extract_dynamic_links(Link={link,LinkData},JSONBody) ->
+  L = proplists:get_value(link,LinkData),
+  S = proplists:get_value(schema,LinkData),
+  case jsg_jsonschema:propertyValue(L,"targetSchema") of
+    undefined ->
+      [];
+    SchemaDesc ->
+      Schema = get_schema(SchemaDesc,S),
+      Links = collect_schema_links(Schema,true),
+      lists:map(fun ({lnk,Props}) -> {lnk,[{object,JSONBody}|Props]} end,Links)
+  end.
+
+get_schema(Value,Root) ->
+  case proplists:get_value(<<"$ref">>,Value) of
+    undefined ->
+      Value;
+    Ref ->
+      jsg_jsonref:unref(Value,Root)
+  end.
 
 run_statem(PrivateModule,Files) ->
   case collect_links(Files) of

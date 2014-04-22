@@ -10,10 +10,11 @@
  },
  "links" : [
    {"rel" : "answer_put",
-    "href" : "http://127.0.0.1/q/{qid}",
+    "href" : "http://127.0.0.1:8000/q/{qid}",
     "schema" : {
     "method" : "PUT",
     "targetSchema" : {"$ref" : "answer.jsch#"} }
    }  
  ]
 }
+

@@ -5,8 +5,8 @@
  },
  "links" : [
    {"rel" : "question",
-    "href" : "http://127.0.0.1/q}",
-    "method" : "PUT",
+    "href" : "http://127.0.0.1:8000/q",
+    "method" : "POST",
     "schema" : "#",
     "schema" : "question.jsch#"
    }
