@@ -9,8 +9,15 @@ collect_links(Files) ->
   lists:flatmap(fun collect_links_from_file/1, Files).
 
 collect_links_from_file(File) ->
-  {ok,Schema} = jsg_jsonschema:read_schema(File),
-  collect_schema_links(Schema, File).
+  try jsg_jsonschema:read_schema(File) of
+      {ok,Schema} -> collect_schema_links(Schema, File)
+  catch Class:Reason ->
+      Stacktrace = erlang:get_stacktrace(),
+      io:format
+	("*** Error: could not read schema from file ~p~n",
+	 [File]),
+      erlang:raise(Class,Reason,Stacktrace)
+  end.
 
 collect_schema_links(Schema, File) ->
   %% Find all schemas, and retrieve links

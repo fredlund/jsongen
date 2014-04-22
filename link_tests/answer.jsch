@@ -10,7 +10,9 @@
      "answer" : {"type" : "string"} },
  "links" : [
    {"rel" : "question",
-    "href" : "http://127.0.0.1/q/{qid}"}
+    "href" : "http://127.0.0.1/q/{qid}",
+    "targetSchema" : {"$ref" : "question.jsh#"}
+    }
  ]
 }
 

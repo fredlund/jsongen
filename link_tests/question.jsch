@@ -7,5 +7,13 @@
  "properties" : {
       "qid"    : {"$ref" : "#/definitions/small_nat"},
       "statement" : {"type" : "string" }
- }
+ },
+ "links" : [
+   {"rel" : "answer_put",
+    "href" : "http://127.0.0.1/q/{qid}",
+    "schema" : {
+    "method" : "PUT",
+    "targetSchema" : {"$ref" : "answer.jsch#"} }
+   }  
+ ]
 }

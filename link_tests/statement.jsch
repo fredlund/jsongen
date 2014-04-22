@@ -1,0 +1,14 @@
+{"type" : "object",
+ "required" : [ "statement" ],
+ "properties" : {
+      "statement" : {"type" : "string" }
+ },
+ "links" : [
+   {"rel" : "question",
+    "href" : "http://127.0.0.1/q}",
+    "method" : "PUT",
+    "schema" : "#",
+    "schema" : "question.jsch#"
+   }
+ ]
+}
