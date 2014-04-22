@@ -71,16 +71,23 @@ follow_link(Link) ->
   Result =
     case Argument of
       {ok,Body} ->
-	case RequestType of
-	  get ->
+	case has_body(RequestType) of
+	  true ->
 	    http_request_with_headers(URI,RequestType,encode_headers(Body));
-	  _ ->
+	  false ->
 	    http_request_with_body(URI,RequestType,mochijson2:encode(Body))
 	end;
       _ ->
 	http_request(URI,RequestType)
     end,
   analyze_http_result(Result).
+
+has_body(get) ->
+  false;
+has_body(put) ->
+  false;
+has_body(_) ->
+  true.
 
 encode_headers(X) ->
   X.
