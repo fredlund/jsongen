@@ -8,7 +8,7 @@
     "href" : "http://127.0.0.1:8000/q",
     "method" : "POST",
     "schema" : "#",
-    "schema" : "question.jsch#"
+    "targetSchema" : "question.jsch#"
    }
  ]
 }

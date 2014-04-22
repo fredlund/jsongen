@@ -65,7 +65,7 @@ follow_link(Link) ->
   io:format("URI is ~p~n",[URI]),
   RequestType = jsg_links:request_type(Link),
   Argument = jsg_links:generate_argument(Link),
-  Result = http_request(URI,RequestType,Argument),
+  Result = http_request(URI,RequestType,mochijson2:encode(Argument)),
   analyze_http_result(Result).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

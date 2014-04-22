@@ -63,8 +63,13 @@ compute_uri(Link={link,LinkData}) ->
     end,
   uri_template:sub(Variables,Template).
 
-generate_argument(_) ->
-  "".
+generate_argument(Link={link,LinkData}) ->
+  L = proplists:get_value(link,LinkData),
+  S = proplists:get_value(schema,LinkData),
+  ArgumentSchema = jsg_jsonschema:propertyValue(L,"schema"),
+  Schema = get_schema(ArgumentSchema,S),
+  Gen = jsongen:json(Schema),
+  eqc_gen:pick(Gen).
 
 request_type(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
