@@ -1,5 +1,8 @@
 -module(jsg_links).
 
+-include_lib("eqc/include/eqc.hrl").
+-include_lib("eqc/include/eqc_dynamic_cluster.hrl").
+
 -compile(export_all).
 
 %% Given a set of file corresponding to JSON schemas,
@@ -31,7 +34,7 @@ collect_schema_links(Schema, File) ->
 	       Value when is_binary(Value) ->
 		 case depends_on_object_properties(binary_to_list(Value)) of
 		   true -> Ls;
-		   false -> [{Value,File}|Ls]
+		   false -> [{Link,Schema,File}|Ls]
 		 end
 	     end
 	 end, [], Links)
@@ -43,7 +46,23 @@ depends_on_object_properties(Href) ->
 		(_) -> false
 	    end, Template).
 
+run_statem(PrivateModule,Files) ->
+  case collect_links(Files) of
+    [] ->
+      io:format
+	("*** Error: no independent links could be found among the files ~p~n",
+	 [Files]),
+      throw(bad);
+    Links ->
+      js_links_machine:init_table(PrivateModule,Links),
+      js_links_machine:test()
+  end.
 
+test() ->
+  jsg_links:run_statem(test,["question.jsch","answer.jsch","statement.jsch"]).
+
+  
+  
 		 
 		 
 		 
