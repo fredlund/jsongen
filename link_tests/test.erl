@@ -51,7 +51,9 @@ postcondition(Super,State,Call,Result) ->
       case Result of
 	{normal,{Code,ResultBody}} ->
 	  (ShouldSucceed andalso (Code==200))
-	    orelse ((not(ShouldSucceed)) andalso (Code==409))
+	    orelse ((not(ShouldSucceed)) andalso (Code==409));
+	_ ->
+	  false
       end;
     Other ->
       Super(State,Call,Result)

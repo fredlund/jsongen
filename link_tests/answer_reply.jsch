@@ -11,8 +11,8 @@
      "answer" : {"type" : "string"} },
  "links" : [
    {"rel" : "question",
-    "href" : "http://127.0.0.1/a/{aid}",
-    "targetSchema" : {"$ref" : "answer_reply.jsh#"}
+    "href" : "http://127.0.0.1:8000/a/{aid}",
+    "targetSchema" : {"$ref" : "answer_reply.jsch#"}
     }
  ]
 }

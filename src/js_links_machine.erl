@@ -69,8 +69,8 @@ precondition(State,Call) ->
 precondition_int(State,Call) ->
   case Call of
     {_, _, follow_link, [Link,_], _} ->
-      sets:is_element(Link,State#state.static_links) orelse
-	sets:is_element(Link,State#state.links),
+      (sets:is_element(Link,State#state.static_links) orelse
+       sets:is_element(Link,State#state.links)) andalso
       link_permitted(State,Link)
   end.
 
@@ -295,7 +295,17 @@ print_commands([{Call={call,_,follow_link,[_,Request],_},Result}|Rest]) ->
 	""
     end,
   ResultString =
-    io_lib:format(" -> ~p",[Result]),
+    case Result of
+      {other,Error} -> 
+	io_lib:format(" -> error ~p~n",[Error]);
+      {normal,{ResponseCode,RespBody}} ->
+	if
+	  Body=/="" -> 
+	    io_lib:format(" -> ~p with body ~s",[ResponseCode,RespBody]);
+	  true ->
+	    io_lib:format(" -> ~p",[ResponseCode])
+	end
+    end,
   io:format
     ("~saccess ~s using type ~p~s~s~n",
      [TitleString,URI,RequestType,BodyString,ResultString]),
