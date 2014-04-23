@@ -67,17 +67,7 @@ postcondition(State,Call,Result) ->
   end.
 
 next_state(State,Result,Call) ->
-  [{private_module,Module}] = 
-    ets:lookup(js_links_machine_data,private_module),
-  try Module:module_info(exports) of
-      Exports ->
-      case lists:member({next_state,4},Exports) of
-	true ->
-	  Module:next_state(State,Result,Call,fun next_state_int/3);
-	false ->
-	  next_state_int(State,Result,Call)
-      end
-  catch _:_ -> next_state_int(State,Result,Call) end.
+  make_call(next_state,fun next_state_int/3,[State,Result,Call]).
 
 next_state_int(State,Result,Call) ->
   case Call of
@@ -92,6 +82,21 @@ next_state_int(State,Result,Call) ->
       end;
     _ -> ?LOG("Call was~n~p~n",[Call]), State
   end.
+
+make_call(ExternalFunction,InternalFunction,Args) ->
+  [{private_module,Module}] = 
+    ets:lookup(js_links_machine_data,private_module),
+  [{arity,Arity}] =
+    erlang:fun_info(InternalFunction),
+  try Module:module_info(exports) of
+      Exports ->
+      case lists:member({ExternalFunction,Arity+1},Exports) of
+	true ->
+	  apply(Module,ExternalFunction,[InternalFunction|Args]);
+	false ->
+	  apply(InternalFunction,Args)
+      end
+  catch _:_ -> apply(InternalFunction,Args) end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -4,9 +4,10 @@
 
 -record(state,{static_links,links,private_state=void}).
 
-initial_state() -> void.
+initial_state() -> 
+  [].
 
-next_state(State,Result,Call,Super) ->
+next_state(Super,State,Result,Call) ->
   case Call of
     {_, _, follow_link, [{link,LD}], _} ->
       case proplists:get_value(title,LD) of
