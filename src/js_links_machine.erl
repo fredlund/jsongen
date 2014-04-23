@@ -7,7 +7,7 @@
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
 
 
--define(debug,true).
+%%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -15,6 +15,7 @@
 -else.
 -define(LOG(X,Y),true).
 -endif.
+
 
 -record(state,{static_links,links,private_state=void}).
 
@@ -41,18 +42,26 @@ command(State) ->
   make_call(command,fun command_int/1, [State]).
 
 command_int(State) ->
-  eqc_gen:oneof
-  ([
-    {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]} ||
-     Link <-
-       sets:to_list
-	 (sets:union
-	    (State#state.static_links,
-	     State#state.links))
-   ]).
+  Alternatives =
+    [
+     {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]} ||
+      Link <-
+	sets:to_list
+	  (sets:union
+	     (State#state.static_links,
+	      State#state.links)),
+      link_permitted(State,Link)
+    ],
+  eqc_gen:oneof(Alternatives).
 
 callouts(_,_) ->
   ?EMPTY.
+
+link_permitted(State,Link) ->
+  make_call(link_permitted,fun link_permitted_int/2,[State,Link]).
+
+link_permitted_int(State,Link) ->
+  true.
 
 precondition(State,Call) ->
   make_call(precondition,fun precondition_int/2,[State,Call]).
@@ -61,7 +70,8 @@ precondition_int(State,Call) ->
   case Call of
     {_, _, follow_link, [Link,_], _} ->
       sets:is_element(Link,State#state.static_links) orelse
-	sets:is_element(Link,State#state.links)
+	sets:is_element(Link,State#state.links),
+      link_permitted(State,Link)
   end.
 
 postcondition(State,Call,Result) ->
@@ -101,7 +111,7 @@ make_call(ExternalFunction,InternalFunction,Args) ->
     true ->
       apply(Module,ExternalFunction,[InternalFunction|Args]);
     false ->
-      io:format
+      ?LOG
 	("function ~p:~p/~p missing~n",
 	 [Module,ExternalFunction,Arity+1]),
       apply(InternalFunction,Args)
@@ -235,19 +245,62 @@ wait_forever() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 prop_ok() ->
-  ?FORALL(Cmds, eqc_dynamic_cluster:dynamic_commands(?MODULE),
-	  ?CHECK_COMMANDS
-	     ({H, DS, Res},
-	      ?MODULE,
-	      Cmds,
-	      begin
-		pretty_commands
-		  (?MODULE,
-		   Cmds,
-		   {H, DS, Res},
-		   Res == ok)
-	      end)).
+  ?FORALL
+     (Cmds, eqc_dynamic_cluster:dynamic_commands(?MODULE),
+      ?CHECK_COMMANDS
+	 ({H, DS, Res},
+	  ?MODULE,
+	  Cmds,
+	  begin
+	    print_counterexample(Cmds,H,DS,Res),
+	    Res == ok
+	  end)).
 
+print_counterexample(Cmds,H,DS,ok) ->
+  ok;
+print_counterexample(Cmds,H,DS,Reason) ->
+  io:format("~nTest failed with reason ~p~n",[Reason]),
+  {FailingCommandSequence,_} = lists:split(length(H)+1,Cmds),
+  io:format
+    ("len(failedCommands)=~p len(history)=~p~n",
+     [length(FailingCommandSequence),length(H)]),
+  ReturnValues = 
+    case Reason of
+      {exception,_} ->
+	(lists:map(fun ({_,_,Result}) -> Result end, H))++[Reason];
+      _ ->
+	(lists:map(fun ({_,_,Result}) -> Result end, H))
+    end,
+  io:format("Commands:~n"),
+  print_commands(lists:zip(tl(FailingCommandSequence),ReturnValues)),
+  io:format("~n").
+
+print_commands([]) ->
+  ok;
+print_commands([{Call={call,_,follow_link,[_,Request],_},Result}|Rest]) ->
+  Title = test:link_title(Call),
+  TitleString = 
+    if 
+      Title==undefined ->
+	"link ";
+      true ->
+	io_lib:format("link ~p ",[Title])
+    end,
+  {URI,RequestType,Body} = Request,
+  BodyString =
+    case Body of
+      {ok,JSON} ->
+	io_lib:format(" with body ~s",[mochijson2:encode(JSON)]);
+      _ ->
+	""
+    end,
+  ResultString =
+    io_lib:format(" -> ~p",[Result]),
+  io:format
+    ("~saccess ~s using type ~p~s~s~n",
+     [TitleString,URI,RequestType,BodyString,ResultString]),
+  print_commands(Rest).
+  
 test() ->
   case eqc:quickcheck(prop_ok()) of
     false ->

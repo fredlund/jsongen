@@ -5,7 +5,8 @@
 
 -compile(export_all).
 
--define(debug,true).
+
+%%-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -13,6 +14,7 @@
 -else.
 -define(LOG(X,Y),true).
 -endif.
+
 
 %% Given a set of file corresponding to JSON schemas,
 %% traverse the schemas to find (non-relative) link definitions.

@@ -2,32 +2,52 @@
 
 -compile(export_all).
 
--record(state,{static_links,links,private_state=void}).
+-record(state,{static_links,links,private_state={false,[]}}).
+
+
+%%-define(debug,true).
+
+-ifdef(debug).
+-define(LOG(X,Y),
+	io:format("{~p,~p}: ~s~n", [?MODULE,?LINE,io_lib:format(X,Y)])).
+-else.
+-define(LOG(X,Y),true).
+-endif.
+
 
 initial_state() -> 
-  [].
+  {false,[]}.
+
+link_permitted(Super,State,{link,LD}) ->
+  Init = element(1,State#state.private_state),
+  case proplists:get_value(title,LD) of
+    "reset" ->
+      not(Init);
+    _ ->
+      Init
+  end.
 
 next_state(Super,State,Result,Call) ->
   case link_title(Call) of
     "reset" ->
-      State#state{links=sets:new(),private_state=initial_state()};
+      State#state{links=sets:new(),private_state={true,[]}};
     "add_question" -> 
       JSON = get_json_body(Result),
       Qid = jsg_jsonschema:propertyValue(JSON,"qid"),
-      State#state{private_state=[Qid|State#state.private_state]};
+      State#state{private_state={true,[Qid|element(2,State#state.private_state)]}};
     _ -> Super(State,Result,Call)
   end.
 
 postcondition(Super,State,Call,Result) ->
   case link_title(Call) of
     "add_answer" ->
-      io:format("In add_answer postcondition~n",[]),
+      ?LOG("In add_answer postcondition~n",[]),
       {_,_,{ok,Body}} = http_request(Call),
-      io:format("Body is ~p~n",[Body]),
-      io:format("State is ~p~n",[State#state.private_state]),
-      io:format("Result is ~p~n",[Result]),
+      ?LOG("Body is ~p~n",[Body]),
+      ?LOG("State is ~p~n",[State#state.private_state]),
+      ?LOG("Result is ~p~n",[Result]),
       Qid = jsg_jsonschema:propertyValue(Body,"qid"),
-      ShouldSucceed = lists:member(Qid,State#state.private_state),
+      ShouldSucceed = lists:member(Qid,element(2,State#state.private_state)),
       case Result of
 	{normal,{Code,ResultBody}} ->
 	  (ShouldSucceed andalso (Code==200))
