@@ -13,27 +13,32 @@ next_state(Super,State,Result,Call) ->
       State#state{links=sets:new(),private_state=initial_state()};
     "add_question" -> 
       JSON = get_json_body(Result),
-      Qid = binary_to_list(jsg_jsonschema:propertyValue(JSON,"qid")),
+      Qid = jsg_jsonschema:propertyValue(JSON,"qid"),
       State#state{private_state=[Qid|State#state.private_state]};
     _ -> Super(State,Result,Call)
   end.
 
-post_condition(Super,State,Call,Result) ->
+postcondition(Super,State,Call,Result) ->
   case link_title(Call) of
     "add_answer" ->
-      {_,_,Body} = http_request(Call),
+      io:format("In add_answer postcondition~n",[]),
+      {_,_,{ok,Body}} = http_request(Call),
+      io:format("Body is ~p~n",[Body]),
+      io:format("State is ~p~n",[State#state.private_state]),
+      io:format("Result is ~p~n",[Result]),
       Qid = jsg_jsonschema:propertyValue(Body,"qid"),
-      ShouldSucceed = lists:member(Qid,State#state.private_data),
-      case AResult of
+      ShouldSucceed = lists:member(Qid,State#state.private_state),
+      case Result of
 	{normal,{Code,ResultBody}} ->
 	  (ShouldSucceed andalso (Code==200))
 	    orelse ((not(ShouldSucceed)) andalso (Code==409))
       end;
-    _ -> Super(State,Call,Result)
+    Other ->
+      Super(State,Call,Result)
   end.
       
 link_title(Call) ->
-  {link,LD} = link(Call),
+  {link,LD} = ?MODULE:link(Call),
   proplists:get_value(title,LD).
 
 http_request(Call) ->
@@ -49,7 +54,8 @@ link(Call) ->
   end.
 
 get_json_body({normal,{_,Body}}) ->
-  to_json(Body).
+  mochijson2:decode(Body).
+
 
 
   

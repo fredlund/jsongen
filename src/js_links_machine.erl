@@ -43,14 +43,12 @@ command(State) ->
 command_int(State) ->
   eqc_gen:oneof
   ([
-    {call, ?MODULE, follow_link, [Link,HTTPRequest]} ||
+    {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]} ||
      Link <-
        sets:to_list
 	 (sets:union
 	    (State#state.static_links,
-	     State#state.links)),
-     HTTPRequest <-
-       gen_http_request(Link)
+	     State#state.links))
    ]).
 
 callouts(_,_) ->
@@ -96,13 +94,16 @@ next_state_int(State,Result,Call) ->
   end.
 
 make_call(ExternalFunction,InternalFunction,Args) ->
-  [{arity,Arity}] = erlang:fun_info(InternalFunction),
+  [{private_module,Module}] = 
+    ets:lookup(js_links_machine_data,private_module),
+  {arity,Arity} = erlang:fun_info(InternalFunction,arity),
   case exists_private_function(ExternalFunction,Arity+1) of
     true ->
-      [{private_module,Module}] = 
-	ets:lookup(js_links_machine_data,private_module),
       apply(Module,ExternalFunction,[InternalFunction|Args]);
     false ->
+      io:format
+	("function ~p:~p/~p missing~n",
+	 [Module,ExternalFunction,Arity+1]),
       apply(InternalFunction,Args)
   end.
 
