@@ -1,0 +1,13 @@
+{"type" : "object",
+ "required" : [ "reset" ],
+ "properties" : {
+      "reset" : {"type" : "boolean" }
+ },
+ "links" : [
+   {"rel" : "reset",
+    "href" : "http://127.0.0.1:8000/reset",
+    "method" : "POST",
+    "schema" : { "$ref" : "#" },
+   }
+ ]
+}
