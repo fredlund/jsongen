@@ -6,7 +6,8 @@
 -include_lib("eqc/include/eqc_component.hrl").
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
 
-%%-define(debug,true).
+
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -96,8 +97,8 @@ next_state_int(State,Result,Call) ->
 
 follow_link(Link) ->
   URI = jsg_links:compute_uri(Link),
-  ?LOG("~nfollow_link: URI is ~p~n",[URI]),
   RequestType = jsg_links:request_type(Link),
+  ?LOG("~nfollow_link: URI is ~p; request ~p~n",[URI,RequestType]),
   Argument = jsg_links:generate_argument(Link),
   Result =
     case Argument of

@@ -5,7 +5,7 @@
 
 -compile(export_all).
 
-%%-define(debug,true).
+-define(debug,true).
 
 -ifdef(debug).
 -define(LOG(X,Y),
@@ -164,7 +164,7 @@ run_statem(PrivateModule,Files) ->
   end.
 
 test() ->
-  jsg_links:run_statem(test,["question.jsch","answer.jsch","statement.jsch","reset.jsch"]).
+  jsg_links:run_statem(test,["question.jsch","answer.jsch","statement.jsch","reset.jsch","answer_reply.jsch"]).
 
   
   
