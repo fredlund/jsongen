@@ -38,6 +38,9 @@ initial_state() ->
      private_state=PrivateState}.
 
 command(State) ->
+  make_call(command,fun command_int/1, [State]).
+
+command_int(State) ->
   eqc_gen:oneof
   ([
     {call, ?MODULE, follow_link, [Link,HTTPRequest]} ||
@@ -54,6 +57,9 @@ callouts(_,_) ->
   ?EMPTY.
 
 precondition(State,Call) ->
+  make_call(precondition,fun precondition_int/2,[State,Call]).
+
+precondition_int(State,Call) ->
   case Call of
     {_, _, follow_link, [Link,_], _} ->
       sets:is_element(Link,State#state.static_links) orelse
@@ -61,6 +67,9 @@ precondition(State,Call) ->
   end.
 
 postcondition(State,Call,Result) ->
+  make_call(postcondition,fun postcondition_int/3,[State,Call,Result]).
+
+postcondition_int(State,Call,Result) ->
   ?LOG("result is ~p~n",[Result]),
   case Result of
     {normal,{200,_}} ->
