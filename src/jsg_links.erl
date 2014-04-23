@@ -5,6 +5,15 @@
 
 -compile(export_all).
 
+%%-define(debug,true).
+
+-ifdef(debug).
+-define(LOG(X,Y),
+	io:format("{~p,~p}: ~s~n", [?MODULE,?LINE,io_lib:format(X,Y)])).
+-else.
+-define(LOG(X,Y),true).
+-endif.
+
 %% Given a set of file corresponding to JSON schemas,
 %% traverse the schemas to find (non-relative) link definitions.
 
@@ -36,7 +45,12 @@ collect_schema_links(Schema, DependsOnObject) ->
 		   depends_on_object_properties(binary_to_list(Value)),
 		 if
 		   Dependency==DependsOnObject ->
-		     [{link,[{link,Link},{schema,Schema}]}|Ls];
+		     LinkData =
+		       case jsg_jsonschema:propertyValue(Link,"title") of
+			 undefined -> [];
+			 Title -> [{title,binary_to_list(Title)}]
+		       end,
+		     [{link,[{link,Link},{schema,Schema}|LinkData]}|Ls];
 		   true ->
 		     Ls
 		 end
@@ -64,7 +78,7 @@ compute_uri(Link={link,LinkData}) ->
 	       {list_to_atom(binary_to_list(Key)),Value}
 	   end, Proplist)
     end,
-  io:format("Variables are ~p~n",[Variables]),
+  ?LOG("Variables are ~p~n",[Variables]),
   uri_template:sub(Variables,binary_to_list(Href)).
 
 generate_argument(Link={link,LinkData}) ->

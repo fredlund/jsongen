@@ -6,7 +6,16 @@
 -include_lib("eqc/include/eqc_component.hrl").
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
 
--record(state,{links,private_state=void}).
+%%-define(debug,true).
+
+-ifdef(debug).
+-define(LOG(X,Y),
+	io:format("{~p,~p}: ~s~n", [?MODULE,?LINE,io_lib:format(X,Y)])).
+-else.
+-define(LOG(X,Y),true).
+-endif.
+
+-record(state,{static_links,links,private_state=void}).
 
 
 %% We assume an ets table initialised with links
@@ -21,12 +30,20 @@ initial_state() ->
     Module:initial_state(),
   [{initial_links,Links}] =
     ets:lookup(js_links_machine_data,initial_links),
-  #state{links=sets:from_list(Links),private_state=PrivateState}.
+  #state
+    {static_links=sets:from_list(Links),
+     links=sets:new(),
+     private_state=PrivateState}.
 
 command(State) ->
   eqc_gen:oneof
   ([
-    {call, ?MODULE, follow_link, [Link]} || Link <- sets:to_list(State#state.links)
+    {call, ?MODULE, follow_link, [Link]} ||
+     Link <-
+       sets:to_list
+	 (sets:union
+	    (State#state.static_links,
+	     State#state.links))
    ]).
 
 callouts(_,_) ->
@@ -35,11 +52,12 @@ callouts(_,_) ->
 precondition(State,Call) ->
   case Call of
     {_, _, follow_link, [Link], _} ->
-      sets:is_element(Link,State#state.links)
+      sets:is_element(Link,State#state.static_links) orelse
+	sets:is_element(Link,State#state.links)
   end.
 
 postcondition(State,Call,Result) ->
-  io:format("result is ~p~n",[Result]),
+  ?LOG("result is ~p~n",[Result]),
   case Result of
     {normal,{200,_}} ->
       true;
@@ -48,6 +66,19 @@ postcondition(State,Call,Result) ->
   end.
 
 next_state(State,Result,Call) ->
+  [{private_module,Module}] = 
+    ets:lookup(js_links_machine_data,private_module),
+  try Module:module_info(exports) of
+      Exports ->
+      case lists:member({next_state,4},Exports) of
+	true ->
+	  Module:next_state(State,Result,Call,fun next_state_int/3);
+	false ->
+	  next_state_int(State,Result,Call)
+      end
+  catch _:_ -> next_state_int(State,Result,Call) end.
+
+next_state_int(State,Result,Call) ->
   case Call of
     {_, ?MODULE, follow_link, [Link], _} ->
       case Result of
@@ -58,14 +89,14 @@ next_state(State,Result,Call) ->
 	  State#state{links=sets:union(sets:from_list(NewLinks),State#state.links)};
 	_ -> State
       end;
-    _ -> io:format("Call was~n~p~n",[Call]), State
+    _ -> ?LOG("Call was~n~p~n",[Call]), State
   end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 follow_link(Link) ->
   URI = jsg_links:compute_uri(Link),
-  io:format("~nfollow_link: URI is ~p~n",[URI]),
+  ?LOG("~nfollow_link: URI is ~p~n",[URI]),
   RequestType = jsg_links:request_type(Link),
   Argument = jsg_links:generate_argument(Link),
   Result =
@@ -73,9 +104,9 @@ follow_link(Link) ->
       {ok,Body} ->
 	case has_body(RequestType) of
 	  true ->
-	    http_request_with_headers(URI,RequestType,encode_headers(Body));
+	    http_request_with_body(URI,RequestType,mochijson2:encode(Body));
 	  false ->
-	    http_request_with_body(URI,RequestType,mochijson2:encode(Body))
+	    http_request_with_headers(URI,RequestType,encode_headers(Body))
 	end;
       _ ->
 	http_request(URI,RequestType)
@@ -84,7 +115,7 @@ follow_link(Link) ->
 
 has_body(get) ->
   false;
-has_body(put) ->
+has_body(delete) ->
   false;
 has_body(_) ->
   true.

@@ -6,6 +6,7 @@
  "links" : [
    {"rel" : "reset",
     "href" : "http://127.0.0.1:8000/reset",
+    "title" : "reset",
     "method" : "POST",
     "schema" : { "$ref" : "#" },
    }
