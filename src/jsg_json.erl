@@ -61,13 +61,15 @@ decode_url(URL = [$h,$t,$t,$p,$:|_]) ->
       Result
   end;
 decode_url([$f,$i,$l,$e,$:|Filename]) ->
-  Result = file:read_file(Filename),
-  case Result of
+  case file:read_file(Filename) of
     {ok, JsonString} ->
       JsonTerm = ?MODULE:decode(JsonString),
       {ok, JsonTerm};
-    _ ->
-      Result
+    Error ->
+      io:format
+	("*** Error: could not read file ~s due to ~p~n",
+	 [Filename,Error]),
+      Error
   end;
 decode_url(URL) ->
   decode_url([$f,$i,$l,$e,$:|URL]).

@@ -6,6 +6,7 @@
  "links" : [
    {"rel" : "question",
     "href" : "http://127.0.0.1:8000/q",
+    "title" : "add_question",
     "method" : "POST",
     "schema" : { "$ref" : "#" },
     "targetSchema" : { "$ref" : "question.jsch#" }

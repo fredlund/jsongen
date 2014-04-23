@@ -11,6 +11,7 @@
  "links" : [
      {"rel" : "answer",
       "href" : "http://127.0.0.1:8000/a",
+      "title" : "add_answer",
       "method" : "POST",
       "schema" : { "$ref" : "answer.jsch#" },
       "targetSchema" : {"$ref" : "answer_reply.jsch#"}

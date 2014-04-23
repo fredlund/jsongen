@@ -25,26 +25,29 @@ api_spec() ->
   #api_spec{}.
 
 initial_state() ->
-  [{private_module,Module}] =
-    ets:lookup(js_links_machine_data,private_module),
   PrivateState = 
-    Module:initial_state(),
-  [{initial_links,Links}] =
-    ets:lookup(js_links_machine_data,initial_links),
+    case exists_private_function(initial_state,0) of
+      true ->
+	(private_module()):initial_state();
+      false ->
+	void
+    end,
   #state
-    {static_links=sets:from_list(Links),
+    {static_links=sets:from_list(initial_links()),
      links=sets:new(),
      private_state=PrivateState}.
 
 command(State) ->
   eqc_gen:oneof
   ([
-    {call, ?MODULE, follow_link, [Link]} ||
+    {call, ?MODULE, follow_link, [Link,HTTPRequest]} ||
      Link <-
        sets:to_list
 	 (sets:union
 	    (State#state.static_links,
-	     State#state.links))
+	     State#state.links)),
+     HTTPRequest <-
+       gen_http_request(Link)
    ]).
 
 callouts(_,_) ->
@@ -52,7 +55,7 @@ callouts(_,_) ->
 
 precondition(State,Call) ->
   case Call of
-    {_, _, follow_link, [Link], _} ->
+    {_, _, follow_link, [Link,_], _} ->
       sets:is_element(Link,State#state.static_links) orelse
 	sets:is_element(Link,State#state.links)
   end.
@@ -71,7 +74,7 @@ next_state(State,Result,Call) ->
 
 next_state_int(State,Result,Call) ->
   case Call of
-    {_, ?MODULE, follow_link, [Link], _} ->
+    {_, ?MODULE, follow_link, [Link,_], _} ->
       case Result of
 	{normal,{200,Body}} -> 
 	  %%io:format("normal result: extracting links~n",[]),
@@ -84,27 +87,43 @@ next_state_int(State,Result,Call) ->
   end.
 
 make_call(ExternalFunction,InternalFunction,Args) ->
+  [{arity,Arity}] = erlang:fun_info(InternalFunction),
+  case exists_private_function(ExternalFunction,Arity+1) of
+    true ->
+      [{private_module,Module}] = 
+	ets:lookup(js_links_machine_data,private_module),
+      apply(Module,ExternalFunction,[InternalFunction|Args]);
+    false ->
+      apply(InternalFunction,Args)
+  end.
+
+exists_private_function(Function,Arity) ->
   [{private_module,Module}] = 
     ets:lookup(js_links_machine_data,private_module),
-  [{arity,Arity}] =
-    erlang:fun_info(InternalFunction),
   try Module:module_info(exports) of
-      Exports ->
-      case lists:member({ExternalFunction,Arity+1},Exports) of
-	true ->
-	  apply(Module,ExternalFunction,[InternalFunction|Args]);
-	false ->
-	  apply(InternalFunction,Args)
-      end
-  catch _:_ -> apply(InternalFunction,Args) end.
+      Exports -> lists:member({Function,Arity},Exports)
+  catch _:_ -> false end.
+
+private_module() ->
+  [{private_module,Module}] = 
+    ets:lookup(js_links_machine_data,private_module),
+  Module.
+
+initial_links() ->
+  [{initial_links,Links}] =
+    ets:lookup(js_links_machine_data,initial_links),
+  Links.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-follow_link(Link) ->
+gen_http_request(Link) ->
   URI = jsg_links:compute_uri(Link),
   RequestType = jsg_links:request_type(Link),
-  ?LOG("~nfollow_link: URI is ~p; request ~p~n",[URI,RequestType]),
   Argument = jsg_links:generate_argument(Link),
+  {URI,RequestType,Argument}.
+
+follow_link(Link,HTTPRequest={URI,RequestType,Argument}) ->
+  ?LOG("~nfollow_link: URI is ~p; request ~p~n",[URI,RequestType]),
   Result =
     case Argument of
       {ok,Body} ->
