@@ -41,11 +41,7 @@ next_state(Super,State,Result,Call) ->
 postcondition(Super,State,Call,Result) ->
   case link_title(Call) of
     "add_answer" ->
-      ?LOG("In add_answer postcondition~n",[]),
       {_,_,{ok,Body}} = http_request(Call),
-      ?LOG("Body is ~p~n",[Body]),
-      ?LOG("State is ~p~n",[State#state.private_state]),
-      ?LOG("Result is ~p~n",[Result]),
       Qid = jsg_jsonschema:propertyValue(Body,"qid"),
       ShouldSucceed = lists:member(Qid,element(2,State#state.private_state)),
       case Result of
