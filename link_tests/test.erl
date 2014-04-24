@@ -41,19 +41,28 @@ next_state(Super,State,Result,Call) ->
 postcondition(Super,State,Call,Result) ->
   case link_title(Call) of
     "add_answer" ->
-      {_,_,{ok,Body}} = http_request(Call),
-      Qid = jsg_jsonschema:propertyValue(Body,"qid"),
-      ShouldSucceed = lists:member(Qid,element(2,State#state.private_state)),
-      case js_links_machine:http_result_type(Result) of
-	ok -> 
+      case js_links_machine:validate_call_not_error_result(Call,Result) of
+	true ->
+	  {_,_,{ok,Body}} = http_request(Call),
+	  Qid = jsg_jsonschema:propertyValue(Body,"qid"),
+	  ExpectedCode =
+	    case lists:member(Qid,element(2,State#state.private_state)) of
+	      true -> 200;
+	      false -> 409
+	    end,
 	  ResultCode = js_links_machine:http_result_code(Result),
-	  (ShouldSucceed andalso (ResultCode==200))
-	    orelse ((not(ShouldSucceed)) andalso (ResultCode==409));
-	_ ->
-	  false
+	  if
+	    ResultCode == ExpectedCode ->
+	      js_links_machine:validate_call_result_body(Call,Result);
+	    true -> 
+	      io:format
+		("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code ~p~n",
+		 [js_links_machine:format_http_call(Call),ResultCode,ExpectedCode]),
+	      false
+	  end;
+	_ -> false
       end;
-    Other ->
-      Super(State,Call,Result)
+    _ -> Super(State,Call,Result)
   end.
       
 
@@ -67,6 +76,10 @@ link_schema(Call) ->
   {link,LD} = ?MODULE:link(Call),
   proplists:get_value(schema,LD).
 
+link_link(Call) ->
+  {link,LD} = ?MODULE:link(Call),
+  proplists:get_value(link,LD).
+
 http_request(Call) ->
   case Call of
     {_, _, follow_link, [_,Request], _} ->
@@ -79,8 +92,8 @@ link(Call) ->
       Link
   end.
 
-get_json_body({normal,{_,Body}}) ->
-  mochijson2:decode(Body).
+get_json_body(Result) ->
+  mochijson2:decode(js_links_machine:http_body(Result)).
 
 
 

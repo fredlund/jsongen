@@ -3,7 +3,6 @@
   {"small_nat" :
     {"type" : "integer", "minimum" : 1, "maximum" : 40}},
  "required" : [ "qid", "uid", "aid", "answer" ],
- "additionalProperties" : false,
  "properties" : {
      "aid"    : {"$ref" : "#/definitions/small_nat"},
      "qid"    : {"$ref" : "#/definitions/small_nat"},

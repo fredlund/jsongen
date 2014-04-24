@@ -76,45 +76,60 @@ postcondition(State,Call,Result) ->
   make_call(postcondition,fun postcondition_int/3,[State,Call,Result]).
 
 postcondition_int(State,Call,Result) ->
-  ?LOG("result is ~p~n",[Result]),
-  case http_response_is_ok(Result) of
+  case validate_call_not_error_result(Call,Result) of
     true ->
-      Schema = test:link_schema(Call),
-      case jsg_jsonschema:propertyValue(Schema,"targetSchema") of
-	undefined ->
-	  true;
-	TargetSchema ->
-	  RealTargetSchema = jsg_links:get_schema(TargetSchema),
-	  case response_has_json_body(Result) of
-	    false ->
-	      false;
-	    true ->
-	      Body = http_body(Result),
-	      JSON = mochijson2:decode(Body),
-	      case jesse:validate(TargetSchema,JSON) of
-		{ok,_} -> true;
-		Other -> 
-		  io:format
-		    ("~n*** Error: postcondition error: for http call~n~s~nthe JSON value~n~p~n"++
-		       "did not validate against the schema~n~p~n"++
-		       "due to error~n~p~n",
-		     [format_http_call(Call),JSON,Schema,Other]),
-		  false
-	      end
-	  end
-      end;
-    false ->
-      case http_result_type(Result) of
-	{error, Error} ->
-	  io:format
-	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
-	     [format_http_call(Call),http_error(Result)]);
-	_ ->
+      case http_result_code(Result) of
+	200 ->
+	  validate_call_result_body(Call,Result);
+	Other ->
 	  io:format
 	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code 200~n",
-	     [format_http_call(Call),http_result_code(Result)])
-      end,
+	     [format_http_call(Call),Other]),
+	  false
+      end;
+    _ -> false
+  end.
+
+validate_call_not_error_result(Call,Result) ->
+  case http_result_type(Result) of
+    ok ->
+      true;
+    {error,Error} ->
+      io:format
+	("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
+	 [format_http_call(Call),http_error(Result)]),
       false
+  end.
+
+validate_call_result_body(Call,Result) ->
+  Link = test:link_link(Call),
+  Schema = test:link_schema(Call),
+  case jsg_jsonschema:propertyValue(Link,"targetSchema") of
+    undefined ->
+      true;
+    TargetSchema ->
+      RealTargetSchema = jsg_links:get_schema(TargetSchema,Schema),
+      case response_has_json_body(Result) of
+	false ->
+	  false;
+	true ->
+	  Body = http_body(Result),
+	  JSON = mochijson2:decode(Body),
+	  try jesse_schema_validator:validate(RealTargetSchema,JSON,[]) of
+	    {ok,_} -> true
+	  catch Class:Reason ->
+	      io:format
+		("~n*** Error: postcondition error: for http call~n~s~n"++
+		   "the JSON value~n~s~n"++
+		   "did not validate against the schema~n~s~n"++
+		   "due to error~n~p~n",
+		 [format_http_call(Call),
+		  mochijson2:encode(JSON),
+		  mochijson2:encode(RealTargetSchema),
+		  Reason]),
+	      false
+	  end
+      end
   end.
 
 next_state(State,Result,Call) ->
@@ -229,9 +244,6 @@ http_request_with_body(URI,Type,Body) ->
 	iolist_to_binary(Body)},
        [{timeout,1500}],
        []),
-  io:format
-    ("URI: ~p Type: ~p~nBody: ~s~nreturned result~n~p~n",
-     [URI,Type,Body,Result]),
   Result.
 
 http_request_with_headers(URI,Type,Headers) ->
@@ -296,11 +308,11 @@ http_response_is_ok(Result) ->
 
 http_content_length(Result) ->
   Headers = http_headers(Result),
-  proplists:get_value(Headers,"content-length").
+  proplists:get_value("content-length",Headers).
 
 http_content_type(Result) ->
   Headers = http_headers(Result),
-  proplists:get_value(Headers,"content-type").
+  proplists:get_value("content-type",Headers).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -367,18 +379,18 @@ prop_ok() ->
 	  ?MODULE,
 	  Cmds,
 	  begin
-	    print_counterexample(Cmds,H,DS,Res),
-	    Res == ok
+	    if
+	      Res == ok ->
+		true;
+	      true ->
+		print_counterexample(Cmds,H,DS,Res),
+		false
+	    end
 	  end)).
 
-print_counterexample(Cmds,H,DS,ok) ->
-  ok;
 print_counterexample(Cmds,H,DS,Reason) ->
   io:format("~nTest failed with reason ~p~n",[Reason]),
   {FailingCommandSequence,_} = lists:split(length(H)+1,Cmds),
-  io:format
-    ("len(failedCommands)=~p len(history)=~p~n",
-     [length(FailingCommandSequence),length(H)]),
   ReturnValues = 
     case Reason of
       {exception,_} ->
@@ -386,9 +398,10 @@ print_counterexample(Cmds,H,DS,Reason) ->
       _ ->
 	(lists:map(fun ({_,_,Result}) -> Result end, H))
     end,
-  io:format("Commands:~n"),
+  io:format("~nCommand sequence:~n"),
+  io:format("---------------~n~n"),
   print_commands(lists:zip(tl(FailingCommandSequence),ReturnValues)),
-  io:format("~n").
+  io:format("~n~n").
 
 print_commands([]) ->
   ok;
@@ -397,36 +410,46 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   TitleString = 
     if 
       Title==undefined ->
-	"link ";
+	"Link ";
       true ->
-	io_lib:format("link ~p ",[Title])
+	io_lib:format("Link ~p ",[Title])
     end,
   ResultString =
     case http_result_type(Result) of
       {error,Error} -> 
-	io_lib:format(" -> error ~p~n",[Error]);
+	io_lib:format(" ->~n    error ~p~n",[Error]);
       ok ->
 	ResponseCode = http_result_code(Result),
 	case response_has_body(Result) of
 	  true -> 
-	    io_lib:format(" -> ~p with body ~s",[ResponseCode,http_body(Result)]);
+	    io_lib:format
+	      (" ->~n    ~p with body ~s",
+	       [ResponseCode,http_body(Result)]);
 	  false ->
-	    io_lib:format(" -> ~p",[ResponseCode])
+	    io_lib:format
+	      (" ->~n     ~p",
+	       [ResponseCode])
 	end
     end,
   io:format
-    ("~saccess ~s~s~n",
+    ("~saccess ~s~s~n~n",
      [TitleString,format_http_call(Call),ResultString]),
   print_commands(Rest).
   
 test() ->
-  case eqc:quickcheck(prop_ok()) of
+  case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
     false ->
-      io:format
-	("~n~n***FAILED; counterexample is~n~n~p~n",
-	 [eqc:counterexample()]);
+      io:format("~n~n***FAILED~n");
     true ->
-      io:format
-	("~n~nPASSED~n",[])
+      io:format("~n~nPASSED~n",[])
   end.
+
+%% To make eqc not print the horrible counterexample
+eqc_printer(Format,String) ->
+  case Format of
+    "~p~n" -> ok;
+    _ -> io:format(Format,String)
+  end.
+
+       
 
