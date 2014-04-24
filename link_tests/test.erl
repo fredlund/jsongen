@@ -44,10 +44,11 @@ postcondition(Super,State,Call,Result) ->
       {_,_,{ok,Body}} = http_request(Call),
       Qid = jsg_jsonschema:propertyValue(Body,"qid"),
       ShouldSucceed = lists:member(Qid,element(2,State#state.private_state)),
-      case Result of
-	{normal,{Code,ResultBody}} ->
-	  (ShouldSucceed andalso (Code==200))
-	    orelse ((not(ShouldSucceed)) andalso (Code==409));
+      case js_links_machine:http_result_type(Result) of
+	ok -> 
+	  ResultCode = js_links_machine:http_result_code(Result),
+	  (ShouldSucceed andalso (ResultCode==200))
+	    orelse ((not(ShouldSucceed)) andalso (ResultCode==409));
 	_ ->
 	  false
       end;
@@ -55,9 +56,16 @@ postcondition(Super,State,Call,Result) ->
       Super(State,Call,Result)
   end.
       
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 link_title(Call) ->
   {link,LD} = ?MODULE:link(Call),
   proplists:get_value(title,LD).
+
+link_schema(Call) ->
+  {link,LD} = ?MODULE:link(Call),
+  proplists:get_value(schema,LD).
 
 http_request(Call) ->
   case Call of

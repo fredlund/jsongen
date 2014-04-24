@@ -20,8 +20,6 @@
 -record(state,{static_links,links,private_state=void}).
 
 
-%% We assume an ets table initialised with links
-
 api_spec() ->
   #api_spec{}.
 
@@ -79,10 +77,43 @@ postcondition(State,Call,Result) ->
 
 postcondition_int(State,Call,Result) ->
   ?LOG("result is ~p~n",[Result]),
-  case Result of
-    {normal,{200,_}} ->
-      true;
-    _ ->
+  case http_response_is_ok(Result) of
+    true ->
+      Schema = test:link_schema(Call),
+      case jsg_jsonschema:propertyValue(Schema,"targetSchema") of
+	undefined ->
+	  true;
+	TargetSchema ->
+	  RealTargetSchema = jsg_links:get_schema(TargetSchema),
+	  case response_has_json_body(Result) of
+	    false ->
+	      false;
+	    true ->
+	      Body = http_body(Result),
+	      JSON = mochijson2:decode(Body),
+	      case jesse:validate(TargetSchema,JSON) of
+		{ok,_} -> true;
+		Other -> 
+		  io:format
+		    ("~n*** Error: postcondition error: for http call~n~s~nthe JSON value~n~p~n"++
+		       "did not validate against the schema~n~p~n"++
+		       "due to error~n~p~n",
+		     [format_http_call(Call),JSON,Schema,Other]),
+		  false
+	      end
+	  end
+      end;
+    false ->
+      case http_result_type(Result) of
+	{error, Error} ->
+	  io:format
+	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
+	     [format_http_call(Call),http_error(Result)]);
+	_ ->
+	  io:format
+	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code 200~n",
+	     [format_http_call(Call),http_result_code(Result)])
+      end,
       false
   end.
 
@@ -156,7 +187,25 @@ follow_link(Link,HTTPRequest={URI,RequestType,Argument}) ->
       _ ->
 	http_request(URI,RequestType)
     end,
-  analyze_http_result(Result).
+  Result.
+
+format_http_call(Call) ->
+  case Call of
+    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body}], _} ->
+      format_http_call(URI,RequestType,Body)
+  end.
+
+format_http_call(URI,RequestType,Body) ->
+  BodyString =
+    case Body of
+      {ok,JSON} ->
+	io_lib:format(" body=~s",[mochijson2:encode(JSON)]);
+      _ ->
+	""
+    end,
+  io_lib:format
+    ("~s using ~s~s",
+     [URI,string:to_upper(atom_to_list(RequestType)),BodyString]).
 
 has_body(get) ->
   false;
@@ -170,43 +219,109 @@ encode_headers(X) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 http_request_with_body(URI,Type,Body) ->
-  httpc:request
-    (Type,
-     {URI,
-      [],
-      "application/json",
-      iolist_to_binary(Body)},
-     [{timeout,1500}],
-     []).
+  Result =
+    httpc:request
+      (Type,
+       {URI,
+	[],
+	"application/json",
+	iolist_to_binary(Body)},
+       [{timeout,1500}],
+       []),
+  io:format
+    ("URI: ~p Type: ~p~nBody: ~s~nreturned result~n~p~n",
+     [URI,Type,Body,Result]),
+  Result.
 
 http_request_with_headers(URI,Type,Headers) ->
-  httpc:request
-    (Type,
-     {URI,
-      Headers},
-     [{timeout,1500}],
-     []).
+  Result =
+    httpc:request
+      (Type,
+       {URI,
+	Headers},
+       [{timeout,1500}],
+       []),
+  Result.
 
 http_request(URI,Type) ->
-  httpc:request
-    (Type,
-     {URI,[]},
-     [{timeout,1500}],
-     []).
+  Result = 
+    httpc:request
+      (Type,
+       {URI,[]},
+       [{timeout,1500}],
+       []),
+  Result.
   
-analyze_http_result(Result) ->
-  case Result of 
-    {ok,{StatusLine,_Headers,RespBody}} ->
-      case StatusLine of
-	{_,ResponseCode,_} ->
-	  {normal,{ResponseCode,RespBody}};
-	_ ->
-	  {other,Result}
+http_result_type({ok,_}) ->
+  ok;
+http_result_type(Other) ->
+  Other.
+
+http_error({error,Error}) ->
+  Error.
+
+http_headers({ok,{_,Headers,_}}) ->
+  Headers.
+
+http_body({ok,{_,_,Body}}) ->
+  Body.
+
+http_status_line({ok,{StatusLine,_,_}}) ->
+  StatusLine.
+
+http_version(Result) ->
+  case http_status_line(Result) of
+    {Version,_,_} ->
+      Version
+  end.
+
+http_result_code(Result) ->
+  case http_status_line(Result) of
+    {_,ResultCode,_} ->
+      ResultCode
+  end.
+
+http_reason_phrase(Result) ->
+  case http_status_line(Result) of
+    {_,_,ReasonPhrase} ->
+      ReasonPhrase
+  end.
+
+http_response_is_ok(Result) ->
+  case http_result_type(Result) of
+    ok ->  http_result_code(Result)==200;
+    _ -> false
+  end.
+
+http_content_length(Result) ->
+  Headers = http_headers(Result),
+  proplists:get_value(Headers,"content-length").
+
+http_content_type(Result) ->
+  Headers = http_headers(Result),
+  proplists:get_value(Headers,"content-type").
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+response_has_body(Result) ->
+  case http_result_type(Result) of
+    ok -> 
+      ContentLength = http_content_length(Result),
+      if
+	ContentLength=/=undefined ->
+	  ContLen = list_to_integer(ContentLength),
+	  ContLen>0;
+	true -> 
+	  false
       end;
-    _ -> 
-      {other,Result}
+    _ -> false
+  end.
+
+response_has_json_body(Result) ->
+  case response_has_body(Result) of
+    true -> http_content_type(Result) == "application/json";
+    false -> false
   end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -277,7 +392,7 @@ print_counterexample(Cmds,H,DS,Reason) ->
 
 print_commands([]) ->
   ok;
-print_commands([{Call={call,_,follow_link,[_,Request],_},Result}|Rest]) ->
+print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   Title = test:link_title(Call),
   TitleString = 
     if 
@@ -286,29 +401,22 @@ print_commands([{Call={call,_,follow_link,[_,Request],_},Result}|Rest]) ->
       true ->
 	io_lib:format("link ~p ",[Title])
     end,
-  {URI,RequestType,Body} = Request,
-  BodyString =
-    case Body of
-      {ok,JSON} ->
-	io_lib:format(" with body ~s",[mochijson2:encode(JSON)]);
-      _ ->
-	""
-    end,
   ResultString =
-    case Result of
-      {other,Error} -> 
+    case http_result_type(Result) of
+      {error,Error} -> 
 	io_lib:format(" -> error ~p~n",[Error]);
-      {normal,{ResponseCode,RespBody}} ->
-	if
-	  Body=/="" -> 
-	    io_lib:format(" -> ~p with body ~s",[ResponseCode,RespBody]);
-	  true ->
+      ok ->
+	ResponseCode = http_result_code(Result),
+	case response_has_body(Result) of
+	  true -> 
+	    io_lib:format(" -> ~p with body ~s",[ResponseCode,http_body(Result)]);
+	  false ->
 	    io_lib:format(" -> ~p",[ResponseCode])
 	end
     end,
   io:format
-    ("~saccess ~s using type ~p~s~s~n",
-     [TitleString,URI,RequestType,BodyString,ResultString]),
+    ("~saccess ~s~s~n",
+     [TitleString,format_http_call(Call),ResultString]),
   print_commands(Rest).
   
 test() ->
