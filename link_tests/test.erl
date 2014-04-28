@@ -68,18 +68,6 @@ postcondition(Super,State,Call,Result) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-link_title(Call) ->
-  {link,LD} = ?MODULE:link(Call),
-  proplists:get_value(title,LD).
-
-link_schema(Call) ->
-  {link,LD} = ?MODULE:link(Call),
-  proplists:get_value(schema,LD).
-
-link_link(Call) ->
-  {link,LD} = ?MODULE:link(Call),
-  proplists:get_value(link,LD).
-
 http_request(Call) ->
   case Call of
     {_, _, follow_link, [_,Request], _} ->

@@ -19,53 +19,6 @@
 %% Given a set of file corresponding to JSON schemas,
 %% traverse the schemas to find (non-relative) link definitions.
 
-collect_links(Files) ->
-  lists:flatmap(fun collect_links_from_file/1, Files).
-
-collect_links_from_file(File) ->
-  try jsg_jsonschema:read_schema(File) of
-      {ok,Schema} -> collect_schema_links(Schema,false)
-  catch Class:Reason ->
-      Stacktrace = erlang:get_stacktrace(),
-      io:format
-	("*** Error: could not read schema from file ~p~n",
-	 [File]),
-      erlang:raise(Class,Reason,Stacktrace)
-  end.
-
-collect_schema_links(Schema, DependsOnObject) ->
-  %% Find all schemas, and retrieve links
-  case jsg_jsonschema:links(Schema) of
-    undefined ->
-      [];
-    Links when is_list(Links) ->
-      lists:foldl
-	(fun (Link,Ls) ->
-	     case jsg_jsonschema:propertyValue(Link,"href") of
-	       Value when is_binary(Value) ->
-		Dependency =
-		   depends_on_object_properties(binary_to_list(Value)),
-		 if
-		   Dependency==DependsOnObject ->
-		     LinkData =
-		       case jsg_jsonschema:propertyValue(Link,"title") of
-			 undefined -> [];
-			 Title -> [{title,binary_to_list(Title)}]
-		       end,
-		     [{link,[{link,Link},{schema,Schema}|LinkData]}|Ls];
-		   true ->
-		     Ls
-		 end
-	     end
-	 end, [], Links)
-  end.
-
-depends_on_object_properties(Href) ->
-  Template = uri_template:parse(Href),
-  lists:any(fun ({var, _, _}) -> true;
-		(_) -> false
-	    end, Template).
-
 compute_uri(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
   Href = jsg_jsonschema:propertyValue(L,"href"),
@@ -119,7 +72,7 @@ extract_dynamic_links(Link={link,LinkData},JSONBody) ->
 	Type ->
 	  case Type of
 	    <<"object">> ->
-	      Links = collect_schema_links(Schema,true),
+	      Links = js_links_machine:collect_schema_links(Schema,true),
 	      %%io:format("schema links are:~n~p~n",[Links]),
 	      lists:map
 		(fun ({link,Props}) -> {link,[{object,JSONBody}|Props]} end,
@@ -130,7 +83,7 @@ extract_dynamic_links(Link={link,LinkData},JSONBody) ->
 		  ItemSchemaDesc = proplists:get_value(<<"items">>,Proplist),
 		  %%io:format("itemSchema is ~p~n",[ItemSchemaDesc]),
 		  ItemSchema = get_schema(ItemSchemaDesc,S),
-		  Links = collect_schema_links(ItemSchema,true),
+		  Links = js_links_machine:collect_schema_links(ItemSchema,true),
 		  %%io:format("schema links are:~n~p~n",[Links]),
 		  lists:flatmap
 		    (fun ({link,Props}) ->
@@ -153,25 +106,26 @@ get_schema(Value={struct,Proplist},Root) ->
       jsg_jsonref:unref(Value,Root)
   end.
 
-run_statem(PrivateModule,Files) ->
-  case collect_links(Files) of
-    [] ->
-      io:format
-	("*** Error: no independent links could be found among the files ~p~n",
-	 [Files]),
-      throw(bad);
-    Links ->
-      js_links_machine:init_table(PrivateModule,Links),
-      js_links_machine:test()
-  end.
+test1() ->
+  js_links_machine:run_statem(void,["question.jsch","answer.jsch","statement.jsch","reset.jsch","answer_reply.jsch"]).
 
-test() ->
-  jsg_links:run_statem(test,["question.jsch","answer.jsch","statement.jsch","reset.jsch","answer_reply.jsch"]).
+test2() ->
+  js_links_machine:run_statem(qa,["question.jsch","answer.jsch","statement.jsch","reset.jsch","answer_reply.jsch"]).
 
   
-  
-		 
-		 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+link_title(Link) ->
+  {link,LD} = Link,
+  proplists:get_value(title,LD).
+
+link_schema(Link) ->
+  {link,LD} = Link,
+  proplists:get_value(schema,LD).
+
+link_link(Link) ->
+  {link,LD} = Link,
+  proplists:get_value(link,LD).
 		 
 	     
       

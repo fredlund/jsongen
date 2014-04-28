@@ -5,6 +5,7 @@
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_component.hrl").
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
+-include_lib("jsongen.hrl").
 
 
 %%-define(debug,true).
@@ -17,7 +18,6 @@
 -endif.
 
 
--record(state,{static_links,links,private_state=void}).
 
 
 api_spec() ->
@@ -33,7 +33,7 @@ initial_state() ->
     end,
   #state
     {static_links=sets:from_list(initial_links()),
-     links=sets:new(),
+     dynamic_links=sets:new(),
      private_state=PrivateState}.
 
 command(State) ->
@@ -47,7 +47,7 @@ command_int(State) ->
 	sets:to_list
 	  (sets:union
 	     (State#state.static_links,
-	      State#state.links)),
+	      State#state.dynamic_links)),
       link_permitted(State,Link)
     ],
   eqc_gen:oneof(Alternatives).
@@ -68,7 +68,7 @@ precondition_int(State,Call) ->
   case Call of
     {_, _, follow_link, [Link,_], _} ->
       (sets:is_element(Link,State#state.static_links) orelse
-       sets:is_element(Link,State#state.links)) andalso
+       sets:is_element(Link,State#state.dynamic_links)) andalso
       link_permitted(State,Link)
   end.
 
@@ -102,8 +102,8 @@ validate_call_not_error_result(Call,Result) ->
   end.
 
 validate_call_result_body(Call,Result) ->
-  Link = test:link_link(Call),
-  Schema = test:link_schema(Call),
+  Link = jsg_links:link_link(call_link(Call)),
+  Schema = jsg_links:link_schema(call_link(Call)),
   case jsg_jsonschema:propertyValue(Link,"targetSchema") of
     undefined ->
       true;
@@ -143,7 +143,7 @@ next_state_int(State,Result,Call) ->
 	  %%io:format("normal result: extracting links~n",[]),
 	  NewLinks =
 	    jsg_links:extract_dynamic_links(Link,mochijson2:decode(Body)),
-	  State#state{links=sets:union(sets:from_list(NewLinks),State#state.links)};
+	  State#state{dynamic_links=sets:union(sets:from_list(NewLinks),State#state.dynamic_links)};
 	_ -> State
       end;
     _ -> ?LOG("Call was~n~p~n",[Call]), State
@@ -406,7 +406,7 @@ print_counterexample(Cmds,H,DS,Reason) ->
 print_commands([]) ->
   ok;
 print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
-  Title = test:link_title(Call),
+  Title = call_link_title(Call),
   TitleString = 
     if 
       Title==undefined ->
@@ -444,6 +444,18 @@ test() ->
       io:format("~n~nPASSED~n",[])
   end.
 
+run_statem(PrivateModule,Files) ->
+  case collect_links(Files) of
+    [] ->
+      io:format
+	("*** Error: no independent links could be found among the files ~p~n",
+	 [Files]),
+      throw(bad);
+    Links ->
+      js_links_machine:init_table(PrivateModule,Links),
+      js_links_machine:test()
+  end.
+
 %% To make eqc not print the horrible counterexample
 eqc_printer(Format,String) ->
   case Format of
@@ -451,5 +463,89 @@ eqc_printer(Format,String) ->
     _ -> io:format(Format,String)
   end.
 
-       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+set_private_state(NewPrivateState,State) ->
+  State#state{private_state=NewPrivateState}.
+
+private_state(State) ->
+  State#state.private_state.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+call_link_title(Call) ->
+  jsg_links:link_title(call_link(Call)).
+
+call_link(Call) ->
+  case Call of
+    {call, ?MODULE, follow_link, [Link,_], _} ->
+      Link
+  end.
+
+json_call_body(Call) ->
+  case Call of
+    {call, ?MODULE, follow_link, [_,HTTPRequest={_,_,Argument}], _} ->
+      case Argument of
+	{ok,Body} -> Body
+      end
+  end.
+
+get_json_body(Result) ->
+  case response_has_json_body(Result) of
+    true -> mochijson2:decode(http_body(Result))
+  end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+collect_links(Files) ->
+  lists:flatmap(fun collect_links_from_file/1, Files).
+
+collect_links_from_file(File) ->
+  try jsg_jsonschema:read_schema(File) of
+      {ok,Schema} -> collect_schema_links(Schema,false)
+  catch Class:Reason ->
+      Stacktrace = erlang:get_stacktrace(),
+      io:format
+	("*** Error: could not read schema from file ~p~n",
+	 [File]),
+      erlang:raise(Class,Reason,Stacktrace)
+  end.
+
+collect_schema_links(Schema, DependsOnObject) ->
+  %% Find all schemas, and retrieve links
+  case jsg_jsonschema:links(Schema) of
+    undefined ->
+      [];
+    Links when is_list(Links) ->
+      lists:foldl
+	(fun (Link,Ls) ->
+	     case jsg_jsonschema:propertyValue(Link,"href") of
+	       Value when is_binary(Value) ->
+		Dependency =
+		   depends_on_object_properties(binary_to_list(Value)),
+		 if
+		   Dependency==DependsOnObject ->
+		     LinkData =
+		       case jsg_jsonschema:propertyValue(Link,"title") of
+			 undefined -> [];
+			 Title -> [{title,binary_to_list(Title)}]
+		       end,
+		     [{link,[{link,Link},{schema,Schema}|LinkData]}|Ls];
+		   true ->
+		     Ls
+		 end
+	     end
+	 end, [], Links)
+  end.
+
+depends_on_object_properties(Href) ->
+  Template = uri_template:parse(Href),
+  lists:any(fun ({var, _, _}) -> true;
+		(_) -> false
+	    end, Template).
+
+
+
+  
 

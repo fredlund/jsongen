@@ -67,9 +67,11 @@ ABSTRGDIR2=`pwd`
 mkdir ebin
 mkdir doc
 mkdir tests
+mkdir include
 
 cp ${ABSSRCDIR}/ebin/*.beam ebin
 cp -r ${ABSSRCDIR}/tests/* tests/
+cp ${ABSSRCDIR}/src/jsongen.hrl include
 
 pushd $ABSSRCDIR/doc/doc
 find . | grep -v '/\.svn' | cpio -dump $ABSTRGDIR2/doc
