@@ -1,0 +1,1 @@
+-record(state,{static_links,dynamic_links,private_state={false,[]}}).
