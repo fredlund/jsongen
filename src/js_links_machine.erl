@@ -18,8 +18,6 @@
 -endif.
 
 
-
-
 api_spec() ->
   #api_spec{}.
 
@@ -33,27 +31,44 @@ initial_state() ->
     end,
   #state
     {static_links=sets:from_list(initial_links()),
+     initialized=false,
      dynamic_links=sets:new(),
      private_state=PrivateState}.
 
 command(State) ->
   make_call(command,fun command_int/1, [State]).
 
+%% add metadata -- not sure it is necessary...
+
 command_int(State) ->
-  Alternatives =
-    [
-     {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]} ||
-      Link <-
-	sets:to_list
-	  (sets:union
-	     (State#state.static_links,
-	      State#state.dynamic_links)),
-      link_permitted(State,Link)
-    ],
-  eqc_gen:oneof(Alternatives).
+  if
+    State#state.initialized ->
+      Alternatives =
+	[
+	 gen_link(State,Link) ||
+	  Link <-
+	    sets:to_list
+	      (sets:union
+		 (State#state.static_links,
+		  State#state.dynamic_links)),
+	  link_permitted(State,Link)
+	],
+      eqc_gen:oneof(Alternatives);
+    true ->
+      {call, ?MODULE, initialize, []}
+  end.
+
+initialize() ->
+  httpc:reset_cookies().
 
 callouts(_,_) ->
   ?EMPTY.
+
+gen_link(State,Link) ->
+  make_call(gen_link,fun gen_link_int/2,[State,Link]).
+
+gen_link_int(State,Link) ->
+  {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]}.
 
 link_permitted(State,Link) ->
   make_call(link_permitted,fun link_permitted_int/2,[State,Link]).
@@ -67,27 +82,34 @@ precondition(State,Call) ->
 precondition_int(State,Call) ->
   case Call of
     {_, _, follow_link, [Link,_], _} ->
-      (sets:is_element(Link,State#state.static_links) orelse
-       sets:is_element(Link,State#state.dynamic_links)) andalso
-      link_permitted(State,Link)
+      (State#state.initialized==true) andalso
+      ((sets:is_element(Link,State#state.static_links) orelse
+	sets:is_element(Link,State#state.dynamic_links)) andalso
+       link_permitted(State,Link));
+    _ ->
+      State#state.initialized==false
   end.
 
 postcondition(State,Call,Result) ->
   make_call(postcondition,fun postcondition_int/3,[State,Call,Result]).
 
 postcondition_int(State,Call,Result) ->
-  case validate_call_not_error_result(Call,Result) of
-    true ->
-      case http_result_code(Result) of
-	200 ->
-	  validate_call_result_body(Call,Result);
-	Other ->
-	  io:format
-	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code 200~n",
-	     [format_http_call(Call),Other]),
-	  false
+  case Call of
+    {_, _, follow_link, _, _} ->
+      case validate_call_not_error_result(Call,Result) of
+	true ->
+	  case http_result_code(Result) of
+	    200 ->
+	      validate_call_result_body(Call,Result);
+	    Other ->
+	      io:format
+		("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code 200~n",
+		 [format_http_call(Call),Other]),
+	      false
+	  end;
+	_ -> false
       end;
-    _ -> false
+    _ -> true
   end.
 
 validate_call_not_error_result(Call,Result) ->
@@ -137,6 +159,8 @@ next_state(State,Result,Call) ->
 
 next_state_int(State,Result,Call) ->
   case Call of
+    {_, ?MODULE, initialize, _, _} ->
+      State#state{initialized=true};
     {_, ?MODULE, follow_link, [Link,_], _} ->
       case Result of
 	{normal,{200,Body}} -> 
@@ -197,7 +221,7 @@ follow_link(Link,HTTPRequest={URI,RequestType,Argument}) ->
 	  true ->
 	    http_request_with_body(URI,RequestType,mochijson2:encode(Body));
 	  false ->
-	    http_request_with_headers(URI,RequestType,encode_headers(Body))
+	    http_request_with_parameters(URI,RequestType,encode_parameters(Body))
 	end;
       _ ->
 	http_request(URI,RequestType)
@@ -229,8 +253,16 @@ has_body(delete) ->
 has_body(_) ->
   true.
 
-encode_headers(X) ->
-  X.
+encode_parameters(X) ->
+  case X of
+    {struct,L} ->
+      lists:map
+	(fun ({Key,Value}) ->
+	     if
+	       is_list(Key), is_list(Value) -> {Key,Value}
+	     end
+	 end, L)
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -246,12 +278,21 @@ http_request_with_body(URI,Type,Body) ->
        []),
   Result.
 
-http_request_with_headers(URI,Type,Headers) ->
+http_request_with_parameters(PreURI,Type,Parameters) ->
+  URI =
+    case Parameters of
+      [] -> PreURI;
+      _ -> 
+	lists:foldr
+	  (fun (Acc,{Key,Value}) ->
+	       Acc++Key++"="++Value
+	   end, PreURI++"?", Parameters)
+    end,
   Result =
     httpc:request
       (Type,
        {URI,
-	Headers},
+	Parameters},
        [{timeout,1500}],
        []),
   Result.
@@ -445,6 +486,15 @@ test() ->
   end.
 
 run_statem(PrivateModule,Files) ->
+  run_statem(PrivateModule,Files,[]).
+
+run_statem(PrivateModule,Files,Args) ->
+  case proplists:get_value(cookies,Args) of
+    true ->
+      true = httpc:set_options([{cookies,enabled}]);
+    _ ->
+      ok
+  end,
   case collect_links(Files) of
     [] ->
       io:format

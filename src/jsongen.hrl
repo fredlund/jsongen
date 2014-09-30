@@ -1,1 +1,5 @@
--record(state,{static_links,dynamic_links,private_state={false,[]}}).
+-record(state,
+	{static_links,
+	 dynamic_links,
+	 initialized,
+	 private_state={false,[]}}).
