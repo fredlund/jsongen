@@ -221,7 +221,7 @@ follow_link(Link,HTTPRequest={URI,RequestType,Argument}) ->
 	  true ->
 	    http_request_with_body(URI,RequestType,mochijson2:encode(Body));
 	  false ->
-	    http_request_with_headers(URI,RequestType,encode_headers(Body))
+	    http_request_with_parameters(URI,RequestType,encode_parameters(Body))
 	end;
       _ ->
 	http_request(URI,RequestType)
@@ -253,8 +253,16 @@ has_body(delete) ->
 has_body(_) ->
   true.
 
-encode_headers(X) ->
-  X.
+encode_parameters(X) ->
+  case X of
+    {struct,L} ->
+      lists:map
+	(fun ({Key,Value}) ->
+	     if
+	       is_list(Key), is_list(Value) -> {Key,Value}
+	     end
+	 end, L)
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -270,12 +278,21 @@ http_request_with_body(URI,Type,Body) ->
        []),
   Result.
 
-http_request_with_headers(URI,Type,Headers) ->
+http_request_with_parameters(PreURI,Type,Parameters) ->
+  URI =
+    case Parameters of
+      [] -> PreURI;
+      _ -> 
+	lists:foldr
+	  (fun (Acc,{Key,Value}) ->
+	       Acc++Key++"="++Value
+	   end, PreURI++"?", Parameters)
+    end,
   Result =
     httpc:request
       (Type,
        {URI,
-	Headers},
+	Parameters},
        [{timeout,1500}],
        []),
   Result.
