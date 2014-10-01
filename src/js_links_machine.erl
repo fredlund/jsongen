@@ -37,9 +37,6 @@ initial_state() ->
 
 command(State) ->
   Command = make_call(command,fun command_int/1, [State]),
-  io:format
-    ("command: with private state ~p generated~n  ~p~n",
-     [State#state.private_state,Command]),
   Command.
 
 %% add metadata -- not sure it is necessary...
@@ -297,7 +294,7 @@ encode_parameters(X) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 http_request_with_body(URI,Type,Body) ->
-  io:format("URI: ~s cookies are ~p~n",[URI,httpc:which_cookies()]),
+  %%io:format("URI: ~s cookies are ~p~n",[URI,httpc:which_cookies()]),
   Result =
     httpc:request
       (Type,
@@ -307,11 +304,11 @@ http_request_with_body(URI,Type,Body) ->
 	iolist_to_binary(Body)},
        [{timeout,1500}],
        []),
-  io:format("Result is ~p~n",[Result]),
+  %%io:format("Result is ~p~n",[Result]),
   Result.
 
 http_request_with_parameters(PreURI,Type,Parameters) ->
-  io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
+  %%io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
   URI =
     case Parameters of
       [] -> PreURI;
@@ -328,18 +325,18 @@ http_request_with_parameters(PreURI,Type,Parameters) ->
 	Parameters},
        [{timeout,1500}],
        []),
-  io:format("Result is ~p~n",[Result]),
+  %%io:format("Result is ~p~n",[Result]),
   Result.
 
 http_request(URI,Type) ->
-  io:format("URI: ~s cookies are ~p~n",[URI,httpc:which_cookies()]),
+  %%io:format("URI: ~s cookies are ~p~n",[URI,httpc:which_cookies()]),
   Result = 
     httpc:request
       (Type,
        {URI,[]},
        [{timeout,1500}],
        []),
-  io:format("Result is ~p~n",[Result]),
+  %%io:format("Result is ~p~n",[Result]),
   Result.
   
 http_result_type({ok,_}) ->
