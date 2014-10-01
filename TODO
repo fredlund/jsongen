@@ -45,3 +45,7 @@ otra vez usando "schema : true.
 
 
 - Dependencies (mochijson2) must be automatically solved (rebar?).
+
+- Permit parameters for POST and PUT, in ADDITION to a body.
+We probably need a new schema for that (extension of JSON schema).
+

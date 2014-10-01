@@ -36,7 +36,8 @@ initial_state() ->
      private_state=PrivateState}.
 
 command(State) ->
-  make_call(command,fun command_int/1, [State]).
+  Command = make_call(command,fun command_int/1, [State]),
+  Command.
 
 %% add metadata -- not sure it is necessary...
 
@@ -77,7 +78,12 @@ link_permitted_int(State,Link) ->
   true.
 
 precondition(State,Call) ->
-  make_call(precondition,fun precondition_int/2,[State,Call]).
+  case Call of
+    {_, _, follow_link, _, _} ->
+      make_call(precondition,fun precondition_int/2,[State,Call]);
+    _ ->
+      precondition_int(State,Call)
+  end.
 
 precondition_int(State,Call) ->
   case Call of
@@ -91,7 +97,12 @@ precondition_int(State,Call) ->
   end.
 
 postcondition(State,Call,Result) ->
-  make_call(postcondition,fun postcondition_int/3,[State,Call,Result]).
+  case Call of
+    {_, _, follow_link, _, _} ->
+      make_call(postcondition,fun postcondition_int/3,[State,Call,Result]);
+    _ ->
+      postcondition_int(State,Call,Result)
+  end.
 
 postcondition_int(State,Call,Result) ->
   case Call of
@@ -113,49 +124,65 @@ postcondition_int(State,Call,Result) ->
   end.
 
 validate_call_not_error_result(Call,Result) ->
-  case http_result_type(Result) of
-    ok ->
-      true;
-    {error,Error} ->
-      io:format
-	("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
-	 [format_http_call(Call),http_error(Result)]),
-      false
+  case Call of
+    {_, _, follow_link, _, _} ->
+      case http_result_type(Result) of
+	ok ->
+	  true;
+	{error,Error} ->
+	  io:format
+	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
+	     [format_http_call(Call),http_error(Result)]),
+	  false
+      end;
+    _ -> true
   end.
 
 validate_call_result_body(Call,Result) ->
-  Link = jsg_links:link_link(call_link(Call)),
-  Schema = jsg_links:link_schema(call_link(Call)),
-  case jsg_jsonschema:propertyValue(Link,"targetSchema") of
-    undefined ->
-      true;
-    TargetSchema ->
-      RealTargetSchema = jsg_links:get_schema(TargetSchema,Schema),
-      case response_has_json_body(Result) of
-	false ->
-	  false;
-	true ->
-	  Body = http_body(Result),
-	  JSON = mochijson2:decode(Body),
-	  try jesse_schema_validator:validate(RealTargetSchema,JSON,[]) of
-	    {ok,_} -> true
-	  catch Class:Reason ->
-	      io:format
-		("~n*** Error: postcondition error: for http call~n~s~n"++
-		   "the JSON value~n~s~n"++
-		   "did not validate against the schema~n~s~n"++
-		   "due to error~n~p~n",
-		 [format_http_call(Call),
-		  mochijson2:encode(JSON),
-		  mochijson2:encode(RealTargetSchema),
-		  Reason]),
-	      false
+  case Call of
+    {_, _, follow_link, _, _} ->
+      Link = jsg_links:link_link(call_link(Call)),
+      Schema = jsg_links:link_schema(call_link(Call)),
+      case jsg_jsonschema:propertyValue(Link,"targetSchema") of
+	undefined ->
+	  true;
+	TargetSchema ->
+	  RealTargetSchema = jsg_links:get_schema(TargetSchema,Schema),
+	  case response_has_json_body(Result) of
+	    false ->
+	      false;
+	    true ->
+	      Body = http_body(Result),
+	      JSON = mochijson2:decode(Body),
+	      try jesse_schema_validator:validate(RealTargetSchema,JSON,[]) of
+		  {ok,_} -> true
+	      catch Class:Reason ->
+		  io:format
+		    ("~n*** Error: postcondition error: for http call~n~s~n"++
+		       "the JSON value~n~s~n"++
+		       "did not validate against the schema~n~s~n"++
+		       "due to error~n~p~n",
+		     [format_http_call(Call),
+		      mochijson2:encode(JSON),
+		      mochijson2:encode(RealTargetSchema),
+		      Reason]),
+		  io:format
+		    ("Stacktrace:~n~p~n",
+		     [erlang:get_stacktrace()]),
+		  false
+	      end
 	  end
-      end
+      end;
+    _ -> true
   end.
 
 next_state(State,Result,Call) ->
-  make_call(next_state,fun next_state_int/3,[State,Result,Call]).
+  case Call of
+    {_, _, follow_link, _, _} ->
+      make_call(next_state,fun next_state_int/3,[State,Result,Call]);
+    _ ->
+      next_state_int(State,Result,Call)
+  end.
 
 next_state_int(State,Result,Call) ->
   case Call of
@@ -209,23 +236,12 @@ initial_links() ->
 gen_http_request(Link) ->
   URI = jsg_links:compute_uri(Link),
   RequestType = jsg_links:request_type(Link),
-  Argument = jsg_links:generate_argument(Link),
-  {URI,RequestType,Argument}.
+  {Body,QueryParms} = jsg_links:generate_argument(Link),
+  {URI,RequestType,Body,QueryParms}.
 
-follow_link(Link,HTTPRequest={URI,RequestType,Argument}) ->
+follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   ?LOG("~nfollow_link: URI is ~p; request ~p~n",[URI,RequestType]),
-  Result =
-    case Argument of
-      {ok,Body} ->
-	case has_body(RequestType) of
-	  true ->
-	    http_request_with_body(URI,RequestType,mochijson2:encode(Body));
-	  false ->
-	    http_request_with_parameters(URI,RequestType,encode_parameters(Body))
-	end;
-      _ ->
-	http_request(URI,RequestType)
-    end,
+  Result = http_request(URI,RequestType,Body,QueryParms),
   Result.
 
 format_http_call(Call) ->
@@ -253,42 +269,52 @@ has_body(delete) ->
 has_body(_) ->
   true.
 
-encode_parameters(X) ->
-  %% 
+encode_parameters(PreURI,X) ->
+  case X of
+    {struct,L} ->
+      Parms =
+	lists:map
+	  (fun ({Key,Value}) -> {binary_to_list(Key), binary_to_list(Value)}
+	   end, L),
+      ParmString =
+	encode_parameters(Parms),
+      if
+	ParmString=="" -> PreURI;
+	true -> PreURI++"?"++ParmString
+      end
+  end.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+encode_parameters([]) -> "";
+encode_parameters([{Key,Value}|Rest]) -> 
+  Continuation = 
+    if
+      Rest==[] -> "";
+      true -> "&"++encode_parameters(Rest)
+    end,
+  Key++"="++Value++Continuation.
 
-http_request_with_body(URI,Type,Body) ->
-  Result =
-    httpc:request
-      (Type,
-       {URI,
-	[],
-	"application/json",
-	iolist_to_binary(Body)},
-       [{timeout,1500}],
-       []),
+http_request(PreURI,Type,Body,QueryParms) ->
+  %%io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
+  URI =
+    case QueryParms of
+      {ok,ParmObj} -> encode_parameters(PreURI,ParmObj);
+      _ -> PreURI
+    end,
+  URIwithBody =
+    case Body of
+      {ok,RawBody} ->
+	{URI,[],
+	 "application/json",
+	 iolist_to_binary(mochijson2:encode(RawBody))};
+      _ ->
+	{URI,[]}
+    end,
+  Request = [Type,URIwithBody,[{timeout,1500}],[]],
+  %%io:format("Request=~p~n",[Request]),
+  Result = apply(httpc,request,Request),
+  %%io:format("Result is ~p~n",[Result]),
   Result.
 
-http_request_with_parameters(URI,Type,Headers) ->
-  Result =
-    httpc:request
-      (Type,
-       {URI,
-	Headers},
-       [{timeout,1500}],
-       []),
-  Result.
-
-http_request(URI,Type) ->
-  Result = 
-    httpc:request
-      (Type,
-       {URI,[]},
-       [{timeout,1500}],
-       []),
-  Result.
-  
 http_result_type({ok,_}) ->
   ok;
 http_result_type(Other) ->
@@ -356,7 +382,7 @@ response_has_body(Result) ->
 
 response_has_json_body(Result) ->
   case response_has_body(Result) of
-    true -> http_content_type(Result) == "application/json";
+    true -> string:str(http_content_type(Result), "application/json") >= 0;
     false -> false
   end.
 
@@ -429,6 +455,8 @@ print_counterexample(Cmds,H,DS,Reason) ->
 
 print_commands([]) ->
   ok;
+print_commands([{Call={call,_,initialize,_,_},Result}|Rest]) ->
+  print_commands(Rest);
 print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   Title = call_link_title(Call),
   TitleString = 
@@ -472,9 +500,10 @@ run_statem(PrivateModule,Files) ->
   run_statem(PrivateModule,Files,[]).
 
 run_statem(PrivateModule,Files,Args) ->
+  inets:start(),
   case proplists:get_value(cookies,Args) of
     true ->
-      true = httpc:set_options([{cookies,enabled}]);
+      ok = httpc:set_options([{cookies,enabled}]);
     _ ->
       ok
   end,
@@ -517,8 +546,8 @@ call_link(Call) ->
 
 json_call_body(Call) ->
   case Call of
-    {call, ?MODULE, follow_link, [_,HTTPRequest={_,_,Argument}], _} ->
-      case Argument of
+    {call, ?MODULE, follow_link, [_,HTTPRequest={_,_,BodyArg,_}], _} ->
+      case BodyArg of
 	{ok,Body} -> Body
       end
   end.
