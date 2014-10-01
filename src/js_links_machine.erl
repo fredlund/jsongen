@@ -236,23 +236,12 @@ initial_links() ->
 gen_http_request(Link) ->
   URI = jsg_links:compute_uri(Link),
   RequestType = jsg_links:request_type(Link),
-  Argument = jsg_links:generate_argument(Link),
-  {URI,RequestType,Argument}.
+  {Body,QueryParms} = jsg_links:generate_argument(Link),
+  {URI,RequestType,Body,QueryParms}.
 
-follow_link(Link,HTTPRequest={URI,RequestType,Argument}) ->
+follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   ?LOG("~nfollow_link: URI is ~p; request ~p~n",[URI,RequestType]),
-  Result =
-    case Argument of
-      {ok,Body} ->
-	case has_body(RequestType) of
-	  true ->
-	    http_request_with_body(URI,RequestType,mochijson2:encode(Body));
-	  false ->
-	    http_request_with_parameters(URI,RequestType,encode_parameters(Body))
-	end;
-      _ ->
-	http_request(URI,RequestType)
-    end,
+  Result = http_request(URI,RequestType,Body,QueryParms),
   Result.
 
 format_http_call(Call) ->
@@ -280,65 +269,54 @@ has_body(delete) ->
 has_body(_) ->
   true.
 
-encode_parameters(X) ->
+encode_parameters(PreURI,X) ->
   case X of
     {struct,L} ->
-      lists:map
-	(fun ({Key,Value}) ->
-	     if
-	       is_list(Key), is_list(Value) -> {Key,Value}
-	     end
-	 end, L)
+      Parms =
+	lists:map
+	  (fun ({Key,Value}) -> {binary_to_list(Key), binary_to_list(Value)}
+	   end, L),
+      ParmString =
+	encode_parameters(Parms),
+      if
+	ParmString=="" -> PreURI;
+	true -> PreURI++"?"++ParmString
+      end
   end.
+
+encode_parameters([]) -> "";
+encode_parameters([{Key,Value}|Rest]) -> 
+  Continuation = 
+    if
+      Rest==[] -> "";
+      true -> "&"++encode_parameters(Rest)
+    end,
+  Key++"="++Value++Continuation.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-http_request_with_body(URI,Type,Body) ->
-  %%io:format("URI: ~s cookies are ~p~n",[URI,httpc:which_cookies()]),
-  Result =
-    httpc:request
-      (Type,
-       {URI,
-	[],
-	"application/json",
-	iolist_to_binary(Body)},
-       [{timeout,1500}],
-       []),
-  %%io:format("Result is ~p~n",[Result]),
-  Result.
-
-http_request_with_parameters(PreURI,Type,Parameters) ->
+http_request(PreURI,Type,Body,QueryParms) ->
   %%io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
   URI =
-    case Parameters of
-      [] -> PreURI;
-      _ -> 
-	lists:foldr
-	  (fun (Acc,{Key,Value}) ->
-	       Acc++Key++"="++Value
-	   end, PreURI++"?", Parameters)
+    case QueryParms of
+      {ok,ParmObj} -> encode_parameters(PreURI,ParmObj);
+      _ -> PreURI
     end,
-  Result =
-    httpc:request
-      (Type,
-       {URI,
-	Parameters},
-       [{timeout,1500}],
-       []),
+  URIwithBody =
+    case Body of
+      {ok,RawBody} ->
+	{URI,[],
+	 "application/json",
+	 iolist_to_binary(mochijson2:encode(RawBody))};
+      _ ->
+	{URI,[]}
+    end,
+  Request = [Type,URIwithBody,[{timeout,1500}],[]],
+  %%io:format("Request=~p~n",[Request]),
+  Result = apply(httpc,request,Request),
   %%io:format("Result is ~p~n",[Result]),
   Result.
 
-http_request(URI,Type) ->
-  %%io:format("URI: ~s cookies are ~p~n",[URI,httpc:which_cookies()]),
-  Result = 
-    httpc:request
-      (Type,
-       {URI,[]},
-       [{timeout,1500}],
-       []),
-  %%io:format("Result is ~p~n",[Result]),
-  Result.
-  
 http_result_type({ok,_}) ->
   ok;
 http_result_type(Other) ->
@@ -570,8 +548,8 @@ call_link(Call) ->
 
 json_call_body(Call) ->
   case Call of
-    {call, ?MODULE, follow_link, [_,HTTPRequest={_,_,Argument}], _} ->
-      case Argument of
+    {call, ?MODULE, follow_link, [_,HTTPRequest={_,_,BodyArg,_}], _} ->
+      case BodyArg of
 	{ok,Body} -> Body
       end
   end.

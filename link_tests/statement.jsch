@@ -8,6 +8,11 @@
     "href" : "http://127.0.0.1:8000/q",
     "title" : "add_question",
     "method" : "POST",
+    "querySchema" : 
+    		  {"type" : "object", 
+		  "required" : [ "here_is_a_parm" ],
+		   "properties" : { "here_is_a_parm" : {"type" : "string", "minLength" : 1}, "second" : {"type": "string","minLength" : 3}},
+		   "additionalProperties" : false},
     "schema" : { "$ref" : "#" },
     "targetSchema" : { "$ref" : "question.jsch#" }
    }

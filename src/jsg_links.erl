@@ -39,14 +39,51 @@ compute_uri(Link={link,LinkData}) ->
 generate_argument(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
   S = proplists:get_value(schema,LinkData),
-  case jsg_jsonschema:propertyValue(L,"schema") of
-    undefined ->
-      undefined;
-    ArgumentSchema ->
-      Schema = get_schema(ArgumentSchema,S),
-      Gen = jsongen:json(Schema),
-      {ok,eqc_gen:pick(Gen)}
-  end.
+  Schema = 
+    case jsg_jsonschema:propertyValue(L,"schema") of
+      undefined ->
+	undefined;
+      Sch ->
+	get_schema(Sch,S)
+    end,
+  QuerySchema = 
+    case jsg_jsonschema:propertyValue(L,"querySchema") of
+      undefined ->
+	undefined;
+      QSch ->
+	get_schema(QSch,S)
+    end,
+  RequestType = request_type(Link),
+  Body = 
+    case may_have_body(RequestType) of
+      true when Schema=/=undefined -> 
+	BodyGen = jsongen:json(Schema),
+	{ok,eqc_gen:pick(BodyGen)};
+      _ -> 
+	undefined
+    end,
+  QueryParameters =
+    case may_have_body(RequestType) of
+      true when QuerySchema=/=undefined ->
+	QGen = jsongen:json(QuerySchema),
+	{ok,eqc_gen:pick(QGen)};
+      false when QuerySchema=/=undefined ->
+	QGen = jsongen:json(QuerySchema),
+	{ok,eqc_gen:pick(QGen)};
+      false when Schema=/=undefined ->
+	QGen = jsongen:json(Schema),
+	{ok,eqc_gen:pick(QGen)};
+      _ ->
+	undefined
+    end,
+  {Body,QueryParameters}.
+
+may_have_body(get) ->
+  false;
+may_have_body(delete) ->
+  false;
+may_have_body(_) ->
+  true.
 
 request_type(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
