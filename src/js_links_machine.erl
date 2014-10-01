@@ -406,7 +406,7 @@ response_has_body(Result) ->
 
 response_has_json_body(Result) ->
   case response_has_body(Result) of
-    true -> http_content_type(Result) == "application/json";
+    true -> string:str(http_content_type(Result), "application/json") >= 0;
     false -> false
   end.
 
