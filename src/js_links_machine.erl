@@ -221,7 +221,7 @@ follow_link(Link,HTTPRequest={URI,RequestType,Argument}) ->
 	  true ->
 	    http_request_with_body(URI,RequestType,mochijson2:encode(Body));
 	  false ->
-	    http_request_with_headers(URI,RequestType,encode_headers(Body))
+	    http_request_with_parameters(URI,RequestType,encode_parameters(Body))
 	end;
       _ ->
 	http_request(URI,RequestType)
@@ -253,8 +253,8 @@ has_body(delete) ->
 has_body(_) ->
   true.
 
-encode_headers(X) ->
-  X.
+encode_parameters(X) ->
+  %% 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -270,7 +270,7 @@ http_request_with_body(URI,Type,Body) ->
        []),
   Result.
 
-http_request_with_headers(URI,Type,Headers) ->
+http_request_with_parameters(URI,Type,Headers) ->
   Result =
     httpc:request
       (Type,
