@@ -23,17 +23,8 @@ compute_uri(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
   Href = jsg_jsonschema:propertyValue(L,"href"),
   Template = uri_template:parse(binary_to_list(Href)),
-  Variables = 
-    case proplists:get_value(object,LinkData) of
-      undefined ->
-	[];
-      {struct,Proplist} ->
-	lists:map
-	  (fun ({Key,Value}) ->
-	       {list_to_atom(binary_to_list(Key)),Value}
-	   end, Proplist)
-    end,
-  ?LOG("Variables are ~p~n",[Variables]),
+  Variables = proplists:get_value(vars,LinkData),
+  %%io:format("compute_uri: variables are~n~p~n",[Variables]),
   uri_template:sub(Variables,binary_to_list(Href)).
 
 generate_argument(Link={link,LinkData}) ->
@@ -96,6 +87,7 @@ request_type(Link={link,LinkData}) ->
 extract_dynamic_links(Link={link,LinkData},JSONBody) ->
   L = proplists:get_value(link,LinkData),
   S = proplists:get_value(schema,LinkData),
+  V = proplists:get_value(vars,LinkData),
   case jsg_jsonschema:propertyValue(L,"targetSchema") of
     undefined ->
       [];
@@ -107,12 +99,17 @@ extract_dynamic_links(Link={link,LinkData},JSONBody) ->
 	  %% Could be a union schema; we don't handle this yet
 	  throw(bad);
 	Type ->
+	  %%io:format("Schema type is ~p~n",[Type]),
 	  case Type of
 	    <<"object">> ->
-	      Links = js_links_machine:collect_schema_links(Schema,true),
+	      Links = js_links_machine:collect_schema_links(Schema,true,V),
 	      %%io:format("schema links are:~n~p~n",[Links]),
 	      lists:map
-		(fun ({link,Props}) -> {link,[{object,JSONBody}|Props]} end,
+		(fun ({link,Props}) ->
+		     NewVars = update_vars(JSONBody,V),
+		     NewProps = [{object,JSONBody}|Props],
+		     {link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}
+		 end,
 		 Links);
 	    <<"array">> ->
 	      case proplists:get_value(<<"additionalItems">>,Proplist) of
@@ -120,19 +117,35 @@ extract_dynamic_links(Link={link,LinkData},JSONBody) ->
 		  ItemSchemaDesc = proplists:get_value(<<"items">>,Proplist),
 		  %%io:format("itemSchema is ~p~n",[ItemSchemaDesc]),
 		  ItemSchema = get_schema(ItemSchemaDesc,S),
-		  Links = js_links_machine:collect_schema_links(ItemSchema,true),
+		  Links = js_links_machine:collect_schema_links(ItemSchema,true,V),
 		  %%io:format("schema links are:~n~p~n",[Links]),
 		  lists:flatmap
 		    (fun ({link,Props}) ->
 			 lists:map
 			   (fun (Item) ->
-				{link,[{object,Item}|Props]}
+				NewVars = update_vars(Item,V),
+				NewProps = [{object,Item}|Props],
+				{link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}
 			    end, JSONBody)
 		     end, Links)
 	      end
 	  end
       end
   end.
+
+update_vars(Object,OldVars) ->
+  NewVars =
+    case Object of
+      {struct,Proplist} ->
+	lists:foldl
+	  (fun ({Key,Value},Acc) ->
+	       [{list_to_atom(binary_to_list(Key)),Value}|Acc]
+	   end, OldVars, Proplist)
+    end,
+  %%io:format
+    %%("new_vars: from ~p and object~n~p~ncomputes ~p~n",
+     %%[OldVars,Object,NewVars]),
+  NewVars.
 
 get_schema(Value={struct,Proplist},Root) ->
   case proplists:get_value(<<"$ref">>,Proplist) of

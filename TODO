@@ -49,3 +49,7 @@ otra vez usando "schema : true.
 - Permit parameters for POST and PUT, in ADDITION to a body.
 We probably need a new schema for that (extension of JSON schema).
 
+- How to do things such as support substitution of object values
+into query parameters? (i.e., token returned, token used)
+- Or for that matter in bodies?
+

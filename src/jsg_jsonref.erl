@@ -169,7 +169,7 @@ subst([Key|Pointer],{struct, JSON_dict},NewValue) -> %% Object
   Key_bin = list_to_binary(Key),
   JsonTerm = proplists:get_value(Key_bin,JSON_dict),
   JSON_dict2 = proplists:delete(Key_bin,JSON_dict),
-  {struct,[{Key,subst(Pointer,JsonTerm,NewValue)}|JSON_dict2]}.
+  {struct,[{Key_bin,subst(Pointer,JsonTerm,NewValue)}|JSON_dict2]}.
 
 substl(1,Pointer,[H|T],NewValue) -> 
   [subst(Pointer,H,NewValue)|T];

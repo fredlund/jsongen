@@ -36,7 +36,7 @@ initial_state() ->
      private_state=PrivateState}.
 
 command(State) ->
-  Command = make_call(command,fun command_int/1, [State]),
+  Command = make_call(command,fun command_int/1,[State]),
   Command.
 
 %% add metadata -- not sure it is necessary...
@@ -54,12 +54,20 @@ command_int(State) ->
 		  State#state.dynamic_links)),
 	  link_permitted(State,Link)
 	],
-      eqc_gen:oneof(Alternatives);
+      compose_alternatives(State,Alternatives);
     true ->
       {call, ?MODULE, initialize, []}
   end.
 
+compose_alternatives(State,Alternatives) ->
+  make_call
+    (compose_alternatives,fun compose_alternatives_int/2,[State,Alternatives]).
+
+compose_alternatives_int(State,Alternatives) ->
+  eqc_gen:oneof(Alternatives).
+
 initialize() ->
+  %%io:format("~n~nNew test:~n"),
   httpc:reset_cookies().
 
 callouts(_,_) ->
@@ -190,12 +198,16 @@ next_state_int(State,Result,Call) ->
       State#state{initialized=true};
     {_, ?MODULE, follow_link, [Link,_], _} ->
       case Result of
-	{normal,{200,Body}} -> 
+	%% Maybe we should not only extract links on success...
+	{ok,{{_,200,_},_Headers,Body}} ->
 	  %%io:format("normal result: extracting links~n",[]),
 	  NewLinks =
 	    jsg_links:extract_dynamic_links(Link,mochijson2:decode(Body)),
+	  %%io:format
+	    %%("NewLinks are~n~p~n",[NewLinks]),
 	  State#state{dynamic_links=sets:union(sets:from_list(NewLinks),State#state.dynamic_links)};
-	_ -> State
+	_Other ->
+	  State
       end;
     _ -> ?LOG("Call was~n~p~n",[Call]), State
   end.
@@ -240,17 +252,20 @@ gen_http_request(Link) ->
   {URI,RequestType,Body,QueryParms}.
 
 follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
-  ?LOG("~nfollow_link: URI is ~p; request ~p~n",[URI,RequestType]),
+  %%io:format
+    %%("~nfollow_link:~n~p~n URI is ~p; request ~p~n",
+     %%[Link,URI,RequestType]),
   Result = http_request(URI,RequestType,Body,QueryParms),
   Result.
 
 format_http_call(Call) ->
   case Call of
-    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body}], _} ->
+    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body,Params}], _} ->
       format_http_call(URI,RequestType,Body)
   end.
 
 format_http_call(URI,RequestType,Body) ->
+  %% We should print the query string too
   BodyString =
     case Body of
       {ok,JSON} ->
@@ -565,7 +580,7 @@ collect_links(Files) ->
 
 collect_links_from_file(File) ->
   try jsg_jsonschema:read_schema(File) of
-      {ok,Schema} -> collect_schema_links(Schema,false)
+      {ok,Schema} -> collect_schema_links(Schema,false,{vars,[]})
   catch Class:Reason ->
       Stacktrace = erlang:get_stacktrace(),
       io:format
@@ -574,7 +589,7 @@ collect_links_from_file(File) ->
       erlang:raise(Class,Reason,Stacktrace)
   end.
 
-collect_schema_links(Schema, DependsOnObject) ->
+collect_schema_links(Schema, DependsOnObject, Vars) ->
   %% Find all schemas, and retrieve links
   case jsg_jsonschema:links(Schema) of
     undefined ->
@@ -593,7 +608,7 @@ collect_schema_links(Schema, DependsOnObject) ->
 			 undefined -> [];
 			 Title -> [{title,binary_to_list(Title)}]
 		       end,
-		     [{link,[{link,Link},{schema,Schema}|LinkData]}|Ls];
+		     [{link,[{link,Link},{schema,Schema},Vars|LinkData]}|Ls];
 		   true ->
 		     Ls
 		 end
