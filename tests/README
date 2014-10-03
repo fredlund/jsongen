@@ -14,5 +14,5 @@ In the case when empty is true just a single value is generated.
 In the case when empty is false (the default case) 10 values are generated.
 
 To run this "tests" execute
-erl -pa ebin -run rtest test -run erlang halt
+erl -pa ebin -run jsg_rtest test -run erlang halt
 
