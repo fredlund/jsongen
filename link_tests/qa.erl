@@ -75,6 +75,12 @@ request_type_match(_, whatever) ->
 request_type_match(T1,T2) ->
   T1==T2.
 
+funItem(Arg,Context) ->
+  io:format
+    ("eqc generator called with context=~n~p~n and Arg=~p~n",
+     [Context,Arg]),
+  <<"hola">>.
+
 link_permitted(Super,State,Link) ->
   HasReset = element(1,js_links_machine:private_state(State)),
   case jsg_links:link_title(Link) of

@@ -6,7 +6,7 @@
  "additionalProperties" : false,
  "properties" : {
       "qid"    : {"$ref" : "#/definitions/small_nat"},
-      "statement" : {"type" : "string" }
+      "statement" : {"type" : "string" },
  },
  "links" : [
    {"rel" : "question_get",

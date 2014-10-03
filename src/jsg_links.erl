@@ -28,7 +28,7 @@ compute_uri(Link={link,LinkData}) ->
   uri_template:sub(Variables,binary_to_list(Href)).
 
 generate_argument(Link={link,LinkData}) ->
-  put(eqc_gen_context,Link),
+  jsg_store:put(eqc_gen_context,Link),
   L = proplists:get_value(link,LinkData),
   S = proplists:get_value(schema,LinkData),
   Schema = 

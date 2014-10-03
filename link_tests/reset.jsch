@@ -1,7 +1,8 @@
 {"type" : "object",
- "required" : [ "reset" ],
+ "required" : [ "reset", "funitem" ],
  "properties" : {
-      "reset" : {"enum" : [true]}
+      "reset" : {"enum" : [true]},
+      "funitem" : {"quickcheck" : {"name":"qa:funItem","key":"value"}}
  },
  "links" : [
    {"rel" : "reset",
