@@ -128,6 +128,10 @@ expand_list(Vars, Values, Expand) ->
 
 percent_encode(Term) when is_integer(Term) ->
   integer_to_list(Term);
+percent_encode(Term) when is_float(Term) ->
+  float_to_list(Term);
+percent_encode(Term) when is_atom(Term) ->
+  percent_encode(atom_to_list(Term));
 percent_encode(Term) when is_binary(Term) ->
   percent_encode(lists:reverse(binary_to_list(Term), []), []);
 percent_encode(Term) when is_list(Term) ->

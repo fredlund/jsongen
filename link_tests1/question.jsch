@@ -13,6 +13,22 @@
     "href" : "http://127.0.0.1:8000/q/{qid}",
     "method" : "GET",
     "targetSchema" : {"$ref" : "question.jsch#"}
+   },
+   {"rel" : "question",
+    "href" : "http://127.0.0.1:8000/q",
+    "title" : "add_question",
+    "isRelative" : true,
+    "method" : "POST",
+    "schema" : {"type" : "object",
+    	        "required" : [ "qid", "statement" ],
+		 "additionalProperties" : false,
+		  "properties" : {
+		        "qid"    : {"quickcheck" : 
+				      {"name" : "qa:var",
+				       "var"  : "qid"}},
+ 		        "statement" : {"type" : "string" }
+			}},
+    "targetSchema" : { "$ref" : "question.jsch#" }
    }
  ]
 }

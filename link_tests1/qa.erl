@@ -15,27 +15,7 @@
 -endif.
 
 
-initial_state() -> [].
-
-%% Make it more likely to pick an existing qid
-gen_link(Super,State,Link) ->
-  case Super(State,Link) of
-    Call={call,Module,follow_link,[Link,{Addr="http://127.0.0.1:8000/a",post,{ok,Body},Parms}]} ->
-      case element(2,js_links_machine:private_state(State)) of
-	[] ->
-	  Call;
-	OldQids ->
-	  Gen =
-	    ?LET(Qid,
-		 eqc_gen:oneof([99|OldQids]),
-		 begin
-		   NewBody = jsg_jsonref:subst(["qid"],Body,Qid),
-		   {call,Module,follow_link,[Link,{Addr,post,{ok,NewBody},Parms}]}
-		 end),
-	  eqc_gen:pick(Gen)
-      end;
-    OtherCall -> OtherCall
-  end.
+initial_state() -> void.
 
 compose_alternatives(_,State,Alternatives) ->
   Freqs=
@@ -59,6 +39,12 @@ compose_alternatives(_,State,Alternatives) ->
   %%io:format("Result=~n~p~n",[Freqs]),
   eqc_gen:frequency(Freqs).
 	      
+link_permitted(Super,State,Link) ->
+  case jsg_links:link_title(Link) of
+    "reset" -> js_links_machine:private_state(State)==void;
+    _ -> true
+  end.
+
 freq_comp(Generator,String,_,[],Default) ->
   {Default,Generator};
 freq_comp(Generator,String,RequestType1,
@@ -83,6 +69,11 @@ funItem(Arg,Context) ->
 
 next_state(Super,State,Result,Call) ->
   case js_links_machine:call_link_title(Call) of
+    "reset" -> 
+      Super
+      (js_links_machine:set_private_state([],State),
+       Result,
+       Call);
     "add_question" -> 
       JSON = js_links_machine:get_json_body(Result),
       Qid = jsg_jsonschema:propertyValue(JSON,"qid"),
@@ -116,7 +107,10 @@ postcondition(Super,State,Call,Result) ->
     _ -> Super(State,Call,Result)
   end.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-  
-
+var(Spec,{ok,{link,LinkData}}) ->
+  Variables = proplists:get_value(vars,LinkData),
+  Var = jsg_jsonschema:propertyValue(Spec,"var"),
+  Value = proplists:get_value(list_to_atom(binary_to_list(Var)),Variables),
+  Value.

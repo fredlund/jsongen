@@ -23,7 +23,10 @@ compute_uri(Link={link,LinkData}) ->
   L = proplists:get_value(link,LinkData),
   Href = jsg_jsonschema:propertyValue(L,"href"),
   Template = uri_template:parse(binary_to_list(Href)),
-  Variables = proplists:get_value(vars,LinkData),
+  Variables = 
+    lists:filter
+      (fun ({_,Value}) -> is_integer(Value) orelse is_binary(Value) end,
+       proplists:get_value(vars,LinkData)),
   %%io:format("compute_uri: variables are~n~p~n",[Variables]),
   uri_template:sub(Variables,binary_to_list(Href)).
 

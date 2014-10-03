@@ -325,9 +325,9 @@ http_request(PreURI,Type,Body,QueryParms) ->
 	{URI,[]}
     end,
   Request = [Type,URIwithBody,[{timeout,1500}],[]],
-  io:format("Request=~p~n",[Request]),
+  %%io:format("Request=~p~n",[Request]),
   Result = apply(httpc,request,Request),
-  io:format("Result is ~p~n",[Result]),
+  %%io:format("Result is ~p~n",[Result]),
   Result.
 
 http_result_type({ok,_}) ->

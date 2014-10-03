@@ -1,8 +1,7 @@
 {"type" : "object",
- "required" : [ "reset", "funitem" ],
+ "required" : [ "reset" ],
  "properties" : {
-      "reset" : {"enum" : [true]},
-      "funitem" : {"quickcheck" : {"name":"qa:funItem","key":"value"}}
+      "reset" : {"enum" : [true]}
  },
  "links" : [
    {"rel" : "reset",
@@ -10,6 +9,7 @@
     "title" : "reset",
     "method" : "POST",
     "schema" : { "$ref" : "#" },
+    "targetSchema" : { "$ref" : "#" }
    },
    {"rel" : "questions_get",
     "href" : "http://127.0.0.1:8000/q",

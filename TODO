@@ -75,6 +75,9 @@ for links, this can obviously be transitive).
 - We should have convenient operations for defining frequencies,
 and for redefining values.
 
+- Maybe define a whole schema using quickcheck
+(i.e., define querySchema or schema).
+
 
 
 
