@@ -597,30 +597,31 @@ collect_schema_links(Schema, DependsOnObject, Vars) ->
     Links when is_list(Links) ->
       lists:foldl
 	(fun (Link,Ls) ->
-	     case jsg_jsonschema:propertyValue(Link,"href") of
-	       Value when is_binary(Value) ->
-		Dependency =
-		   depends_on_object_properties(binary_to_list(Value)),
-		 if
-		   Dependency==DependsOnObject ->
-		     LinkData =
-		       case jsg_jsonschema:propertyValue(Link,"title") of
-			 undefined -> [];
-			 Title -> [{title,binary_to_list(Title)}]
-		       end,
-		     [{link,[{link,Link},{schema,Schema},Vars|LinkData]}|Ls];
-		   true ->
-		     Ls
-		 end
+	     Dependency = depends_on_object_properties(Link),
+	     if
+	       Dependency==DependsOnObject ->
+		 LinkData =
+		   case jsg_jsonschema:propertyValue(Link,"title") of
+		     undefined -> [];
+		     Title -> [{title,binary_to_list(Title)}]
+		   end,
+		 [{link,[{link,Link},{schema,Schema},Vars|LinkData]}|Ls];
+	       true ->
+		 Ls
 	     end
 	 end, [], Links)
   end.
 
-depends_on_object_properties(Href) ->
-  Template = uri_template:parse(Href),
-  lists:any(fun ({var, _, _}) -> true;
-		(_) -> false
-	    end, Template).
+depends_on_object_properties(Link) ->
+  case jsg_jsonschema:propertyValue(Link,"href") of
+    Value when is_binary(Value) ->
+      Href = binary_to_list(Value),
+      Template = uri_template:parse(Href),
+      (jsg_jsonschema:propertyValue(Link,"isRelative")) orelse
+	(lists:any(fun ({var, _, _}) -> true;
+		       (_) -> false
+		   end, Template))
+  end.
 
 
 
