@@ -1,0 +1,56 @@
+{"type" : "object",
+ "required" : [ "reset", "funitem" ],
+ "properties" : {
+      "reset" : {"enum" : [true]},
+      "funitem" : {"quickcheck" : {"name":"qa:funItem","key":"value"}}
+ },
+ "links" : [
+   {"rel" : "reset",
+    "href" : "http://127.0.0.1:8000/reset",
+    "title" : "reset",
+    "method" : "POST",
+    "schema" : { "$ref" : "#" },
+   },
+   {"rel" : "questions_get",
+    "href" : "http://127.0.0.1:8000/q",
+    "method" : "GET",
+    "isRelative" : true,
+    "targetSchema" :
+    {"type" : "array",
+     "additionalItems" : false,
+     "items" : {"$ref" : "question.jsch#"}
+    }
+   },
+     {"rel" : "answer",
+      "href" : "http://127.0.0.1:8000/a",
+      "title" : "add_answer",
+    "isRelative" : true,
+      "method" : "POST",
+      "schema" : { "$ref" : "answer.jsch#" },
+      "targetSchema" : {"$ref" : "answer_reply.jsch#"}
+     },
+      {"rel" : "questions_get",
+       "href" : "http://127.0.0.1:8000/a",
+       "method" : "GET",
+    "isRelative" : true,
+       "targetSchema" :
+       {"type" : "array",
+	"additionalItems" : false,
+	"items" : {"$ref" : "answer_reply.jsch#"}
+       }
+      },
+   {"rel" : "question",
+    "href" : "http://127.0.0.1:8000/q",
+    "title" : "add_question",
+    "isRelative" : true,
+    "method" : "POST",
+    "querySchema" : 
+    		  {"type" : "object", 
+		  "required" : [ "here_is_a_parm" ],
+		   "properties" : { "here_is_a_parm" : {"type" : "string", "minLength" : 1}, "second" : {"type": "string","minLength" : 3}},
+		   "additionalProperties" : false},
+    "schema" : { "$ref" : "#" },
+    "targetSchema" : { "$ref" : "question.jsch#" }
+   }
+ ]
+}

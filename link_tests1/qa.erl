@@ -15,7 +15,7 @@
 -endif.
 
 
-initial_state() -> {false,[]}.
+initial_state() -> [].
 
 %% Make it more likely to pick an existing qid
 gen_link(Super,State,Link) ->
@@ -81,23 +81,14 @@ funItem(Arg,Context) ->
      %%[Context,Arg]),
   <<"hola">>.
 
-link_permitted(Super,State,Link) ->
-  HasReset = element(1,js_links_machine:private_state(State)),
-  case jsg_links:link_title(Link) of
-    "reset" -> not(HasReset);
-    _ -> HasReset
-  end.
-
 next_state(Super,State,Result,Call) ->
   case js_links_machine:call_link_title(Call) of
-    "reset" ->
-      js_links_machine:set_private_state({true,[]},State);
     "add_question" -> 
       JSON = js_links_machine:get_json_body(Result),
       Qid = jsg_jsonschema:propertyValue(JSON,"qid"),
-      OldQids = element(2,js_links_machine:private_state(State)),
+      OldQids = js_links_machine:private_state(State),
       Super
-      (js_links_machine:set_private_state({true,[Qid|OldQids]},State),
+      (js_links_machine:set_private_state([Qid|OldQids],State),
        Result,
        Call);
     _ -> 
@@ -112,7 +103,7 @@ postcondition(Super,State,Call,Result) ->
 	  CallBody = js_links_machine:json_call_body(Call),
 	  Qid = jsg_jsonschema:propertyValue(CallBody,"qid"),
           PrivateState = js_links_machine:private_state(State),
-          QidExists = lists:member(Qid,element(2,PrivateState)),
+          QidExists = lists:member(Qid,PrivateState),
 	  ExpectedCode = if QidExists -> 200; true -> 409 end,
 	  ResultCode = js_links_machine:http_result_code(Result),
 	  if

@@ -325,9 +325,9 @@ http_request(PreURI,Type,Body,QueryParms) ->
 	{URI,[]}
     end,
   Request = [Type,URIwithBody,[{timeout,1500}],[]],
-  %%io:format("Request=~p~n",[Request]),
+  io:format("Request=~p~n",[Request]),
   Result = apply(httpc,request,Request),
-  %%io:format("Result is ~p~n",[Result]),
+  io:format("Result is ~p~n",[Result]),
   Result.
 
 http_result_type({ok,_}) ->
@@ -617,7 +617,7 @@ depends_on_object_properties(Link) ->
     Value when is_binary(Value) ->
       Href = binary_to_list(Value),
       Template = uri_template:parse(Href),
-      (jsg_jsonschema:propertyValue(Link,"isRelative")) orelse
+      (jsg_jsonschema:propertyValue(Link,"isRelative")=/=undefined) orelse
 	(lists:any(fun ({var, _, _}) -> true;
 		       (_) -> false
 		   end, Template))
