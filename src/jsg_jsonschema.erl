@@ -18,6 +18,11 @@
 read_schema(URL) ->
   jsg_json:decode_url(URL).
 
+is_object({struct,_}) ->
+  true;
+is_object(_) ->
+  false.
+
 hasType(_Schema={struct,Def}) ->
   case proplists:lookup(<<"type">>,Def) of
       {_,_Type} ->
@@ -30,6 +35,14 @@ hasType(_Other) ->
 
 hasEnum(_Schema={struct,Def}) ->
   case proplists:lookup(<<"enum">>,Def) of
+    {_,_Type} ->
+      true;
+    none ->
+      false
+  end.
+
+hasQuickCheck(_Schema={struct,Def}) ->
+  case proplists:lookup(<<"quickcheck">>,Def) of
     {_,_Type} ->
       true;
     none ->

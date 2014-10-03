@@ -43,7 +43,6 @@ otra vez usando "schema : true.
 
    Excerpt from: http://stackoverflow.com/questions/7202477/are-double-definitions-allowed-in-json-and-if-so-how-should-they-be-interprete
 
-
 - Dependencies (mochijson2) must be automatically solved (rebar?).
 
 - Permit parameters for POST and PUT, in ADDITION to a body.
@@ -51,5 +50,40 @@ We probably need a new schema for that (extension of JSON schema).
 
 - How to do things such as support substitution of object values
 into query parameters? (i.e., token returned, token used)
-- Or for that matter in bodies?
+Or for that matter in bodies?
+One possibility is to extend some kind of substitution syntax for these
+entities, e.g., {token} as a literal value inside a schema. 
+Maybe we can define: "token" : {"from_resource" : "var"}.
+Do we do a deep search? Maybe.
+- And a QuickCheck operator:
+- "pelle" : {"quickcheck" : "name_of_function"} or
+  "pelle" : {"quickcheck" : {name:"..",others}} which
+sends along the JSON object to the QuickCheck function name.
+- We could do "token" : {"quickcheck" : {name:"resource-var",var-name:"token"}}
+(for now that is ok).
+
+- We need to remove links that depend upon an object upon delete,
+And change them upon PUT (this obviously depends on the URI, which 
+is either linked, or we can link to, the object).
+
+The question is what happens to such indirect things as expressed above,
+i.e., permitting the {key} syntax in schema:s and querySchema:s,
+when we start delete the object defining the key upon which they rely.
+(I guess they should be deleted too, so we have a depends-on relation
+for links, this can obviously be transitive).
+
+- We should have convenient operations for defining frequencies,
+and for redefining values.
+
+
+
+
+
+
+
+
+
+
+
+
 

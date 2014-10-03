@@ -85,11 +85,26 @@ json(Schema,Options) ->
                                                     gen_typed_schema(Schema,Options);
                                                 false ->
                                                     case jsg_jsonschema:hasEnum(Schema) of
-                                                        true -> 
-                                                            eqc_gen:oneof(jsg_jsonschema:enumerated(Schema));
-                                                        false ->
-							throw({bad_schema,Schema,?LINE})
-                                                    end
+						      true -> 
+							eqc_gen:oneof(jsg_jsonschema:enumerated(Schema));
+						      false ->
+							case jsg_jsonschema:hasQuickCheck(Schema) of
+							  true -> 
+							    QcValue = jsg_jsonschema:propertyValue(Schema,"quickcheck"),
+							    case jsg_jsonschema:is_object(QcValue) of
+							      true ->
+								Name = binary_to_list(jsg_jsonschema:propertyValue(QcValue,"name")),
+								[Module,Fun] = re:split(Name,":"),
+								(binary_to_atom(Module)):(binary_to_atom(Fun))(QcValue,get(eqc_gen_context));
+							      false ->
+								Name = binary_to_list(QcValue),
+								[Module,Fun] = re:split(Name,":"),
+								(binary_to_atom(Module)):(binary_to_atom(Fun))(get(eqc_gen_context))
+							    end;
+							  false ->
+							    throw({bad_schema,Schema,?LINE})
+							end
+						    end
                                             end
                                     end;
 
@@ -204,6 +219,9 @@ json(Schema,Options) ->
             end
      
     end.
+
+binary_to_atom(Bin) ->
+  list_to_atom(binary_to_list(Bin)).
 
 -spec valid_schemas(jsg_json:json_term(),[jsg_json:json_term()]) -> [jsg_json:json_term()].
 valid_schemas(Value,Schemas) ->
