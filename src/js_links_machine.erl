@@ -609,7 +609,7 @@ depends_on_object_properties(Link) ->
     Value when is_binary(Value) ->
       Href = binary_to_list(Value),
       Template = uri_template:parse(Href),
-      (jsg_jsonschema:propertyValue(Link,"isRelative")=/=undefined) orelse
+      (jsg_jsonschema:propertyValue(Link,"isRelative")==true) orelse
 	(lists:any(fun ({var, _, _}) -> true;
 		       (_) -> false
 		   end, Template))
