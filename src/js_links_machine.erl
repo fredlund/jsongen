@@ -542,14 +542,6 @@ eqc_printer(Format,String) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-set_private_state(NewPrivateState,State) ->
-  State#state{private_state=NewPrivateState}.
-
-private_state(State) ->
-  State#state.private_state.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 call_link_title(Call) ->
   jsg_links:link_title(call_link(Call)).
 
@@ -622,7 +614,6 @@ depends_on_object_properties(Link) ->
 		       (_) -> false
 		   end, Template))
   end.
-
 
 
   

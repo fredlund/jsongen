@@ -24,7 +24,7 @@
 		 "additionalProperties" : false,
 		  "properties" : {
 		        "qid"    : {"quickcheck" : 
-				      {"name" : "qa:var",
+				      {"name" : "js_links_utils:var",
 				       "var"  : "qid"}},
  		        "statement" : {"type" : "string" }
 			}},

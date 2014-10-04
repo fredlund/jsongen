@@ -143,7 +143,8 @@ update_vars(Object,OldVars) ->
       {struct,Proplist} ->
 	lists:foldl
 	  (fun ({Key,Value},Acc) ->
-	       [{list_to_atom(binary_to_list(Key)),Value}|Acc]
+	       AtomKey = list_to_atom(binary_to_list(Key)),
+	       [{AtomKey,Value}|proplists:delete(AtomKey,Acc)]
 	   end, OldVars, Proplist)
     end,
   %%io:format
