@@ -17,7 +17,7 @@
 initial_state() -> void.
 
 compose_alternatives(_,State,Alternatives) ->
-  freq_alternatives
+  jsg_links_utils:freq_alternatives
     ([{3,whatever,"/q/"},
       {3,whatever,"/a/"},
       {5,post,"/a"},

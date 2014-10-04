@@ -59,166 +59,145 @@ json(Schema) ->
 
 -spec json(jsg_json:json_term(),options()) -> eqc_gen:gen(jsg_json:json_term()).
 json(Schema,Options) ->
-    ?LOG("json(~s,~p)",[jsg_json:encode(Schema),Options]),
-    case jsg_jsonschema:oneOf(Schema) of
-        undefined ->
-            case jsg_jsonschema:anyOf(Schema) of
-                undefined ->
-                    case jsg_jsonschema:allOf(Schema) of
-                        undefined ->
-                            case jsg_jsonschema:notKeyword(Schema) of
-                                undefined ->
-                                    case jsg_jsonschema:isRef(Schema) of
-                                        true ->
-                                            RootSchema = proplists:get_value(root,Options),
-                                            RefSch = jsg_jsonref:unref(Schema,RootSchema),
-                                            NewOptions =
-                % We should change the root but at this moment peano2 goes into an inifinite loop.
-                % TODO: do we need to maintain an environment!?
-                % AH: nop, maybe it is enough the root to be a URL instead of a schema
-                % [{root,RefSch}|proplists:delete(root,Options)],
-                                                Options,
-                                            ?LAZY(json(RefSch,NewOptions));
-                                        false ->  
-                                            case jsg_jsonschema:hasType(Schema) of
-                                                true ->
-                                                    gen_typed_schema(Schema,Options);
-                                                false ->
-                                                    case jsg_jsonschema:hasEnum(Schema) of
-						      true -> 
-							eqc_gen:oneof(jsg_jsonschema:enumerated(Schema));
-						      false ->
-							case jsg_jsonschema:hasQuickCheck(Schema) of
-							  true -> 
-							    QcValue = jsg_jsonschema:propertyValue(Schema,"quickcheck"),
-							    case jsg_jsonschema:is_object(QcValue) of
-							      true ->
-								Name = binary_to_list(jsg_jsonschema:propertyValue(QcValue,"name")),
-								[Module,Fun] = re:split(Name,":"),
-								(binary_to_atom(Module)):(binary_to_atom(Fun))(QcValue,jsg_store:get(eqc_gen_context));
-							      false ->
-								Name = binary_to_list(QcValue),
-								[Module,Fun] = re:split(Name,":"),
-								(binary_to_atom(Module)):(binary_to_atom(Fun))(jsg_store:get(eqc_gen_context))
-							    end;
-							  false ->
-							    throw({bad_schema,Schema,?LINE})
-							end
-						    end
-                                            end
-                                    end;
+  ?LOG("json(~s,~p)",[jsg_json:encode(Schema),Options]),
+  case jsg_jsonschema:schemaType(Schema) of
+    'ref' ->
+      RootSchema = proplists:get_value(root,Options),
+      RefSch = jsg_jsonref:unref(Schema,RootSchema),
+      NewOptions =
+	%% We should change the root but at this moment peano2 
+	%% goes into an inifinite loop.
+	%% TODO: do we need to maintain an environment!?
+	%% AH: nop, maybe it is enough the root to be a URL instead of a schema
+	%% [{root,RefSch}|proplists:delete(root,Options)],
+	Options,
+      ?LAZY(json(RefSch,NewOptions));
+    'type' ->
+      gen_typed_schema(Schema,Options);
+    'enum' ->
+      eqc_gen:oneof(jsg_jsonschema:enumerated(Schema));
+    'not' ->                                
+      SingleSchema = jsg_jsonschema:notKeyword(Schema),
+      case jsg_jsonschema:hasType(Schema) of
+	true ->
+	  ?SUCHTHAT(ValidationResult,
+		    ?LET(Value, gen_typed_schema(Schema,Options),
+			 begin
+			   case valid_schemas(Value,[SingleSchema]) of
+			     0 -> Value;
+			     _ -> error
+			   end
+			 end),
+		    ValidationResult =/= error);
+	false ->
+	  throw(not_keyword_with_no_schemas)
+      end;
+    'allOf' ->
+      ListOfSchemas = jsg_jsonschema:allOf(Schema),
+      case jsg_jsonschema:hasType(Schema) of
+	true ->
+	  ?SUCHTHAT(ValidationResult,
+		    ?LET(Value, gen_typed_schema(Schema,Options),
+			 begin
+			   N = valid_schemas(Value,ListOfSchemas),
+			   if
+			     N == length(ListOfSchemas) -> Value;
+			     true -> error
+			   end
+			 end),
+		    ValidationResult =/= error);
+	false ->
+	  ?SUCHTHAT(ValidationResult,
+		    ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
+			 ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
+			      begin
+				N = valid_schemas(Value,
+						  delete_nth_element
+						    (I,ListOfSchemas)),
+				if
+				  N > (length(ListOfSchemas) -1) -> Value;
+				  true -> error
+				end
+			      end)),
+		    ValidationResult =/= error)
+      end;
 
+    'anyOf' ->
+      ListOfSchemas = jsg_jsonschema:anyOf(Schema),
+      ?LOG("AnyOf with List of Schemas: ~p~n",[ListOfSchemas]),
+      case jsg_jsonschema:hasType(Schema) of
+	true ->
+	  ?SUCHTHAT(ValidationResult,
+		    ?LET(Value, gen_typed_schema(Schema,Options),
+			 begin
+			   N = valid_schemas(Value,ListOfSchemas),
+			   if
+			     N > 0 -> Value;
+			     true -> error
+			   end
+			 end),
+		    ValidationResult =/= error);
+	false ->
+	  ?SUCHTHAT(ValidationResult,
+		    ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
+			 ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
+			      begin
+				N = valid_schemas
+				      (Value,
+				       delete_nth_element(I,ListOfSchemas)),
+				if
+				  N > 0 -> Value;
+				  true -> error
+				end
+			      end)),
+		    ValidationResult =/= error)
+      end;
+    
+    'oneOf' ->
+      ListOfSchemas = jsg_jsonschema:oneOf(Schema),
+      case jsg_jsonschema:hasType(Schema) of
+	true ->
+	  ?SUCHTHAT(ValidationResult,
+		    ?LET(Value, gen_typed_schema(Schema,Options),
+			 begin
+			   case valid_schemas(Value,ListOfSchemas) of
+			     1 -> Value;
+			     _ -> error
+			   end
+			 end),
+		    ValidationResult =/= error);
+	false ->
+	  ?SUCHTHAT(ValidationResult,
+		    ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
+			 ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
+			      begin
+				case valid_schemas
+				  (Value,delete_nth_element(I,ListOfSchemas)) of
+				  0 -> Value;
+				  _ -> error
+				end
+			      end)),
+		    ValidationResult =/= error)
+      end;
 
-                                %%not
-                                SingleSchema ->
-                                    case jsg_jsonschema:hasType(Schema) of
-                                        true ->
-                                            ?SUCHTHAT(ValidationResult,
-                                             ?LET(Value, gen_typed_schema(Schema,Options),
-                                               begin
-                                                case valid_schemas(Value,[SingleSchema]) of
-                                                    0 -> Value;
-                                                    _ -> error
-                                                end
-                                               end),
-                                     ValidationResult =/= error);
+    'quickcheck' ->
+      QcValue = jsg_jsonschema:propertyValue(Schema,"quickcheck"),
+      case jsg_jsonschema:is_object(QcValue) of
+	true ->
+	  Name = binary_to_list(jsg_jsonschema:propertyValue(QcValue,"name")),
+	  [Module,Fun] = re:split(Name,":"),
+	  (binary_to_atom(Module)):
+	    (binary_to_atom(Fun))(QcValue,jsg_store:get(eqc_gen_context));
+	false ->
+	  Name = binary_to_list(QcValue),
+	  [Module,Fun] = re:split(Name,":"),
+	  (binary_to_atom(Module)):
+	    (binary_to_atom(Fun))(jsg_store:get(eqc_gen_context))
+      end;
 
-                                false ->
-                                            throw(not_keyword_with_no_schemas)
-                                    end
-                                
-                                        
-                            end;
-
-                        %%allOf
-                        ListOfSchemas ->
-                            case jsg_jsonschema:hasType(Schema) of
-                                true ->
-                                    ?SUCHTHAT(ValidationResult,
-                                      ?LET(Value, gen_typed_schema(Schema,Options),
-                                      begin
-                                          N = valid_schemas(Value,ListOfSchemas),
-                                          if
-                                              N == length(ListOfSchemas) -> Value;
-                                              true -> error
-                                          end
-                                      end),
-                                     ValidationResult =/= error);
-
-                                false ->
-                                    ?SUCHTHAT(ValidationResult,
-                                       ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
-                                          ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
-                                             begin
-                                                N = valid_schemas(Value,
-                                                         delete_nth_element(I,ListOfSchemas)),
-                                               if
-                                                 N > (length(ListOfSchemas) -1) -> Value;
-                                                 true -> error
-                                               end
-                                             end)),
-                                     ValidationResult =/= error)
-                            end
-                    end;
-
-                %anyOf
-                ListOfSchemas ->
-                    ?LOG("AnyOf with List of Schemas: ~p~n",[ListOfSchemas]),
-                    case jsg_jsonschema:hasType(Schema) of
-                        true ->
-                            ?SUCHTHAT(ValidationResult,
-                                      ?LET(Value, gen_typed_schema(Schema,Options),
-                                      begin
-                                          N = valid_schemas(Value,ListOfSchemas),
-                                          if
-                                              N > 0 -> Value;
-                                              true -> error
-                                          end
-                                      end),
-                              ValidationResult =/= error);
-
-                        false ->
-                            ?SUCHTHAT(ValidationResult,
-                              ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
-                                   ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
-                                   begin
-                                    N = valid_schemas(Value,delete_nth_element(I,ListOfSchemas)),
-                                          if
-                                              N > 0 -> Value;
-                                              true -> error
-                                          end
-                                   end)),
-                              ValidationResult =/= error)
-                    end
-            end;
-
-        %%oneOf
-        ListOfSchemas ->
-            case jsg_jsonschema:hasType(Schema) of
-                true ->
-                    ?SUCHTHAT(ValidationResult,
-                              ?LET(Value, gen_typed_schema(Schema,Options),
-                                   begin
-                                       case valid_schemas(Value,ListOfSchemas) of
-                                           1 -> Value;
-                                           _ -> error
-                                       end
-                                   end),
-                              ValidationResult =/= error);
-                false ->
-                    ?SUCHTHAT(ValidationResult,
-                              ?LET(I, eqc_gen:choose(1,length(ListOfSchemas)),
-                                   ?LET(Value, json(lists:nth(I,ListOfSchemas),Options),
-                                   begin
-                                 case valid_schemas(Value,delete_nth_element(I,ListOfSchemas)) of
-                                           0 -> Value;
-                                           _ -> error
-                                       end
-                                   end)),
-                              ValidationResult =/= error)
-            end
-     
-    end.
+    _ -> 
+      throw({bad_schema,Schema,?LINE})
+  end.
 
 binary_to_atom(Bin) ->
   list_to_atom(binary_to_list(Bin)).

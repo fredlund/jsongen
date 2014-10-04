@@ -33,6 +33,40 @@ hasType(_Schema={struct,Def}) ->
 hasType(_Other) ->
   throw(bad).
 
+schemaType(Schema) ->
+  case oneOf(Schema) of
+    undefined ->
+      case anyOf(Schema) of
+	undefined ->
+	  case allOf(Schema) of
+	    undefined ->
+	      case notKeyword(Schema) of
+		undefined ->
+		  case isRef(Schema) of
+		    false ->  
+		      case hasType(Schema) of
+			false ->
+			  case hasEnum(Schema) of
+			    false ->
+			      case hasQuickCheck(Schema) of
+				false -> 'error';
+				_ -> 'quickcheck'
+			      end;
+			    _ -> 'enum'
+			  end;
+			_ -> 'type'
+		      end;
+		    _ -> 'ref'
+		  end;
+		_ -> 'not'
+	      end;
+	    _ -> 'allOf'
+	  end;
+	_ -> 'anyOf'
+      end;
+    _ -> 'oneOf'
+  end.
+
 hasEnum(_Schema={struct,Def}) ->
   case proplists:lookup(<<"enum">>,Def) of
     {_,_Type} ->
