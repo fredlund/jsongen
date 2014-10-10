@@ -294,8 +294,13 @@ encode_parameters(PreURI,X) ->
       ParmString =
 	encode_parameters(Parms),
       if
-	ParmString=="" -> PreURI;
-	true -> PreURI++"?"++ParmString
+	ParmString=="" ->
+	  PreURI;
+	true ->
+	  case string:string(PreURI,"?") of
+	    0 -> PreURI++"?"++ParmString;
+	    N -> PreURI++"&"++ParmString
+	  end
       end
   end.
 
