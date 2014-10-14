@@ -49,7 +49,22 @@ encode(JsonErlang) ->
 %% The function argument can either 
 %% be on the form "http:...", "file:..." or a filename.
 -spec decode_url(string()) -> {ok, json_term()} | {error, any()}.
-decode_url(URL = [$h,$t,$t,$p,$:|_]) ->
+decode_url(URL) ->
+  case jsg_utils:lookup_schema(URL) of
+    Result={ok,_} ->
+      Result;
+    _ ->
+      Result = decode_url1(URL),
+      case Result of
+	{ok,Schema} ->
+	  jsg_utils:store_schema(URL,Schema);
+	_ ->
+	  ok
+      end,
+      Result
+  end.
+
+decode_url1(URL=[$h,$t,$t,$p,$:|_]) ->
   Result = httpc:request(URL),
   case Result of
     {ok, {{_Version, 200, _ReasonPhrase},
@@ -60,7 +75,7 @@ decode_url(URL = [$h,$t,$t,$p,$:|_]) ->
     _ ->
       Result
   end;
-decode_url([$f,$i,$l,$e,$:|Filename]) ->
+decode_url1([$f,$i,$l,$e,$:|Filename]) ->
   case file:read_file(Filename) of
     {ok, JsonString} ->
       JsonTerm = ?MODULE:decode(JsonString),
@@ -71,5 +86,6 @@ decode_url([$f,$i,$l,$e,$:|Filename]) ->
 	 [Filename,Error]),
       Error
   end;
-decode_url(URL) ->
-  decode_url([$f,$i,$l,$e,$:|URL]).
+decode_url1(URL) ->
+  decode_url1([$f,$i,$l,$e,$:|URL]).
+

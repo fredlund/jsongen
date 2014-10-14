@@ -30,7 +30,7 @@ freq_alternatives(Freqs,Alternatives) ->
        end, Alternatives),
   eqc_gen:frequency(FreqAlternatives).
 
-freq_comp(Generator,String,_,[],Default) ->
+freq_comp(Generator,_String,_,[],Default) ->
   {Default,Generator};
 freq_comp(Generator,String,RequestType1,
 	  [{Weight,RequestType2,First}|Rest],Default) ->
@@ -53,4 +53,6 @@ var(Spec,{ok,{link,LinkData}}) ->
   Var = jsg_jsonschema:propertyValue(Spec,"var"),
   Value = proplists:get_value(list_to_atom(binary_to_list(Var)),Variables),
   Value.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

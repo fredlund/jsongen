@@ -67,6 +67,13 @@ compose_alternatives_int(State,Alternatives) ->
   eqc_gen:oneof(Alternatives).
 
 initialize() ->
+  {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
+  io:format
+    ("~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
+     [self(),
+      ProcessMemory,
+      Mem/(1024.0*1024.0*1024.0),
+      erlang:memory()]),
   %%io:format("~n~nNew test:~n"),
   httpc:reset_cookies().
 
@@ -465,6 +472,17 @@ prop_ok() ->
 	  ?MODULE,
 	  Cmds,
 	  begin
+	    io:format("Res size is ~p~n",[erts_debug:size(Res)]),
+	    io:format("DS size is ~p~n",[erts_debug:size(DS)]),
+	    io:format("length(H)=~p~n",[length(H)]),
+	    io:format("H size is ~p~n",[erts_debug:size(H)]),
+	    [{P1,P2,P3}|_] = H,
+	    io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
+	    io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
+	    io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
+	    io:format("P1=~p~n",[P1]),
+	    io:format("P2=~p~n",[P2]),
+	    io:format("P3=~p~n",[P3]),
 	    if
 	      Res == ok ->
 		true;
