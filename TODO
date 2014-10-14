@@ -78,6 +78,13 @@ and for redefining values.
 - Maybe define a whole schema using quickcheck
 (i.e., define querySchema or schema).
 
+- How to handle attributes of (possibly)
+multiple instances as arguments to operations.
+In general, how to handle arrays?
+Would be nice with a member operation (on something, on the return value
+of an operation).
+
+
 
 
 

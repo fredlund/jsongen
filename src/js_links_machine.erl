@@ -329,9 +329,25 @@ http_request(PreURI,Type,Body,QueryParms) ->
       _ ->
 	{URI,[]}
     end,
-  Request = [Type,URIwithBody,[{timeout,1500}],[]],
+  Timeout =
+    case ets:lookup(js_links_machine_data,timeout) of
+      [{_,N}] -> N;
+      _ -> 1500
+    end,
+  ShowHttpTiming =
+    case ets:lookup(js_links_machine_data,show_http_timing) of
+      [{_,Value}] when is_boolean(Value) -> Value;
+      _ -> false
+    end,
+  Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
   %%io:format("Request=~p~n",[Request]),
-  Result = apply(httpc,request,Request),
+  {ElapsedTime,Result} = timer:tc(httpc,request,Request),
+  if
+    ShowHttpTiming ->
+      io:format("http request took ~p milliseconds~n",[ElapsedTime/1000]);
+    true ->
+      ok
+  end,
   %%io:format("Result is ~p~n",[Result]),
   Result.
 
@@ -534,9 +550,21 @@ run_statem(PrivateModule,Files,Args) ->
 	 [Files]),
       throw(bad);
     Links ->
-      js_links_machine:init_table(PrivateModule,Links),
-      js_links_machine:test()
-  end.
+      js_links_machine:init_table(PrivateModule,Links)
+  end,
+  case proplists:get_value(timeout,Args) of
+    undefined ->
+      ok;
+    N when is_integer(N), N>0 ->
+      ets:insert(js_links_machine_data,{timeout,N})
+  end,
+  case proplists:get_value(show_http_timing,Args) of
+    undefined ->
+      ok;
+    B when is_boolean(B) ->
+      ets:insert(js_links_machine_data,{show_http_timing,B})
+  end,
+  js_links_machine:test().
 
 %% To make eqc not print the horrible counterexample
 eqc_printer(Format,String) ->
