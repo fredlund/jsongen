@@ -84,50 +84,69 @@ extract_dynamic_links(Link,JSONBody) ->
   LD = link_def(Link),
   V = link_vars(Link),
   %%io:format("extract_dynamic_links(~p)~nSch=~p~n",[Link,LD]),
-  case jsg_jsonschema:propertyValue(LD,"targetSchema") of
+  Result =
+    case jsg_jsonschema:propertyValue(LD,"targetSchema") of
+      undefined ->
+	[];
+      SchemaDesc ->
+	extract_links(SchemaDesc,JSONBody,V)
+    end,
+  %%io:format
+    %%("extract_links(~p) from~n~p~nyields~n~p~n",
+     %%[Link,JSONBody,Result]),
+  Result.
+
+extract_links(Sch,Term,V) ->
+  %%io:format("~nSchema is ~p; Term=~n~p~n",[Sch,Term]),
+  Schema = {struct,Proplist} = get_schema(Sch),
+  case proplists:get_value(<<"type">>,Proplist) of
     undefined ->
-      [];
-    SchemaDesc ->
-      io:format("Schema is ~p~n",[SchemaDesc]),
-      Schema = {struct,Proplist} = get_schema(SchemaDesc,S),
-      case proplists:get_value(<<"type">>,Proplist) of
-	undefined ->
-	  %% Could be a union schema; we don't handle this yet
-	  throw(bad);
-	Type ->
-	  io:format("Schema type is ~p~n",[Type]),
-	  case Type of
-	    <<"object">> ->
-	      Links =
-		js_links_machine:collect_schema_links(make_schema(SchemaDesc,S),true,V),
-	      io:format("schema links are:~n~p~n",[Links]),
-	      lists:map
-		(fun ({link,Props}) ->
-		     NewVars = update_vars(JSONBody,V),
-		     NewProps = [{object,JSONBody}|Props],
-		     {link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}
-		 end,
-		 Links);
-	    <<"array">> ->
-	      case proplists:get_value(<<"additionalItems">>,Proplist) of
-		false ->
-		  ItemSchemaDesc = proplists:get_value(<<"items">>,Proplist),
-		  io:format("itemSchema is ~p~n",[ItemSchemaDesc]),
-		  Links =
-		    js_links_machine:collect_schema_links(make_schema(ItemSchemaDesc,S),true,V),
-		  io:format("schema links are:~n~p~n",[Links]),
-		  lists:flatmap
-		    (fun ({link,Props}) ->
-			 lists:map
-			   (fun (Item) ->
-				NewVars = update_vars(Item,V),
-				NewProps = [{object,Item}|Props],
-				{link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}
-			    end, JSONBody)
-		     end, Links)
-	      end
-	  end
-      end
+      %% Could be a union schema; we don't handle this yet
+      throw(bad);
+    <<"object">> ->
+      Links = js_links_machine:collect_schema_links(Sch,true,V),
+      ShallowLinks =
+	lists:map
+	  (fun ({link,Props}) ->
+	       NewVars = update_vars(Term,V),
+	       NewProps = [{object,Term}|Props],
+	       {link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}
+	   end,
+	   Links),
+      %%io:format("Shallow links are:~n~p~n",[ShallowLinks]),
+      DeepLinks = extract_links_from_subterms(Schema,Term,V),
+      %%io:format("Deep links are:~n~p~n",[DeepLinks]),
+      ShallowLinks++DeepLinks;
+	
+    <<"array">> ->
+      case proplists:get_value(<<"items">>,Proplist) of
+	ItemSchemaDesc={struct,_} ->
+	  lists:flatmap
+	    (fun (SubItem) -> extract_links(ItemSchemaDesc,SubItem,V) end,
+	     Term);
+	_ -> []
+      end;
+    
+    _ -> []
+  end.
+
+extract_links_from_subterms({struct,Proplist},Term,V) ->
+  case proplists:get_value(<<"properties">>,Proplist) of
+    undefined -> [];
+    {struct,Properties} ->
+      lists:flatmap
+	(fun ({Property,Def}) ->
+	     %%io:format("Property: ~p~n",[Property]),
+	     {struct,Props} = Term,
+	     %%io:format("Term props are ~p~n",[Props]),
+	     case proplists:get_value(Property,Props) of
+	       undefined ->
+		 [];
+	       SubProp ->
+		 %%io:format("SubProp is ~p~n",[SubProp]),
+		 extract_links(Def,SubProp,V)
+	     end
+	 end, Properties)
   end.
 
 update_vars(Object,OldVars) ->
