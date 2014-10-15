@@ -266,6 +266,18 @@ follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   %%io:format
     %%("~nfollow_link:~n~p~n URI is ~p; request ~p~n",
      %%[Link,URI,RequestType]),
+  case jsg_links:link_title(Link) of
+    String when is_list(String) ->
+      Key = list_to_atom(String),
+      {ok,Stats} = jsg_store:get(stats),
+      NewValue =
+	case lists:keyfind(Key,1,Stats) of
+	  false -> 1;
+	  {_,N} -> N+1
+	end,
+      jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
+    _ -> ok
+  end,
   Result = http_request(URI,RequestType,Body,QueryParms),
   NewResult =
     case response_has_body(Result) of
@@ -405,6 +417,14 @@ http_body({ok,{_,_,Body}}) ->
       RealBody;
     _ ->
       Body
+  end.
+
+has_ets_body({ok,{_,_,Body}}) ->
+  case Body of
+    ets_body ->
+      true;
+    _ ->
+      false
   end.
 
 http_status_line({ok,{StatusLine,_,_}}) ->
@@ -564,9 +584,14 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
 	ResponseCode = http_result_code(Result),
 	case response_has_body(Result) of
 	  true -> 
+	    Body =
+	      case has_ets_body(Result) of
+		true -> "<<abstracted_body>>";
+		false -> http_body(Result)
+	      end,
 	    io_lib:format
 	      (" ->~n    ~p with body ~s",
-	       [ResponseCode,http_body(Result)]);
+	       [ResponseCode,Body]);
 	  false ->
 	    io_lib:format
 	      (" ->~n     ~p",
@@ -579,11 +604,23 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   print_commands(Rest).
   
 test() ->
+  jsg_store:put(stats,[]),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
     false ->
       io:format("~n~n***FAILED~n");
     true ->
-      io:format("~n~nPASSED~n",[])
+      io:format("~n~nPASSED~n",[]),
+      {ok,Stats} = jsg_store:get(stats),
+      TotalCalls =
+	lists:foldl(fun ({_,N},Acc) -> N+Acc end, 0, Stats),
+      SortedStats =
+	lists:sort(fun ({_,N},{_,M}) -> N>=M end, Stats),
+      io:format("~nLink statistics:~n"),
+      lists:foreach
+	(fun ({Name,NumCalls}) ->
+	     Percentage = (NumCalls/TotalCalls)*100,
+	     io:format("~p: ~p%~n",[Name,Percentage])
+	 end, SortedStats)
   end.
 
 run_statem(PrivateModule,Files) ->
