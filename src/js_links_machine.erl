@@ -211,7 +211,9 @@ next_state_int(State,Result,Call) ->
 	{ok,{{_,200,_},_Headers,Body}} ->
 	  %%io:format("normal result: extracting links~n",[]),
 	  NewLinks =
-	    jsg_links:extract_dynamic_links(Link,mochijson2:decode(Body)),
+	    jsg_links:extract_dynamic_links
+	      (Link,
+	       mochijson2:decode(http_body(Result))),
 	  %%io:format
 	    %%("NewLinks are~n~p~n",[NewLinks]),
 	  State#state{dynamic_links=sets:union(sets:from_list(NewLinks),State#state.dynamic_links)};
@@ -265,7 +267,24 @@ follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
     %%("~nfollow_link:~n~p~n URI is ~p; request ~p~n",
      %%[Link,URI,RequestType]),
   Result = http_request(URI,RequestType,Body,QueryParms),
-  Result.
+  NewResult =
+    case response_has_body(Result) of
+      true ->
+	ResponseBody = http_body(Result),
+	case length(ResponseBody)>1024 of
+	  true ->
+	    jsg_store:put(last_body,{body,ResponseBody}),
+	    {P1,{P2,P3,_}} = Result,
+	    {P1,{P2,P3,ets_body}};
+	  false ->
+	    jsg_store:put(last_body,has_body),
+	    Result
+	end;
+      false ->
+	jsg_store:put(last_body,no_body),
+	Result
+    end,
+  NewResult.
 
 format_http_call(Call) ->
   case Call of
@@ -380,7 +399,13 @@ http_headers({ok,{_,Headers,_}}) ->
   Headers.
 
 http_body({ok,{_,_,Body}}) ->
-  Body.
+  case Body of
+    ets_body ->
+      {ok,{body,RealBody}} = jsg_store:get(last_body),
+      RealBody;
+    _ ->
+      Body
+  end.
 
 http_status_line({ok,{StatusLine,_,_}}) ->
   StatusLine.
@@ -419,6 +444,7 @@ http_content_type(Result) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% Probably non-ok responses can have a body too...
 response_has_body(Result) ->
   case http_result_type(Result) of
     ok -> 
