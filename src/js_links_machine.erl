@@ -36,6 +36,7 @@ initial_state() ->
      private_state=PrivateState}.
 
 command(State) ->
+  %%io:format("State is ~p~n",[State]),
   Command = make_call(command,fun command_int/1,[State]),
   Command.
 
@@ -67,13 +68,14 @@ compose_alternatives_int(State,Alternatives) ->
   eqc_gen:oneof(Alternatives).
 
 initialize() ->
-  {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
-  io:format
-    ("~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
-     [self(),
-      ProcessMemory,
-      Mem/(1024.0*1024.0*1024.0),
-      erlang:memory()]),
+  jsg_utils:clear_schema_cache(),
+%%  {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
+%%  io:format
+%%    ("~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
+%%     [self(),
+%%      ProcessMemory,
+%%      Mem/(1024.0*1024.0*1024.0),
+%%      erlang:memory()]),
   %%io:format("~n~nNew test:~n"),
   httpc:reset_cookies().
 
@@ -156,7 +158,7 @@ validate_call_not_error_result(Call,Result) ->
 validate_call_result_body(Call,Result) ->
   case Call of
     {_, _, follow_link, _, _} ->
-      Link = jsg_links:link_link(call_link(Call)),
+      Link = jsg_links:link_def(call_link(Call)),
       Schema = jsg_links:link_schema(call_link(Call)),
       case jsg_jsonschema:propertyValue(Link,"targetSchema") of
 	undefined ->
@@ -254,7 +256,7 @@ initial_links() ->
 
 gen_http_request(Link) ->
   URI = jsg_links:compute_uri(Link),
-  RequestType = jsg_links:request_type(Link),
+  RequestType = jsg_links:link_request_type(Link),
   {Body,QueryParms} = jsg_links:generate_argument(Link),
   {URI,RequestType,Body,QueryParms}.
 
@@ -355,7 +357,15 @@ http_request(PreURI,Type,Body,QueryParms) ->
     true ->
       ok
   end,
-  %%io:format("Result is ~p~n",[Result]),
+%%  case response_has_body(Result) of
+%%    true ->
+%%      io:format("length of body is ~p~n",[length(http_body(Result))]),
+%%      JSON = mochijson2:decode(http_body(Result)),
+%%      io:format("Body:~n~p~n",[JSON]);
+%%    false ->
+%%      ok
+%%  end,
+%%  io:format("size of Result is ~p~n",[erts_debug:size(Result)]),
   Result.
 
 http_result_type({ok,_}) ->
@@ -472,17 +482,17 @@ prop_ok() ->
 	  ?MODULE,
 	  Cmds,
 	  begin
-	    io:format("Res size is ~p~n",[erts_debug:size(Res)]),
-	    io:format("DS size is ~p~n",[erts_debug:size(DS)]),
-	    io:format("length(H)=~p~n",[length(H)]),
-	    io:format("H size is ~p~n",[erts_debug:size(H)]),
-	    [{P1,P2,P3}|_] = H,
-	    io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
-	    io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
-	    io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
-	    io:format("P1=~p~n",[P1]),
-	    io:format("P2=~p~n",[P2]),
-	    io:format("P3=~p~n",[P3]),
+%%	    io:format("Res size is ~p~n",[erts_debug:size(Res)]),
+%%	    io:format("DS size is ~p~n",[erts_debug:size(DS)]),
+%%	    io:format("length(H)=~p~n",[length(H)]),
+%%	    [{P1,P2,P3}|_] = lists:reverse(H),
+%%	    io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
+%%	    io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
+%%	    io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
+%%	    io:format("P1=~p~n",[P1]),
+%%	    io:format("P2=~p~n",[P2]),
+%%	    io:format("P3=~p~n",[P3]),
+	    %%io:format("H size is ~p~n",[erts_debug:size(H)]),
 	    if
 	      Res == ok ->
 		true;
@@ -617,42 +627,30 @@ get_json_body(Result) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 collect_links(Files) ->
   lists:flatmap(fun collect_links_from_file/1, Files).
 
 collect_links_from_file(File) ->
-  try jsg_jsonschema:read_schema(File) of
-      {ok,Schema} -> collect_schema_links(Schema,false,{vars,[]})
-  catch Class:Reason ->
-      Stacktrace = erlang:get_stacktrace(),
-      io:format
-	("*** Error: could not read schema from file ~p~n",
-	 [File]),
-      erlang:raise(Class,Reason,Stacktrace)
-  end.
+  FileSchema = {struct,[{<<"$ref">>,list_to_binary(File)}]},
+  collect_schema_links(FileSchema,false,{vars,[]}).
 
-collect_schema_links(Schema, DependsOnObject, Vars) ->
+collect_schema_links(RawSchema, DependsOnObject, Vars) ->
+  Schema = jsg_links:get_schema(RawSchema),
   %% Find all schemas, and retrieve links
   case jsg_jsonschema:links(Schema) of
     undefined ->
       [];
     Links when is_list(Links) ->
       lists:foldl
-	(fun (Link,Ls) ->
+	(fun ({N,Link},Ls) ->
 	     Dependency = depends_on_object_properties(Link),
 	     if
 	       Dependency==DependsOnObject ->
-		 LinkData =
-		   case jsg_jsonschema:propertyValue(Link,"title") of
-		     undefined -> [];
-		     Title -> [{title,binary_to_list(Title)}]
-		   end,
-		 [{link,[{link,Link},{schema,Schema},Vars|LinkData]}|Ls];
+		 [{link,[{link,N},{schema,RawSchema},Vars]}|Ls];
 	       true ->
 		 Ls
 	     end
-	 end, [], Links)
+	 end, [], lists:zip(lists:seq(1,length(Links)),Links))
   end.
 
 depends_on_object_properties(Link) ->

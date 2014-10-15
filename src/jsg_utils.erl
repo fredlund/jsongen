@@ -5,7 +5,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 lookup_schema(URL) ->
-  io:format("looking up ~s~n",[URL]),
+%%  io:format("looking up ~s~n",[URL]),
   ensure_open(ets_schemas),
   case ets:lookup(ets_schemas,URL) of
     [{_,Schema}] ->
@@ -15,9 +15,12 @@ lookup_schema(URL) ->
   end.
 
 store_schema(URL,Schema) ->
-  io:format("storing ~s~n",[URL]),
+%%  io:format("storing ~s~n",[URL]),
   ensure_open(ets_schemas),
   true = ets:insert(ets_schemas,{URL,Schema}).
+
+clear_schema_cache() ->
+  open_ets_table(ets_schemas).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

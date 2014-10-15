@@ -84,8 +84,15 @@ In general, how to handle arrays?
 Would be nice with a member operation (on something, on the return value
 of an operation).
 
+- Recursive link extraction?
+
+{struct,[{<<"channels">>,arr}]}
+
+instead of arr.
 
 
+
+	
 
 
 

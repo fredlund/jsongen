@@ -20,8 +20,7 @@
 %% traverse the schemas to find (non-relative) link definitions.
 
 compute_uri(Link={link,LinkData}) ->
-  L = proplists:get_value(link,LinkData),
-  Href = jsg_jsonschema:propertyValue(L,"href"),
+  Href = link_href(Link),
   Template = uri_template:parse(binary_to_list(Href)),
   Variables = 
     lists:filter
@@ -30,25 +29,25 @@ compute_uri(Link={link,LinkData}) ->
   %%io:format("compute_uri: variables are~n~p~n",[Variables]),
   uri_template:sub(Variables,binary_to_list(Href)).
 
-generate_argument(Link={link,LinkData}) ->
+generate_argument(Link) ->
   jsg_store:put(eqc_gen_context,Link),
-  L = proplists:get_value(link,LinkData),
-  S = proplists:get_value(schema,LinkData),
+  S = link_schema(Link),
+  Sch = link_def(Link),
   Schema = 
-    case jsg_jsonschema:propertyValue(L,"schema") of
+    case jsg_jsonschema:propertyValue(S,"schema") of
       undefined ->
 	undefined;
       Sch ->
 	get_schema(Sch,S)
     end,
   QuerySchema = 
-    case jsg_jsonschema:propertyValue(L,"querySchema") of
+    case jsg_jsonschema:propertyValue(S,"querySchema") of
       undefined ->
 	undefined;
       QSch ->
 	get_schema(QSch,S)
     end,
-  RequestType = request_type(Link),
+  RequestType = link_request_type(Link),
   Body = 
     case may_have_body(RequestType) of
       true when Schema=/=undefined -> 
@@ -80,34 +79,28 @@ may_have_body(delete) ->
 may_have_body(_) ->
   true.
 
-request_type(Link={link,LinkData}) ->
-  L = proplists:get_value(link,LinkData),
-  RequestType = jsg_jsonschema:propertyValue(L,"method"),
-  case RequestType of
-    undefined -> get;
-    Other -> list_to_atom(string:to_lower(binary_to_list(Other)))
-  end.
-
-extract_dynamic_links(Link={link,LinkData},JSONBody) ->
-  L = proplists:get_value(link,LinkData),
-  S = proplists:get_value(schema,LinkData),
-  V = proplists:get_value(vars,LinkData),
-  case jsg_jsonschema:propertyValue(L,"targetSchema") of
+extract_dynamic_links(Link,JSONBody) ->
+  S = link_schema(Link),
+  LD = link_def(Link),
+  V = link_vars(Link),
+  %%io:format("extract_dynamic_links(~p)~nSch=~p~n",[Link,LD]),
+  case jsg_jsonschema:propertyValue(LD,"targetSchema") of
     undefined ->
       [];
     SchemaDesc ->
-      %%io:format("Schema is ~p~n",[SchemaDesc]),
+      io:format("Schema is ~p~n",[SchemaDesc]),
       Schema = {struct,Proplist} = get_schema(SchemaDesc,S),
       case proplists:get_value(<<"type">>,Proplist) of
 	undefined ->
 	  %% Could be a union schema; we don't handle this yet
 	  throw(bad);
 	Type ->
-	  %%io:format("Schema type is ~p~n",[Type]),
+	  io:format("Schema type is ~p~n",[Type]),
 	  case Type of
 	    <<"object">> ->
-	      Links = js_links_machine:collect_schema_links(Schema,true,V),
-	      %%io:format("schema links are:~n~p~n",[Links]),
+	      Links =
+		js_links_machine:collect_schema_links(make_schema(SchemaDesc,S),true,V),
+	      io:format("schema links are:~n~p~n",[Links]),
 	      lists:map
 		(fun ({link,Props}) ->
 		     NewVars = update_vars(JSONBody,V),
@@ -119,10 +112,10 @@ extract_dynamic_links(Link={link,LinkData},JSONBody) ->
 	      case proplists:get_value(<<"additionalItems">>,Proplist) of
 		false ->
 		  ItemSchemaDesc = proplists:get_value(<<"items">>,Proplist),
-		  %%io:format("itemSchema is ~p~n",[ItemSchemaDesc]),
-		  ItemSchema = get_schema(ItemSchemaDesc,S),
-		  Links = js_links_machine:collect_schema_links(ItemSchema,true,V),
-		  %%io:format("schema links are:~n~p~n",[Links]),
+		  io:format("itemSchema is ~p~n",[ItemSchemaDesc]),
+		  Links =
+		    js_links_machine:collect_schema_links(make_schema(ItemSchemaDesc,S),true,V),
+		  io:format("schema links are:~n~p~n",[Links]),
 		  lists:flatmap
 		    (fun ({link,Props}) ->
 			 lists:map
@@ -152,6 +145,11 @@ update_vars(Object,OldVars) ->
      %%[OldVars,Object,NewVars]),
   NewVars.
 
+get_schema(Value={struct,Proplist}) ->
+  get_schema(Value,{struct,[]});
+get_schema([Child,Root]) ->
+  get_schema(Child,Root).
+
 get_schema(Value={struct,Proplist},Root) ->
   case proplists:get_value(<<"$ref">>,Proplist) of
     undefined ->
@@ -161,19 +159,67 @@ get_schema(Value={struct,Proplist},Root) ->
       jsg_jsonref:unref(Value,Root)
   end.
 
+make_schema(Schema,Parent) ->
+  case is_parent_relative(Schema) of
+    true ->
+      [Schema,Parent];
+    false ->
+      Schema
+  end.
+
+is_parent_relative({struct,Proplist}) ->
+  case proplists:get_value(<<"$ref">>,Proplist) of
+    undefined ->
+      false;
+    Ref ->
+      case binary_to_list(Ref) of
+	[$#|_] -> true;
+	_ -> false
+      end
+  end.
+  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+link_def(Link) ->
+  Schema = link_schema(Link),
+  RootSchema = {struct,[]},
+  {struct,SchemaDef} = get_schema(Schema,RootSchema),
+  N = link_num(Link),
+  Links = proplists:get_value(<<"links">>,SchemaDef),
+%%  io:format("Links are ~p~n",[Links]),
+  lists:nth(N,Links).
+
 link_title(Link) ->
-  {link,LD} = Link,
-  proplists:get_value(title,LD).
+  {struct,LinkDef} = link_def(Link),
+  case proplists:get_value(<<"title">>,LinkDef) of
+    L when is_binary(L) ->
+      binary_to_list(L);
+    Other ->
+      Other
+  end.
+
+link_request_type(Link) ->
+  {struct,LinkDef} = link_def(Link),
+  case proplists:get_value(<<"method">>,LinkDef) of
+    undefined -> get;
+    Other -> list_to_atom(string:to_lower(binary_to_list(Other)))
+  end.
+
+link_href(Link) ->
+  {struct,LinkDef} = link_def(Link),
+  proplists:get_value(<<"href">>,LinkDef).
 
 link_schema(Link) ->
   {link,LD} = Link,
   proplists:get_value(schema,LD).
 
-link_link(Link) ->
+link_num(Link) ->
   {link,LD} = Link,
   proplists:get_value(link,LD).
+
+link_vars(Link) ->
+  {link,LD} = Link,
+  proplists:get_value(vars,LD).
 		 
 	     
       
