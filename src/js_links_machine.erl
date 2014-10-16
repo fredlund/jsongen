@@ -36,9 +36,14 @@ initial_state() ->
      private_state=PrivateState}.
 
 command(State) ->
-  %%io:format("State is ~p~n",[State]),
-  Command = make_call(command,fun command_int/1,[State]),
-  Command.
+  try make_call(command,fun command_int/1,[State])
+  catch Class:Reason ->
+      io:format
+	("Warning: command/1 raises exception ~p~n",
+	 [Reason]),
+      StackTrace = erlang:get_stacktrace(),
+      erlang:raise(Class,Reason,StackTrace)
+  end.
 
 %% add metadata -- not sure it is necessary...
 
@@ -64,7 +69,7 @@ compose_alternatives(State,Alternatives) ->
   make_call
     (compose_alternatives,fun compose_alternatives_int/2,[State,Alternatives]).
 
-compose_alternatives_int(State,Alternatives) ->
+compose_alternatives_int(_State,Alternatives) ->
   eqc_gen:oneof(Alternatives).
 
 initialize() ->
@@ -85,21 +90,29 @@ callouts(_,_) ->
 gen_link(State,Link) ->
   make_call(gen_link,fun gen_link_int/2,[State,Link]).
 
-gen_link_int(State,Link) ->
+gen_link_int(_State,Link) ->
   {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]}.
 
 link_permitted(State,Link) ->
   make_call(link_permitted,fun link_permitted_int/2,[State,Link]).
 
-link_permitted_int(State,Link) ->
+link_permitted_int(_State,_Link) ->
   true.
 
 precondition(State,Call) ->
-  case Call of
-    {_, _, follow_link, _, _} ->
-      make_call(precondition,fun precondition_int/2,[State,Call]);
-    _ ->
-      precondition_int(State,Call)
+  try
+    case Call of
+      {_, _, follow_link, _, _} ->
+	make_call(precondition,fun precondition_int/2,[State,Call]);
+      _ ->
+	precondition_int(State,Call)
+    end
+  catch Class:Reason ->
+      io:format
+	("Warning: precondition/2 raises exception ~p~n",
+	 [Reason]),
+      StackTrace = erlang:get_stacktrace(),
+      erlang:raise(Class,Reason,StackTrace)
   end.
 
 precondition_int(State,Call) ->
@@ -114,14 +127,22 @@ precondition_int(State,Call) ->
   end.
 
 postcondition(State,Call,Result) ->
-  case Call of
-    {_, _, follow_link, _, _} ->
-      make_call(postcondition,fun postcondition_int/3,[State,Call,Result]);
-    _ ->
-      postcondition_int(State,Call,Result)
+  try
+    case Call of
+      {_, _, follow_link, _, _} ->
+	make_call(postcondition,fun postcondition_int/3,[State,Call,Result]);
+      _ ->
+	postcondition_int(State,Call,Result)
+    end
+  catch Class:Reason ->
+      io:format
+	("Warning: postcondition/3 raises exception ~p~n",
+	 [Reason]),
+      StackTrace = erlang:get_stacktrace(),
+      erlang:raise(Class,Reason,StackTrace)
   end.
 
-postcondition_int(State,Call,Result) ->
+postcondition_int(_State,Call,Result) ->
   case Call of
     {_, _, follow_link, _, _} ->
       case validate_call_not_error_result(Call,Result) of
@@ -146,7 +167,7 @@ validate_call_not_error_result(Call,Result) ->
       case http_result_type(Result) of
 	ok ->
 	  true;
-	{error,Error} ->
+	{error,_Error} ->
 	  io:format
 	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
 	     [format_http_call(Call),http_error(Result)]),
@@ -175,11 +196,11 @@ validate_call_result_body(Call,Result) ->
 		 %%[RealTargetSchema,
 		  %%Body]),
 	      [{_,Validator}] = 
-		ets:lookup(js_links_machine_data,validator),
+		get_option(validator),
 	      try Validator:validate(RealTargetSchema,Body) of
 		  true -> true;
 		  false -> false
-	      catch Class:Reason ->
+	      catch _Class:Reason ->
 		  io:format
 		    ("~n*** Error: postcondition error: for http call~n~s~n"++
 		       "the JSON value~n~s~n"++
@@ -200,11 +221,19 @@ validate_call_result_body(Call,Result) ->
   end.
 
 next_state(State,Result,Call) ->
-  case Call of
-    {_, _, follow_link, _, _} ->
-      make_call(next_state,fun next_state_int/3,[State,Result,Call]);
-    _ ->
-      next_state_int(State,Result,Call)
+  try
+    case Call of
+      {_, _, follow_link, _, _} ->
+	make_call(next_state,fun next_state_int/3,[State,Result,Call]);
+      _ ->
+	next_state_int(State,Result,Call)
+    end
+  catch Class:Reason ->
+      io:format
+	("Warning: next_state/3 raises exception ~p~n",
+	 [Reason]),
+      StackTrace = erlang:get_stacktrace(),
+      erlang:raise(Class,Reason,StackTrace)
   end.
 
 next_state_int(State,Result,Call) ->
@@ -214,7 +243,7 @@ next_state_int(State,Result,Call) ->
     {_, ?MODULE, follow_link, [Link,_], _} ->
       case Result of
 	%% Maybe we should not only extract links on success...
-	{ok,{{_,200,_},_Headers,Body}} ->
+	{ok,{{_,200,_},_Headers,_Body}} ->
 	  %%io:format("normal result: extracting links~n",[]),
 	  NewLinks =
 	    jsg_links:extract_dynamic_links
@@ -268,7 +297,7 @@ gen_http_request(Link) ->
   {Body,QueryParms} = jsg_links:generate_argument(Link),
   {URI,RequestType,Body,QueryParms}.
 
-follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
+follow_link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   %%io:format
     %%("~nfollow_link:~n~p~n URI is ~p; request ~p~n",
      %%[Link,URI,RequestType]),
@@ -306,7 +335,7 @@ follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
 
 format_http_call(Call) ->
   case Call of
-    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body,Params}], _} ->
+    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body,_Params}], _} ->
       format_http_call(URI,RequestType,Body)
   end.
 
@@ -345,7 +374,7 @@ encode_parameters(PreURI,X) ->
 	true ->
 	  case string:string(PreURI,"?") of
 	    0 -> PreURI++"?"++ParmString;
-	    N -> PreURI++"&"++ParmString
+	    _N -> PreURI++"&"++ParmString
 	  end
       end
   end.
@@ -375,37 +404,17 @@ http_request(PreURI,Type,Body,QueryParms) ->
       _ ->
 	{URI,[]}
     end,
-  Timeout =
-    case ets:lookup(js_links_machine_data,timeout) of
-      [{_,N}] -> N;
-      _ -> 1500
-    end,
-  ShowHttpTiming =
-    case ets:lookup(js_links_machine_data,show_http_timing) of
-      [{_,Value}] when is_boolean(Value) -> Value;
-      _ -> false
-    end,
-  ShowURI =
-    case ets:lookup(js_links_machine_data,show_uri) of
-      [{_,URIV}] when is_boolean(URIV) -> URIV;
-      _ -> false
-    end,
+  Timeout = get_option(timeout),
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
   %%io:format("Request=~p~n",[Request]),
-  if
-    ShowURI ->
-      io:format
-	("Accessing URI ~p~n",
-	 [URI]);
-    true ->
-      ok
+  case get_option(show_uri) of
+    true -> io:format("Accessing URI ~p~n",[URI]);
+    false -> ok
   end,
   {ElapsedTime,Result} = timer:tc(httpc,request,Request),
-  if
-    ShowHttpTiming ->
-      io:format("http request took ~p milliseconds~n",[ElapsedTime/1000]);
-    true ->
-      ok
+  case get_option(show_http_timing) of
+    true -> io:format("http request took ~p milliseconds~n",[ElapsedTime/1000]);
+    false -> ok
   end,
 %%  case response_has_body(Result) of
 %%    true ->
@@ -567,7 +576,7 @@ prop_ok() ->
 	    end
 	  end)).
 
-print_counterexample(Cmds,H,DS,Reason) ->
+print_counterexample(Cmds,H,_DS,Reason) ->
   io:format("~nTest failed with reason ~p~n",[Reason]),
   {FailingCommandSequence,_} = lists:split(length(H)+1,Cmds),
   ReturnValues = 
@@ -584,7 +593,7 @@ print_counterexample(Cmds,H,DS,Reason) ->
 
 print_commands([]) ->
   ok;
-print_commands([{Call={call,_,initialize,_,_},Result}|Rest]) ->
+print_commands([{_Call={call,_,initialize,_,_},_Result}|Rest]) ->
   print_commands(Rest);
 print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   Title = call_link_title(Call),
@@ -624,7 +633,7 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   
 test() ->
   jsg_store:put(stats,[]),
-  [{_,Validator}] = ets:lookup(js_links_machine_data,validator),
+  Validator = get_option(validator),
   Validator:start_validator(),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
     false ->
@@ -647,14 +656,15 @@ test() ->
 run_statem(PrivateModule,Files) ->
   run_statem(PrivateModule,Files,[]).
 
-run_statem(PrivateModule,Files,Args) ->
+run_statem(PrivateModule,Files,Options) ->
   inets:start(),
-  case proplists:get_value(cookies,Args) of
+  case proplists:get_value(cookies,Options) of
     true ->
       ok = httpc:set_options([{cookies,enabled}]);
     _ ->
       ok
   end,
+  check_and_set_options(Options),
   case collect_links(Files) of
     [] ->
       io:format
@@ -664,39 +674,6 @@ run_statem(PrivateModule,Files,Args) ->
     Links ->
       js_links_machine:init_table(PrivateModule,Links)
   end,
-  case proplists:get_value(timeout,Args) of
-    undefined ->
-      ok;
-    N when is_integer(N), N>0 ->
-      ets:insert(js_links_machine_data,{timeout,N})
-  end,
-  case proplists:get_value(show_http_timing,Args) of
-    undefined ->
-      ok;
-    B when is_boolean(B) ->
-      ets:insert(js_links_machine_data,{show_http_timing,B})
-  end,
-  case proplists:get_value(show_uri,Args) of
-    undefined ->
-      ok;
-    URIV when is_boolean(URIV) ->
-      ets:insert(js_links_machine_data,{show_uri,URIV})
-  end,
-  case proplists:get_value(validator,Args) of
-    undefined ->
-      ets:insert(js_links_machine_data,{validator,java_validator});
-    A when is_atom(A) ->
-      case code:which(A) of
-	non_existing ->
-	  io:format
-	    ("*** Error: the validator ~p cannot be found~n",
-	     [A]),
-	  throw(bad);
-	_ ->
-	  ok
-      end,
-      ets:insert(js_links_machine_data,{validator,A})
-  end,
   js_links_machine:test().
 
 %% To make eqc not print the horrible counterexample
@@ -705,6 +682,51 @@ eqc_printer(Format,String) ->
     "~p~n" -> ok;
     _ -> io:format(Format,String)
   end.
+
+check_and_set_options(Options) ->
+  ParsedOptions =
+    lists:map
+      (fun (Option) ->
+	   {Prop,Value} = ParsedOption =
+	     case Option of
+	       {Atom,Val} when is_atom(Atom) -> {Atom,Val};
+	       Atom when is_atom(Atom) -> {Atom,true}
+	     end,
+	 case Prop of
+	   cookies when is_boolean(Value) -> 
+	     if
+	       Value -> 
+		 ok = httpc:set_options([{cookies,enabled}]);
+	       true ->
+		 ok
+	     end,
+	     ParsedOption;
+	   timeout when is_integer(Value),Value>0 -> ParsedOption;
+	   show_http_timing when is_boolean(Value) -> ParsedOption;
+	   show_uri when is_boolean(Value) -> ParsedOption;
+	   validator when is_atom(Value) -> ParsedOption;
+	   Other ->
+	     io:format
+	       ("*** Error: option ~p not recognized~n",
+		[Other]),
+	     throw(bad)
+	 end
+     end, Options),
+  NewParsedOptions1 =
+    case proplists:get_value(validator) of
+      undefined -> [{validator,java_validator}|ParsedOptions];
+      _ -> ParsedOptions
+    end,
+  NewParsedOptions2 =
+    case proplists:get_value(timeout) of
+      undefined -> [{timeout,1500}|NewParsedOptions1];
+      _ -> NewParsedOptions1
+    end,
+  ets:insert(js_links_machine_data,{options,NewParsedOptions2}).
+
+get_option(Atom) when is_atom(Atom) ->
+  [{_,Options}] = ets:lookup(js_links_machine_data,options),
+  proplists:get_value(Atom,Options,false).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -719,7 +741,7 @@ call_link(Call) ->
 
 json_call_body(Call) ->
   case Call of
-    {call, ?MODULE, follow_link, [_,HTTPRequest={_,_,BodyArg,_}], _} ->
+    {call, ?MODULE, follow_link, [_,{_,_,BodyArg,_}], _} ->
       case BodyArg of
 	{ok,Body} -> Body
       end

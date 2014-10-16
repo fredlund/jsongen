@@ -93,7 +93,7 @@ extract_dynamic_links(Link,JSONBody) ->
     end,
   %%io:format
     %%("extract_links(~p) from~n~p~nyields~n~p~n",
-     %%[Link,JSONBody,Result]),
+    %%[Link,JSONBody,Result]),
   Result.
 
 extract_links(Sch,Term,V) ->
@@ -102,7 +102,8 @@ extract_links(Sch,Term,V) ->
   case proplists:get_value(<<"type">>,Proplist) of
     undefined ->
       %% Could be a union schema; we don't handle this yet
-      throw(bad);
+      [];
+
     <<"object">> ->
       Links = js_links_machine:collect_schema_links(Sch,true,V),
       ShallowLinks =
@@ -127,7 +128,7 @@ extract_links(Sch,Term,V) ->
 	_ -> []
       end;
     
-    _ -> []
+    _Other -> []
   end.
 
 extract_links_from_subterms({struct,Proplist},Term,V) ->
@@ -205,7 +206,7 @@ link_def(Link) ->
   {struct,SchemaDef} = get_schema(Schema,RootSchema),
   N = link_num(Link),
   Links = proplists:get_value(<<"links">>,SchemaDef),
-%%  io:format("Links are ~p~n",[Links]),
+  %%io:format("Links are ~p~n",[Links]),
   lists:nth(N,Links).
 
 link_title(Link) ->
