@@ -170,9 +170,15 @@ validate_call_result_body(Call,Result) ->
 	      false;
 	    true ->
 	      Body = http_body(Result),
-	      JSON = mochijson2:decode(Body),
-	      try jesse_schema_validator:validate(RealTargetSchema,JSON,[]) of
-		  {ok,_} -> true
+	      %%io:format
+		%%("Checking schema ~p~nagainst~n~s~n",
+		 %%[RealTargetSchema,
+		  %%Body]),
+	      [{_,Validator}] = 
+		ets:lookup(js_links_machine_data,validator),
+	      try Validator:validate(RealTargetSchema,Body) of
+		  true -> true;
+		  false -> false
 	      catch Class:Reason ->
 		  io:format
 		    ("~n*** Error: postcondition error: for http call~n~s~n"++
@@ -180,7 +186,7 @@ validate_call_result_body(Call,Result) ->
 		       "did not validate against the schema~n~s~n"++
 		       "due to error~n~p~n",
 		     [format_http_call(Call),
-		      mochijson2:encode(JSON),
+		      Body,
 		      mochijson2:encode(RealTargetSchema),
 		      Reason]),
 		  io:format
@@ -211,7 +217,9 @@ next_state_int(State,Result,Call) ->
 	{ok,{{_,200,_},_Headers,Body}} ->
 	  %%io:format("normal result: extracting links~n",[]),
 	  NewLinks =
-	    jsg_links:extract_dynamic_links(Link,mochijson2:decode(Body)),
+	    jsg_links:extract_dynamic_links
+	      (Link,
+	       mochijson2:decode(http_body(Result))),
 	  %%io:format
 	    %%("NewLinks are~n~p~n",[NewLinks]),
 	  State#state{dynamic_links=sets:union(sets:from_list(NewLinks),State#state.dynamic_links)};
@@ -264,8 +272,37 @@ follow_link(Link,HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   %%io:format
     %%("~nfollow_link:~n~p~n URI is ~p; request ~p~n",
      %%[Link,URI,RequestType]),
+  case jsg_links:link_title(Link) of
+    String when is_list(String) ->
+      Key = list_to_atom(String),
+      {ok,Stats} = jsg_store:get(stats),
+      NewValue =
+	case lists:keyfind(Key,1,Stats) of
+	  false -> 1;
+	  {_,N} -> N+1
+	end,
+      jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
+    _ -> ok
+  end,
   Result = http_request(URI,RequestType,Body,QueryParms),
-  Result.
+  NewResult =
+    case response_has_body(Result) of
+      true ->
+	ResponseBody = http_body(Result),
+	case length(ResponseBody)>1024 of
+	  true ->
+	    jsg_store:put(last_body,{body,ResponseBody}),
+	    {P1,{P2,P3,_}} = Result,
+	    {P1,{P2,P3,ets_body}};
+	  false ->
+	    jsg_store:put(last_body,has_body),
+	    Result
+	end;
+      false ->
+	jsg_store:put(last_body,no_body),
+	Result
+    end,
+  NewResult.
 
 format_http_call(Call) ->
   case Call of
@@ -393,7 +430,21 @@ http_headers({ok,{_,Headers,_}}) ->
   Headers.
 
 http_body({ok,{_,_,Body}}) ->
-  Body.
+  case Body of
+    ets_body ->
+      {ok,{body,RealBody}} = jsg_store:get(last_body),
+      RealBody;
+    _ ->
+      Body
+  end.
+
+has_ets_body({ok,{_,_,Body}}) ->
+  case Body of
+    ets_body ->
+      true;
+    _ ->
+      false
+  end.
 
 http_status_line({ok,{StatusLine,_,_}}) ->
   StatusLine.
@@ -432,6 +483,7 @@ http_content_type(Result) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% Probably non-ok responses can have a body too...
 response_has_body(Result) ->
   case http_result_type(Result) of
     ok -> 
@@ -551,9 +603,14 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
 	ResponseCode = http_result_code(Result),
 	case response_has_body(Result) of
 	  true -> 
+	    Body =
+	      case has_ets_body(Result) of
+		true -> "<<abstracted_body>>";
+		false -> http_body(Result)
+	      end,
 	    io_lib:format
 	      (" ->~n    ~p with body ~s",
-	       [ResponseCode,http_body(Result)]);
+	       [ResponseCode,Body]);
 	  false ->
 	    io_lib:format
 	      (" ->~n     ~p",
@@ -566,11 +623,25 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   print_commands(Rest).
   
 test() ->
+  jsg_store:put(stats,[]),
+  [{_,Validator}] = ets:lookup(js_links_machine_data,validator),
+  Validator:start_validator(),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
     false ->
       io:format("~n~n***FAILED~n");
     true ->
-      io:format("~n~nPASSED~n",[])
+      io:format("~n~nPASSED~n",[]),
+      {ok,Stats} = jsg_store:get(stats),
+      TotalCalls =
+	lists:foldl(fun ({_,N},Acc) -> N+Acc end, 0, Stats),
+      SortedStats =
+	lists:sort(fun ({_,N},{_,M}) -> N>=M end, Stats),
+      io:format("~nLink statistics:~n"),
+      lists:foreach
+	(fun ({Name,NumCalls}) ->
+	     Percentage = (NumCalls/TotalCalls)*100,
+	     io:format("~p: ~p%~n",[Name,Percentage])
+	 end, SortedStats)
   end.
 
 run_statem(PrivateModule,Files) ->
@@ -610,6 +681,21 @@ run_statem(PrivateModule,Files,Args) ->
       ok;
     URIV when is_boolean(URIV) ->
       ets:insert(js_links_machine_data,{show_uri,URIV})
+  end,
+  case proplists:get_value(validator,Args) of
+    undefined ->
+      ets:insert(js_links_machine_data,{validator,java_validator});
+    A when is_atom(A) ->
+      case code:which(A) of
+	non_existing ->
+	  io:format
+	    ("*** Error: the validator ~p cannot be found~n",
+	     [A]),
+	  throw(bad);
+	_ ->
+	  ok
+      end,
+      ets:insert(js_links_machine_data,{validator,A})
   end,
   js_links_machine:test().
 
