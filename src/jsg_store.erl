@@ -20,6 +20,10 @@ ensure_open() ->
       ok
   end.
 
+open_clean_db() ->
+  open_db(),
+  ets:delete_all(jsg_store).
+
 open_db() ->
   spawn(fun () ->
 	    ets:new(jsg_store,[named_table,public]),
