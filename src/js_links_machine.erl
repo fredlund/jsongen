@@ -348,8 +348,21 @@ http_request(PreURI,Type,Body,QueryParms) ->
       [{_,Value}] when is_boolean(Value) -> Value;
       _ -> false
     end,
+  ShowURI =
+    case ets:lookup(js_links_machine_data,show_uri) of
+      [{_,URIV}] when is_boolean(URIV) -> URIV;
+      _ -> false
+    end,
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
   %%io:format("Request=~p~n",[Request]),
+  if
+    ShowURI ->
+      io:format
+	("Accessing URI ~p~n",
+	 [URI]);
+    true ->
+      ok
+  end,
   {ElapsedTime,Result} = timer:tc(httpc,request,Request),
   if
     ShowHttpTiming ->
@@ -591,6 +604,12 @@ run_statem(PrivateModule,Files,Args) ->
       ok;
     B when is_boolean(B) ->
       ets:insert(js_links_machine_data,{show_http_timing,B})
+  end,
+  case proplists:get_value(show_uri,Args) of
+    undefined ->
+      ok;
+    URIV when is_boolean(URIV) ->
+      ets:insert(js_links_machine_data,{show_uri,URIV})
   end,
   js_links_machine:test().
 
