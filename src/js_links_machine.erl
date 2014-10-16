@@ -170,9 +170,15 @@ validate_call_result_body(Call,Result) ->
 	      false;
 	    true ->
 	      Body = http_body(Result),
-	      JSON = mochijson2:decode(Body),
-	      try jesse_schema_validator:validate(RealTargetSchema,JSON,[]) of
-		  {ok,_} -> true
+	      %%io:format
+		%%("Checking schema ~p~nagainst~n~s~n",
+		 %%[RealTargetSchema,
+		  %%Body]),
+	      [{_,Validator}] = 
+		ets:lookup(js_links_machine_data,validator),
+	      try Validator:validate(RealTargetSchema,Body) of
+		  true -> true;
+		  false -> false
 	      catch Class:Reason ->
 		  io:format
 		    ("~n*** Error: postcondition error: for http call~n~s~n"++
@@ -180,7 +186,7 @@ validate_call_result_body(Call,Result) ->
 		       "did not validate against the schema~n~s~n"++
 		       "due to error~n~p~n",
 		     [format_http_call(Call),
-		      mochijson2:encode(JSON),
+		      Body,
 		      mochijson2:encode(RealTargetSchema),
 		      Reason]),
 		  io:format
@@ -605,6 +611,8 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   
 test() ->
   jsg_store:put(stats,[]),
+  [{_,Validator}] = ets:lookup(js_links_machine_data,validator),
+  Validator:start_validator(),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
     false ->
       io:format("~n~n***FAILED~n");
@@ -654,6 +662,21 @@ run_statem(PrivateModule,Files,Args) ->
       ok;
     B when is_boolean(B) ->
       ets:insert(js_links_machine_data,{show_http_timing,B})
+  end,
+  case proplists:get_value(validator,Args) of
+    undefined ->
+      ets:insert(js_links_machine_data,{validator,java_validator});
+    A when is_atom(A) ->
+      case code:which(A) of
+	non_existing ->
+	  io:format
+	    ("*** Error: the validator ~p cannot be found~n",
+	     [A]),
+	  throw(bad);
+	_ ->
+	  ok
+      end,
+      ets:insert(js_links_machine_data,{validator,A})
   end,
   js_links_machine:test().
 

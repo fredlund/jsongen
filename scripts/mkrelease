@@ -68,9 +68,11 @@ mkdir ebin
 mkdir doc
 mkdir tests
 mkdir include
+mkdir priv
 
 cp ${ABSSRCDIR}/ebin/*.beam ebin
 cp -r ${ABSSRCDIR}/tests/* tests/
+cp -r $ABSSRCDIR/priv/* priv/
 cp ${ABSSRCDIR}/src/jsongen.hrl include
 
 pushd $ABSSRCDIR/doc/doc
