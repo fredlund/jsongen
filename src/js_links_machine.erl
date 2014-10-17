@@ -195,8 +195,7 @@ validate_call_result_body(Call,Result) ->
 		%%("Checking schema ~p~nagainst~n~s~n",
 		 %%[RealTargetSchema,
 		  %%Body]),
-	      [{_,Validator}] = 
-		get_option(validator),
+	      Validator = get_option(validator),
 	      try Validator:validate(RealTargetSchema,Body) of
 		  true -> true;
 		  false -> false
@@ -664,7 +663,6 @@ run_statem(PrivateModule,Files,Options) ->
     _ ->
       ok
   end,
-  check_and_set_options(Options),
   case collect_links(Files) of
     [] ->
       io:format
@@ -674,6 +672,7 @@ run_statem(PrivateModule,Files,Options) ->
     Links ->
       js_links_machine:init_table(PrivateModule,Links)
   end,
+  check_and_set_options(Options),
   js_links_machine:test().
 
 %% To make eqc not print the horrible counterexample
@@ -713,12 +712,12 @@ check_and_set_options(Options) ->
 	 end
      end, Options),
   NewParsedOptions1 =
-    case proplists:get_value(validator) of
+    case proplists:get_value(validator,ParsedOptions) of
       undefined -> [{validator,java_validator}|ParsedOptions];
       _ -> ParsedOptions
     end,
   NewParsedOptions2 =
-    case proplists:get_value(timeout) of
+    case proplists:get_value(timeout,NewParsedOptions1) of
       undefined -> [{timeout,1500}|NewParsedOptions1];
       _ -> NewParsedOptions1
     end,
