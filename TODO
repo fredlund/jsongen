@@ -45,10 +45,10 @@ otra vez usando "schema : true.
 
 - Dependencies (mochijson2) must be automatically solved (rebar?).
 
-- Permit parameters for POST and PUT, in ADDITION to a body.
+- Permit parameters for POST and PUT, in ADDITION to a body. [x]
 We probably need a new schema for that (extension of JSON schema).
 
-- How to do things such as support substitution of object values
+- How to do things such as support substitution of object values [x]
 into query parameters? (i.e., token returned, token used)
 Or for that matter in bodies?
 One possibility is to extend some kind of substitution syntax for these
@@ -72,11 +72,17 @@ when we start delete the object defining the key upon which they rely.
 (I guess they should be deleted too, so we have a depends-on relation
 for links, this can obviously be transitive).
 
-- We should have convenient operations for defining frequencies,
+- We should have convenient operations for defining frequencies, [x]
 and for redefining values.
 
-- Maybe define a whole schema using quickcheck
+- Maybe define a whole schema using quickcheck [x]
 (i.e., define querySchema or schema).
+
+- Recursive link extraction? [x]
+
+{struct,[{<<"channels">>,arr}]}
+
+instead of arr.
 
 - How to handle attributes of (possibly)
 multiple instances as arguments to operations.
@@ -84,11 +90,31 @@ In general, how to handle arrays?
 Would be nice with a member operation (on something, on the return value
 of an operation).
 
-- Recursive link extraction?
+The idea is to use the syntax
+    type.attribute
+meaning that we look for attribute in any object having the type.
+Possibly we could think of things like var=type;attribute which
+introduces a binding that can later be used in var.attribute
+to enforce that attributes are used from the same element.
+It would be nice if we could separate the binding from the
+attribute use, but it is probably not possible.
+We can use the syntax xxy<-abc:def (binding), abc:def (an attribute for
+any object) and xxy:def (an attribute of a defined variable).
+We can even think of saving such variables in the scope,
+i.e., so that they are accessible in future links.
+But to save a variable we really need an separate assignment,
+so that it is not necessary to use an attribute.
+Maybe something really ugly like {xxy<-abc:_}.
+We could of course do all this also in the Erlang part, and we should
+have nice functions for accomplishing such things.
+We can use the schema "title" attribute as a type
+(and as always, beware of nested types).
+So first we try to interprete xxx as a variable, and then as a type.
+Question: do we 
 
-{struct,[{<<"channels">>,arr}]}
+What is a type name? The name of the file in which a schema resides,
+or better, the name of the schema itself.
 
-instead of arr.
 
 
 
