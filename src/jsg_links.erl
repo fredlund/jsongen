@@ -106,12 +106,28 @@ extract_links(Sch,Term,V) ->
 
     <<"object">> ->
       Links = js_links_machine:collect_schema_links(Sch,true,V),
+      NewVars = update_vars(Term,V),
+      EnvVars = lists:map(fun ({Key,_}) -> Key end, NewVars),
       ShallowLinks =
-	lists:map
-	  (fun ({link,Props}) ->
-	       NewVars = update_vars(Term,V),
+	lists:flatmap
+	  (fun (Link={link,Props}) ->
 	       NewProps = [{object,Term}|Props],
-	       {link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}
+	       NewLink = {link,NewProps},
+	       Href = link_href(Link),
+	       Template = uri_template:parse(binary_to_list(Href)),
+	       TemplateVars = 
+		 lists:filter(fun (T) ->
+				  case T of 
+				    {var,_,_} -> true;
+				    _ -> false
+				  end
+			      end, Template),
+	       case check_vars_exists(TemplateVars,EnvVars,NewLink) of
+		 true ->
+		   [{link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}];
+		 false ->
+		   []
+	       end
 	   end,
 	   Links),
       %%io:format("Shallow links are:~n~p~n",[ShallowLinks]),
@@ -165,6 +181,20 @@ update_vars(Object,OldVars) ->
      %%[OldVars,Object,NewVars]),
   NewVars.
 
+check_vars_exists([],EnvVars,Link) ->
+  true;
+check_vars_exists([{var,Name,_}|LinkVars],EnvVars,Link) ->
+  case not(lists:member(Name,EnvVars)) of
+    true ->
+      io:format
+	("*** Warning: variable ~p not found when generating link~n~p~n"++
+	   "Variables=~p~n*** Warning: Not generating link.~n",
+	 [Name,jsg_links:print_link(Link),EnvVars]),
+      false;
+    false ->
+      check_vars_exists(LinkVars,EnvVars,Link)
+  end.
+
 get_schema(Value={struct,Proplist}) ->
   get_schema(Value,{struct,[]});
 get_schema([Child,Root]) ->
@@ -217,6 +247,23 @@ link_title(Link) ->
     Other ->
       Other
   end.
+
+print_link(Link={link,LD}) ->
+  {struct,LinkDef} = link_def(Link),
+  LinkTitle = 
+    case proplists:get_value(<<"title">>,LinkDef) of
+      L when is_binary(L) ->
+	binary_to_list(L);
+      Other ->
+	Other
+    end,
+  Href =
+    proplists:get_value(<<"href">>,LinkDef),
+  Schema =
+    proplists:get_value(schema,LD),
+  Object =
+    proplists:get_value(object,LD),
+  {link,[{title,LinkTitle},{href,Href},{schema,Schema},{object,Object}]}.
 
 link_request_type(Link) ->
   {struct,LinkDef} = link_def(Link),
