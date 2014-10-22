@@ -291,10 +291,26 @@ initial_links() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 gen_http_request(Link) ->
-  URI = jsg_links:compute_uri(Link),
+  PreURI = jsg_links:compute_uri(Link),
   RequestType = jsg_links:link_request_type(Link),
   {Body,QueryParms} = jsg_links:generate_argument(Link),
-  {URI,RequestType,Body,QueryParms}.
+  EncodedParms = encode_generated_parameters(QueryParms),
+  case re:split(PreURI,"\\?") of
+    [_] ->
+      {PreURI,RequestType,Body,EncodedParms};
+    [BinaryURI,BinaryParms] -> 
+      {binary_to_list(BinaryURI),RequestType,Body,
+       split_parms(BinaryParms)++EncodedParms}
+  end.
+
+split_parms(BinaryParms) ->
+  case re:split(BinaryParms,"&") of
+    [_] ->
+      [Key,Value] = re:split(BinaryParms,"="),
+      [{binary_to_list(Key),binary_to_list(Value)}];
+    Assignments ->
+      lists:flatmap(fun split_parms/1, Assignments)
+  end.
 
 follow_link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   %%io:format
@@ -358,24 +374,13 @@ has_body(delete) ->
 has_body(_) ->
   true.
 
-encode_parameters(PreURI,X) ->
-  case X of
+encode_generated_parameters(Parms) ->
+  case Parms of
     {struct,L} ->
-      Parms =
-	lists:map
-	  (fun ({Key,Value}) -> {binary_to_list(Key), binary_to_list(Value)}
-	   end, L),
-      ParmString =
-	encode_parameters(Parms),
-      if
-	ParmString=="" ->
-	  PreURI;
-	true ->
-	  case string:string(PreURI,"?") of
-	    0 -> PreURI++"?"++ParmString;
-	    _N -> PreURI++"&"++ParmString
-	  end
-      end
+      lists:map
+	(fun ({Key,Value}) -> {binary_to_list(Key), binary_to_list(Value)}
+	 end, L);
+    _ -> []
   end.
 
 encode_parameters([]) -> "";
@@ -391,8 +396,8 @@ http_request(PreURI,Type,Body,QueryParms) ->
   %%io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
   URI =
     case QueryParms of
-      {ok,ParmObj} -> encode_parameters(PreURI,ParmObj);
-      _ -> PreURI
+      [] -> PreURI;
+      _ -> PreURI++"?"++encode_parameters(QueryParms)
     end,
   URIwithBody =
     case Body of
