@@ -83,20 +83,31 @@ extract_dynamic_links(Link,JSONBody) ->
   S = link_schema(Link),
   LD = link_def(Link),
   V = link_vars(Link),
+  Title = link_title(Link),
+  NewHistory = [Title|link_history(Link)],
   %%io:format("extract_dynamic_links(~p)~nSch=~p~n",[Link,LD]),
   Result =
     case jsg_jsonschema:propertyValue(LD,"targetSchema") of
       undefined ->
 	[];
       SchemaDesc ->
-	extract_links(SchemaDesc,JSONBody,V)
+	extract_links
+	  (SchemaDesc,JSONBody,V,NewHistory)
     end,
   %%io:format
     %%("extract_links(~p) from~n~p~nyields~n~p~n",
     %%[Link,JSONBody,Result]),
-  Result.
+  lists:map
+    (fun ({link,Props}) -> 
+	 case proplists:get_value(history,Props) of
+	   undefined ->
+	     {link,[{history,NewHistory}|Props]};
+	   OldHistory ->
+	     {link,[{history,NewHistory}|proplists:delete(history,Props)]}
+	 end
+     end, Result).
 
-extract_links(Sch,Term,V) ->
+extract_links(Sch,Term,V,History) ->
   %%io:format("~nSchema is ~p; Term=~n~p~n",[Sch,Term]),
   Schema = {struct,Proplist} = get_schema(Sch),
   case proplists:get_value(<<"type">>,Proplist) of
@@ -122,7 +133,7 @@ extract_links(Sch,Term,V) ->
 				    _ -> false
 				  end
 			      end, Template),
-	       case check_vars_exists(TemplateVars,EnvVars,NewLink) of
+	       case check_vars_exists(TemplateVars,EnvVars,NewLink,History) of
 		 true ->
 		   [{link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}];
 		 false ->
@@ -131,7 +142,7 @@ extract_links(Sch,Term,V) ->
 	   end,
 	   Links),
       %%io:format("Shallow links are:~n~p~n",[ShallowLinks]),
-      DeepLinks = extract_links_from_subterms(Schema,Term,V),
+      DeepLinks = extract_links_from_subterms(Schema,Term,V,History),
       %%io:format("Deep links are:~n~p~n",[DeepLinks]),
       ShallowLinks++DeepLinks;
 	
@@ -139,7 +150,9 @@ extract_links(Sch,Term,V) ->
       case proplists:get_value(<<"items">>,Proplist) of
 	ItemSchemaDesc={struct,_} ->
 	  lists:flatmap
-	    (fun (SubItem) -> extract_links(ItemSchemaDesc,SubItem,V) end,
+	    (fun (SubItem) ->
+		 extract_links(ItemSchemaDesc,SubItem,V,History)
+	     end,
 	     Term);
 	_ -> []
       end;
@@ -147,7 +160,7 @@ extract_links(Sch,Term,V) ->
     _Other -> []
   end.
 
-extract_links_from_subterms({struct,Proplist},Term,V) ->
+extract_links_from_subterms({struct,Proplist},Term,V,History) ->
   case proplists:get_value(<<"properties">>,Proplist) of
     undefined -> [];
     {struct,Properties} ->
@@ -161,7 +174,7 @@ extract_links_from_subterms({struct,Proplist},Term,V) ->
 		 [];
 	       SubProp ->
 		 %%io:format("SubProp is ~p~n",[SubProp]),
-		 extract_links(Def,SubProp,V)
+		 extract_links(Def,SubProp,V,History)
 	     end
 	 end, Properties)
   end.
@@ -181,18 +194,20 @@ update_vars(Object,OldVars) ->
      %%[OldVars,Object,NewVars]),
   NewVars.
 
-check_vars_exists([],EnvVars,Link) ->
+check_vars_exists([],_EnvVars,_Link,_History) ->
   true;
-check_vars_exists([{var,Name,_}|LinkVars],EnvVars,Link) ->
+check_vars_exists([{var,Name,_}|LinkVars],EnvVars,Link,History) ->
   case not(lists:member(Name,EnvVars)) of
     true ->
       io:format
 	("*** Warning: variable ~p not found when generating link~n~p~n"++
-	   "Variables=~p~n*** Warning: Not generating link.~n",
-	 [Name,jsg_links:print_link(Link),EnvVars]),
+	   "Variables=~p~n"++
+	   "Link history: ~p~n"++
+	   "*** Warning: Not generating link.~n~n",
+	 [Name,jsg_links:print_link(Link),EnvVars,lists:reverse(History)]),
       false;
     false ->
-      check_vars_exists(LinkVars,EnvVars,Link)
+      check_vars_exists(LinkVars,EnvVars,Link,History)
   end.
 
 get_schema(Value={struct,Proplist}) ->
@@ -287,7 +302,11 @@ link_num(Link) ->
 link_vars(Link) ->
   {link,LD} = Link,
   proplists:get_value(vars,LD).
-		 
+
+link_history(Link) ->
+  {link,LD} = Link,
+  proplists:get_value(history,LD,[]).
+
 	     
       
   

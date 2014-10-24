@@ -115,6 +115,16 @@ Question: do we
 What is a type name? The name of the file in which a schema resides,
 or better, the name of the schema itself.
 
+- Invariants:
+\forall tr\in Tr. tr.sender_net_cer = cer("USD",tr.sender_net.currency)
+\forall tr\in Tr. tr.sender_net = tr.sender.net
+(inefficient but maybe ok)
+
+But are these invariants over the REST service, or invariants over
+the discovered links? (or is this the same?)
+
+
+
 
 
 
