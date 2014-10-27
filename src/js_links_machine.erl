@@ -250,7 +250,11 @@ next_state_int(State,Result,Call) ->
 	       mochijson2:decode(http_body(Result))),
 	  %%io:format
 	    %%("NewLinks are~n~p~n",[NewLinks]),
-	  State#state{dynamic_links=sets:union(sets:from_list(NewLinks),State#state.dynamic_links)};
+	  State#state
+	    {dynamic_links=
+	       sets:union
+		 (sets:from_list(NewLinks),
+		  State#state.dynamic_links)};
 	_Other ->
 	  State
       end;
@@ -643,19 +647,9 @@ test() ->
     false ->
       io:format("~n~n***FAILED~n");
     true ->
-      io:format("~n~nPASSED~n",[]),
-      {ok,Stats} = jsg_store:get(stats),
-      TotalCalls =
-	lists:foldl(fun ({_,N},Acc) -> N+Acc end, 0, Stats),
-      SortedStats =
-	lists:sort(fun ({_,N},{_,M}) -> N>=M end, Stats),
-      io:format("~nLink statistics:~n"),
-      lists:foreach
-	(fun ({Name,NumCalls}) ->
-	     Percentage = (NumCalls/TotalCalls)*100,
-	     io:format("~p: ~p%~n",[Name,Percentage])
-	 end, SortedStats)
-  end.
+      io:format("~n~nPASSED~n",[])
+  end,
+  print_stats().
 
 run_statem(PrivateModule,Files) ->
   run_statem(PrivateModule,Files,[]).
@@ -679,6 +673,19 @@ run_statem(PrivateModule,Files,Options) ->
   end,
   check_and_set_options(Options),
   js_links_machine:test().
+
+print_stats() ->
+  {ok,Stats} = jsg_store:get(stats),
+  TotalCalls =
+    lists:foldl(fun ({_,N},Acc) -> N+Acc end, 0, Stats),
+  SortedStats =
+    lists:sort(fun ({_,N},{_,M}) -> N>=M end, Stats),
+  io:format("~nLink statistics:~n-------------------~n"),
+  lists:foreach
+    (fun ({Name,NumCalls}) ->
+	 Percentage = (NumCalls/TotalCalls)*100,
+	 io:format("~p: ~p calls (~p%)~n",[Name,NumCalls,Percentage])
+     end, SortedStats).
 
 %% To make eqc not print the horrible counterexample
 eqc_printer(Format,String) ->

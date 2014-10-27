@@ -115,6 +115,10 @@ Question: do we
 What is a type name? The name of the file in which a schema resides,
 or better, the name of the schema itself.
 
+- Or maybe: links definable over a set of items.
+That is, get_people returns an array of people, we can define
+a link that reference two members of the array.
+
 - Invariants:
 \forall tr\in Tr. tr.sender_net_cer = cer("USD",tr.sender_net.currency)
 \forall tr\in Tr. tr.sender_net = tr.sender.net

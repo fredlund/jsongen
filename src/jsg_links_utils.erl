@@ -17,10 +17,9 @@ private_state(State) ->
 freq_alternatives(Freqs,Alternatives) ->
   FreqAlternatives = 
     lists:map
-      (fun (Gen={call, _, follow_link, [Link={link,LinkData},_]}) ->
-	   RequestType = jsg_links:request_type(Link),
-	   L = proplists:get_value(link,LinkData),
-	   Href = jsg_jsonschema:propertyValue(L,"href"),
+      (fun (Gen={call, _, follow_link, [Link,_]}) ->
+	   RequestType = jsg_links:link_request_type(Link),
+	   Href = jsg_links:link_href(Link),
 	   freq_comp
 	     (Gen,
 	      binary_to_list(Href),
@@ -32,9 +31,16 @@ freq_alternatives(Freqs,Alternatives) ->
 
 freq_comp(Generator,_String,_,[],Default) ->
   {Default,Generator};
+freq_comp(Generator,String,RequestType,
+	  [{Weight,whatever,""}|Rest],Default) ->
+  {Weight,Generator};
+freq_comp(Generator,String,RequestType,
+	  [{Weight,RequestType,""}|Rest],Default) ->
+  {Weight,Generator};
 freq_comp(Generator,String,RequestType1,
 	  [{Weight,RequestType2,First}|Rest],Default) ->
-  case {string:str(String,First),request_type_match(RequestType1,RequestType2)} of
+  case {string:str(String,First),
+	request_type_match(RequestType1,RequestType2)} of
     {N,true} when N>0 ->
       {Weight,Generator};
     _ ->
