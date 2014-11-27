@@ -291,6 +291,10 @@ link_href(Link) ->
   {struct,LinkDef} = link_def(Link),
   proplists:get_value(<<"href">>,LinkDef).
 
+link_targetSchema(Link) ->
+  {struct,LinkDef} = link_def(Link),
+  proplists:get_value(<<"targetSchema">>,LinkDef).
+
 link_schema(Link) ->
   {link,LD} = Link,
   proplists:get_value(schema,LD).
