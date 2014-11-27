@@ -332,25 +332,47 @@ follow_link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
       jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
     _ -> ok
   end,
-  Result = http_request(URI,RequestType,Body,QueryParms),
-  NewResult =
-    case response_has_body(Result) of
-      true ->
-	ResponseBody = http_body(Result),
-	case length(ResponseBody)>1024 of
-	  true ->
-	    jsg_store:put(last_body,{body,ResponseBody}),
-	    {P1,{P2,P3,_}} = Result,
-	    {P1,{P2,P3,ets_body}};
-	  false ->
-	    jsg_store:put(last_body,has_body),
-	    Result
-	end;
-      false ->
-	jsg_store:put(last_body,no_body),
-	Result
-    end,
-  NewResult.
+  case get_option(simulation_mode) of
+    false ->
+      Result = http_request(URI,RequestType,Body,QueryParms),
+      case response_has_body(Result) of
+	true ->
+	  ResponseBody = http_body(Result),
+	  case length(ResponseBody)>1024 of
+	    true ->
+	      jsg_store:put(last_body,{body,ResponseBody}),
+	      {P1,{P2,P3,_}} = Result,
+	      {P1,{P2,P3,ets_body}};
+	    false ->
+	      jsg_store:put(last_body,has_body),
+	      Result
+	  end;
+	false ->
+	  jsg_store:put(last_body,no_body),
+	  Result
+      end;
+    true -> 
+      Schema = jsg_links:get_schema(jsg_links:link_schema(Link)),
+      TargetSchema =
+	case jsg_jsonschema:propertyValue(Schema,"targetSchema") of
+	  undefined ->
+	    undefined;
+	  Sch ->
+	    jsg_links:get_schema(Sch)
+	end,
+      ResponseBody =
+	case TargetSchema of
+	  undefined ->
+	    eqc_gen:pick(jsongen:anyType());
+	  Schema ->
+	    eqc_gen:pick(jsongen:json(TargetSchema))
+	end,
+      EncodedBody = mochijson2:encode(ResponseBody),
+      Headers = {"HTTP/1.1",200,"OK"},
+      StatusLine = [{"content-length",length(EncodedBody)},
+		    {"content-type","application/json;charset=UTF-8"}],
+      {ok,{Headers,StatusLine,EncodedBody}}
+  end.
 
 format_http_call(Call) ->
   case Call of
@@ -419,7 +441,8 @@ http_request(PreURI,Type,Body,QueryParms) ->
     true -> io:format("Accessing URI ~p~n",[URI]);
     false -> ok
   end,
-  {ElapsedTime,Result} = timer:tc(httpc,request,Request),
+  {ElapsedTime,Result} =
+    timer:tc(httpc,request,Request),
   case get_option(show_http_timing) of
     true -> io:format("http request took ~p milliseconds~n",[ElapsedTime/1000]);
     false -> ok
@@ -713,6 +736,7 @@ check_and_set_options(Options) ->
 	     end,
 	     ParsedOption;
 	   timeout when is_integer(Value),Value>0 -> ParsedOption;
+	   simulation_mode when is_boolean(Value) -> ParsedOption;
 	   show_http_timing when is_boolean(Value) -> ParsedOption;
 	   show_uri when is_boolean(Value) -> ParsedOption;
 	   validator when is_atom(Value) -> ParsedOption;

@@ -31,7 +31,7 @@ compute_uri(Link={link,LinkData}) ->
 
 generate_argument(Link) ->
   jsg_store:put(eqc_gen_context,Link),
-  S = link_schema(Link),
+  S = get_schema(link_schema(Link)),
   Sch = link_def(Link),
   Schema = 
     case jsg_jsonschema:propertyValue(S,"schema") of
