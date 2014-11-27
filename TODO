@@ -127,6 +127,14 @@ a link that reference two members of the array.
 But are these invariants over the REST service, or invariants over
 the discovered links? (or is this the same?)
 
+- Idea: we can refer to elements in array using the attribute name
+that refers to the array, and some other element (in)
+"in elements".
+Maybe, we could also make variables more unique by 
+referring to the type (name) where they are introduced,
+if there are collisions:
+   "in channels_epg_response.elements"
+
 
 
 

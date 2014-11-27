@@ -142,7 +142,7 @@ extract_links(Sch,Term,V,History) ->
 	   end,
 	   Links),
       %%io:format("Shallow links are:~n~p~n",[ShallowLinks]),
-      DeepLinks = extract_links_from_subterms(Schema,Term,V,History),
+      DeepLinks = extract_links_from_subterms(Schema,Term,NewVars,History),
       %%io:format("Deep links are:~n~p~n",[DeepLinks]),
       ShallowLinks++DeepLinks;
 	
