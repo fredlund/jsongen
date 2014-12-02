@@ -52,7 +52,7 @@ command_int(State) ->
     State#state.initialized ->
       Alternatives =
 	[
-	 gen_link(State,Link) ||
+	 modify_link(State,Link,gen_link(State,Link)) ||
 	  Link <-
 	    sets:to_list
 	      (sets:union
@@ -92,6 +92,12 @@ gen_link(State,Link) ->
 
 gen_link_int(_State,Link) ->
   {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]}.
+
+modify_link(State,Link,Result) ->
+  make_call(modify_link,fun modify_link_int/3,[State,Link,Result]).
+
+modify_link_int(_State,Link,Result) ->
+  Result.
 
 link_permitted(State,Link) ->
   make_call(link_permitted,fun link_permitted_int/2,[State,Link]).
