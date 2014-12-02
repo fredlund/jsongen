@@ -39,7 +39,7 @@ command(State) ->
   try make_call(command,fun command_int/1,[State])
   catch Class:Reason ->
       io:format
-	("Warning: command/1 raises exception ~p~n",
+	("~n*** Error: command/1 raises exception ~p~n",
 	 [Reason]),
       StackTrace = erlang:get_stacktrace(),
       erlang:raise(Class,Reason,StackTrace)
@@ -378,12 +378,18 @@ has_body(_) ->
 
 encode_generated_parameters(Parms) ->
   case Parms of
-    {struct,L} ->
+    {ok,{struct,L}} ->
       lists:map
-	(fun ({Key,Value}) -> {binary_to_list(Key), binary_to_list(Value)}
+	(fun ({Key,Value}) ->
+	     {to_list(Key), to_list(Value)}
 	 end, L);
     _ -> []
   end.
+
+to_list(B) when is_binary(B) ->
+  binary_to_list(B);
+to_list(I) when is_integer(I) ->
+  integer_to_list(I).
 
 encode_parameters([]) -> "";
 encode_parameters([{Key,Value}|Rest]) -> 

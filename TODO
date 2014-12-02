@@ -134,6 +134,15 @@ Maybe, we could also make variables more unique by
 referring to the type (name) where they are introduced,
 if there are collisions:
    "in channels_epg_response.elements"
+What is really unique is the link; we could let attributes refer to the
+link (if omitted using the last link) and then a normal JSON pointer expression.
+We need also a syntax for referring to any component of an array.
+Maybe some syntax ~2 for literally $any, while...
+
+Syntax:
+	{link.path_expression}
+	a path expression can contain a special _any_ or $any
+	identifier to signal any array index.
 
 - Implement an option to simulate exploring a web service,
 i.e., don't really do the web service calls but let the reply

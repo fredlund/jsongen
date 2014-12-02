@@ -33,20 +33,8 @@ generate_argument(Link) ->
   jsg_store:put(eqc_gen_context,Link),
   S = get_schema(link_schema(Link)),
   Sch = link_def(Link),
-  Schema = 
-    case jsg_jsonschema:propertyValue(S,"schema") of
-      undefined ->
-	undefined;
-      Sch ->
-	get_schema(Sch,S)
-    end,
-  QuerySchema = 
-    case jsg_jsonschema:propertyValue(S,"querySchema") of
-      undefined ->
-	undefined;
-      QSch ->
-	get_schema(QSch,S)
-    end,
+  Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
+  QuerySchema = jsg_jsonschema:propertyValue(Sch,"querySchema"),
   RequestType = link_request_type(Link),
   Body = 
     case may_have_body(RequestType) of
