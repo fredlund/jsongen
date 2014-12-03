@@ -358,18 +358,22 @@ follow_link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
 
 format_http_call(Call) ->
   case Call of
-    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body,_Params}], _} ->
-      format_http_call(URI,RequestType,Body)
+    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body,Params}], _} ->
+      format_http_call(URI,RequestType,Body,Params)
   end.
 
-format_http_call(URI,RequestType,Body) ->
-  %% We should print the query string too
+format_http_call(PreURI,RequestType,Body,Params) ->
   BodyString =
     case Body of
       {ok,JSON} ->
 	io_lib:format(" body=~s",[mochijson2:encode(JSON)]);
       _ ->
 	""
+    end,
+  URI = 
+    case Params of
+      [] -> PreURI;
+      _ -> PreURI++"?"++encode_parameters(Params)
     end,
   io_lib:format
     ("~s using ~s~s",
