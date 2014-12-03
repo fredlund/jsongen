@@ -22,12 +22,7 @@
 compute_uri(Link={link,LinkData}) ->
   Href = link_href(Link),
   Template = uri_template:parse(binary_to_list(Href)),
-  Variables = 
-    lists:filter
-      (fun ({_,Value}) -> is_integer(Value) orelse is_binary(Value) end,
-       proplists:get_value(vars,LinkData)),
-  %%io:format("compute_uri: variables are~n~p~n",[Variables]),
-  uri_template:sub(Variables,binary_to_list(Href)).
+  uri_template:sub(Link,binary_to_list(Href)).
 
 generate_argument(Link) ->
   jsg_store:put(eqc_gen_context,Link),
@@ -67,24 +62,18 @@ may_have_body(delete) ->
 may_have_body(_) ->
   true.
 
-extract_dynamic_links(Link,JSONBody) ->
+extract_dynamic_links(Link,Term,Object) ->
   S = link_schema(Link),
   LD = link_def(Link),
-  V = link_vars(Link),
   Title = link_title(Link),
-  NewHistory = [Title|link_history(Link)],
-  %%io:format("extract_dynamic_links(~p)~nSch=~p~n",[Link,LD]),
-  Result =
+  NewHistory = [{Title,Object}|link_history(Link)],
+  DynamicLinks =
     case jsg_jsonschema:propertyValue(LD,"targetSchema") of
       undefined ->
 	[];
       SchemaDesc ->
-	extract_links
-	  (SchemaDesc,JSONBody,V,NewHistory)
+	extract_links(SchemaDesc,Term,Object,NewHistory)
     end,
-  %%io:format
-    %%("extract_links(~p) from~n~p~nyields~n~p~n",
-    %%[Link,JSONBody,Result]),
   lists:map
     (fun ({link,Props}) -> 
 	 case proplists:get_value(history,Props) of
@@ -93,10 +82,9 @@ extract_dynamic_links(Link,JSONBody) ->
 	   OldHistory ->
 	     {link,[{history,NewHistory}|proplists:delete(history,Props)]}
 	 end
-     end, Result).
+     end, DynamicLinks).
 
-extract_links(Sch,Term,V,History) ->
-  %%io:format("~nSchema is ~p; Term=~n~p~n",[Sch,Term]),
+extract_links(Sch,Term,Object,History) ->
   Schema = {struct,Proplist} = get_schema(Sch),
   case proplists:get_value(<<"type">>,Proplist) of
     undefined ->
@@ -104,42 +92,28 @@ extract_links(Sch,Term,V,History) ->
       [];
 
     <<"object">> ->
-      Links = js_links_machine:collect_schema_links(Sch,true,V),
-      NewVars = update_vars(Term,V),
-      EnvVars = lists:map(fun ({Key,_}) -> Key end, NewVars),
+      Links = js_links_machine:collect_schema_links(Sch,true),
       ShallowLinks =
-	lists:flatmap
+	lists:map
 	  (fun (Link={link,Props}) ->
-	       NewProps = [{object,Term}|Props],
+	       NewProps = [{object,Object}|Props],
 	       NewLink = {link,NewProps},
 	       Href = link_href(Link),
 	       Template = uri_template:parse(binary_to_list(Href)),
-	       TemplateVars = 
-		 lists:filter(fun (T) ->
-				  case T of 
-				    {var,_,_} -> true;
-				    _ -> false
-				  end
-			      end, Template),
-	       case check_vars_exists(TemplateVars,EnvVars,NewLink,History) of
-		 true ->
-		   [{link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}];
-		 false ->
-		   []
-	       end
+	       NewLink
 	   end,
 	   Links),
       %%io:format("Shallow links are:~n~p~n",[ShallowLinks]),
-      DeepLinks = extract_links_from_subterms(Schema,Term,NewVars,History),
+      DeepLinks = extract_links_from_subterms(Schema,Term,Object,History),
       %%io:format("Deep links are:~n~p~n",[DeepLinks]),
       ShallowLinks++DeepLinks;
-	
+
     <<"array">> ->
       case proplists:get_value(<<"items">>,Proplist) of
 	ItemSchemaDesc={struct,_} ->
 	  lists:flatmap
 	    (fun (SubItem) ->
-		 extract_links(ItemSchemaDesc,SubItem,V,History)
+		 extract_links(ItemSchemaDesc,SubItem,Object,History)
 	     end,
 	     Term);
 	_ -> []
@@ -148,7 +122,7 @@ extract_links(Sch,Term,V,History) ->
     _Other -> []
   end.
 
-extract_links_from_subterms({struct,Proplist},Term,V,History) ->
+extract_links_from_subterms({struct,Proplist},Term,Object,History) ->
   case proplists:get_value(<<"properties">>,Proplist) of
     undefined -> [];
     {struct,Properties} ->
@@ -162,40 +136,27 @@ extract_links_from_subterms({struct,Proplist},Term,V,History) ->
 		 [];
 	       SubProp ->
 		 %%io:format("SubProp is ~p~n",[SubProp]),
-		 extract_links(Def,SubProp,V,History)
+		 extract_links(Def,SubProp,Object,History)
 	     end
 	 end, Properties)
   end.
 
-update_vars(Object,OldVars) ->
-  NewVars =
-    case Object of
-      {struct,Proplist} ->
-	lists:foldl
-	  (fun ({Key,Value},Acc) ->
-	       AtomKey = list_to_atom(binary_to_list(Key)),
-	       [{AtomKey,Value}|proplists:delete(AtomKey,Acc)]
-	   end, OldVars, Proplist)
-    end,
-  %%io:format
-    %%("new_vars: from ~p and object~n~p~ncomputes ~p~n",
-     %%[OldVars,Object,NewVars]),
-  NewVars.
-
-check_vars_exists([],_EnvVars,_Link,_History) ->
-  true;
-check_vars_exists([{var,Name,_}|LinkVars],EnvVars,Link,History) ->
-  case not(lists:member(Name,EnvVars)) of
-    true ->
-      io:format
-	("*** Warning: variable ~p not found when generating link~n~p~n"++
-	   "Variables=~p~n"++
-	   "Link history: ~p~n"++
-	   "*** Warning: Not generating link.~n~n",
-	 [Name,jsg_links:print_link(Link),EnvVars,lists:reverse(History)]),
-      false;
-    false ->
-      check_vars_exists(LinkVars,EnvVars,Link,History)
+intern_object(Term) ->
+  %% This is far from process safe...
+  case jsg_store:get(Term) of
+    {ok,N} -> N;
+    _ -> 
+      Counter =
+	case jsg_store:get(object_counter) of
+	  {ok,Cnt} ->
+	    Cnt;
+	  _ ->
+	    jsg_store:put(object_counter,0),
+	    0
+	end,
+      jsg_store:put(Term,Counter),
+      jsg_store:put(object_counter,Counter+1),
+      Counter
   end.
 
 get_schema(Value={struct,Proplist}) ->
@@ -290,10 +251,6 @@ link_schema(Link) ->
 link_num(Link) ->
   {link,LD} = Link,
   proplists:get_value(link,LD).
-
-link_vars(Link) ->
-  {link,LD} = Link,
-  proplists:get_value(vars,LD).
 
 link_history(Link) ->
   {link,LD} = Link,

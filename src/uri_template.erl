@@ -10,7 +10,8 @@
 
 
 sub(Vars, Template) ->
-  sub(parse(Template), encode(Vars), []).
+%%  sub(parse(Template), encode(Vars), []).
+  sub(parse(Template), Vars, []).
 
 sub([], _Vars, URI) ->
   reverse(URI);
@@ -41,7 +42,7 @@ parse_expansion(String) ->
 parse_var(String) ->
   case string:tokens(String, "=") of
     [String] ->
-      {var, list_to_atom(String), []};
+      {var, list_to_atom(String), void};
     [Var, Default] ->
       {var, list_to_atom(Var), Default}
   end.
@@ -63,8 +64,8 @@ encode_var({Key, Value}) ->
   {Key, percent_encode(Value)}.
 
 expand({var, Var, Default}, Values) ->
-  case proplists:lookup(Var, Values) of
-    none -> Default;
+  case var_lookup(Var, Values) of
+    none when Default=/=void -> Default;
     {Var, Value} -> Value
   end;
 expand({opt, Arg, Vars}, Values) ->
@@ -151,3 +152,24 @@ hexchr(N) when N >= 10 ->
   N + $A - 10;
 hexchr(N) when N < 10 ->
   N + $0.
+
+var_lookup(Name, {link,Props}) ->
+  io:format("Name is ~p~n",[Name]),
+  {Object,Pointer} =
+    case string:tokens(Name, ".") of
+      [_] ->
+	Num = proplists:get_value(object,Props),
+	{ok,JSONTerm} = jsg_store:get({object,Num}),
+	{JSONTerm,Name};
+      [Title,JPointer] ->
+	History = proplists:get_value(history,Props),
+	{_,Num} = lists:keyfind(Title,1,History),
+	{ok,JSONTerm} = jsg_store:get({object,Num}),
+	{JSONTerm,JPointer}
+    end,
+  Pointer = string:tokens(Pointer,"/"),
+  jsg_jsonref:deref(Object,Pointer).
+      
+      
+  
+  
