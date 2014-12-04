@@ -30,7 +30,7 @@ extract_dynamic_links(Link,Term,Object) ->
   lists:map
     (fun ({link,Props}) -> 
 	 {link,
-	  [{object,Object},{history,NewHistory}|
+	  [{type,dynamic},{object,Object},{history,NewHistory}|
 	   proplists:delete(history,Props)]}
      end, DynamicLinks).
 
@@ -221,5 +221,9 @@ link_history(Link) ->
 link_calculated_href(Link) ->	     
   {link,LD} = Link,
   proplists:get_value(calculated_href,LD,[]).
+
+link_type(Link) ->	     
+  {link,LD} = Link,
+  proplists:get_value(type,LD,[]).
       
   
