@@ -50,17 +50,25 @@ command(State) ->
 command_int(State) ->
   if
     State#state.initialized ->
-      Alternatives =
-	[
-	 modify_link(State,Link,gen_link(State,Link)) ||
-	  Link <-
-	    sets:to_list
-	      (sets:union
-		 (State#state.static_links,
-		  State#state.dynamic_links)),
-	  link_permitted(State,Link)
-	],
-      compose_alternatives(State,Alternatives);
+      ?LET
+	(Link,
+	 begin
+	   Alternatives =
+	     [
+	      Link ||
+	       Link <-
+		 sets:to_list
+		   (sets:union
+		      (State#state.static_links,
+		       State#state.dynamic_links)),
+	       link_permitted(State,Link)
+	     ],
+	   compose_alternatives(State,Alternatives)
+	 end,
+	 ?LET(Parms,
+	      gen_http_request(Link),
+	      {call, ?MODULE, follow_link, [Link,Parms]}));
+
     true ->
       {call, ?MODULE, initialize, []}
   end.
@@ -75,24 +83,19 @@ compose_alternatives_int(_State,Alternatives) ->
 initialize() ->
   %%jsg_store:open_clean_db(),
   jsg_utils:clear_schema_cache(),
-%%  {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
-%%  io:format
-%%    ("~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
-%%     [self(),
-%%      ProcessMemory,
-%%      Mem/(1024.0*1024.0*1024.0),
-%%      erlang:memory()]),
-  %%io:format("~n~nNew test:~n"),
+  true = ets:match_delete(jsg_store,{{object,'_'},'_'}),
+  true = ets:match_delete(jsg_store,{{term,'_'},'_'}),
+  {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
+  io:format
+    ("~n~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
+     [self(),
+      ProcessMemory,
+      Mem/(1024.0*1024.0*1024.0),
+      erlang:memory()]),
   httpc:reset_cookies().
 
 callouts(_,_) ->
   ?EMPTY.
-
-gen_link(State,Link) ->
-  make_call(gen_link,fun gen_link_int/2,[State,Link]).
-
-gen_link_int(_State,Link) ->
-  {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]}.
 
 modify_link(State,Link,Result) ->
   make_call(modify_link,fun modify_link_int/3,[State,Link,Result]).
@@ -325,17 +328,57 @@ initial_links() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 gen_http_request(Link) ->
-  PreURI = jsg_links:link_calculated_href(Link),
+  ?LET({Body,QueryParms},
+       {generate_body(Link),generate_parameters(Link)},
+       begin
+	 PreURI = jsg_links:link_calculated_href(Link),
+	 RequestType = jsg_links:link_request_type(Link),
+	 EncodedParms = encode_generated_parameters(QueryParms),
+	 case re:split(PreURI,"\\?") of
+	   [_] ->
+	     {PreURI,RequestType,Body,EncodedParms};
+	   [BinaryURI,BinaryParms] -> 
+	     {binary_to_list(BinaryURI),RequestType,Body,
+	      split_parms(BinaryParms)++EncodedParms}
+	 end
+       end).
+
+generate_body(Link) ->
+  S = jsg_links:get_schema(jsg_links:link_schema(Link)),
+  Sch = jsg_links:link_def(Link),
+  Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
+  QuerySchema = jsg_jsonschema:propertyValue(Sch,"querySchema"),
   RequestType = jsg_links:link_request_type(Link),
-  {Body,QueryParms} = jsg_links:generate_argument(Link),
-  EncodedParms = encode_generated_parameters(QueryParms),
-  case re:split(PreURI,"\\?") of
-    [_] ->
-      {PreURI,RequestType,Body,EncodedParms};
-    [BinaryURI,BinaryParms] -> 
-      {binary_to_list(BinaryURI),RequestType,Body,
-       split_parms(BinaryParms)++EncodedParms}
+  case may_have_body(RequestType) of
+    true when Schema=/=undefined -> 
+      jsongen:json(Schema);
+    _ -> 
+      undefined
   end.
+
+generate_parameters(Link) ->
+  S = jsg_links:get_schema(jsg_links:link_schema(Link)),
+  Sch = jsg_links:link_def(Link),
+  Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
+  QuerySchema = jsg_jsonschema:propertyValue(Sch,"querySchema"),
+  RequestType = jsg_links:link_request_type(Link),
+  case may_have_body(RequestType) of
+    true when QuerySchema=/=undefined ->
+      jsongen:json(QuerySchema);
+    false when QuerySchema=/=undefined ->
+      jsongen:json(QuerySchema);
+    false when Schema=/=undefined ->
+      jsongen:json(Schema);
+    _ ->
+      undefined
+  end.
+
+may_have_body(get) ->
+  false;
+may_have_body(delete) ->
+  false;
+may_have_body(_) ->
+  true.
 
 split_parms(BinaryParms) ->
   case re:split(BinaryParms,"&") of

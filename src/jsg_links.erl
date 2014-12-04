@@ -15,53 +15,6 @@
 -define(LOG(X,Y),true).
 -endif.
 
-
-%% Given a set of file corresponding to JSON schemas,
-%% traverse the schemas to find (non-relative) link definitions.
-
-compute_uri(Link={link,LinkData}) ->
-  Href = link_href(Link),
-  Template = uri_template:parse(binary_to_list(Href)),
-  uri_template:sub(Link,binary_to_list(Href)).
-
-generate_argument(Link) ->
-  jsg_store:put(eqc_gen_context,Link),
-  S = get_schema(link_schema(Link)),
-  Sch = link_def(Link),
-  Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
-  QuerySchema = jsg_jsonschema:propertyValue(Sch,"querySchema"),
-  RequestType = link_request_type(Link),
-  Body = 
-    case may_have_body(RequestType) of
-      true when Schema=/=undefined -> 
-	BodyGen = jsongen:json(Schema),
-	{ok,eqc_gen:pick(BodyGen)};
-      _ -> 
-	undefined
-    end,
-  QueryParameters =
-    case may_have_body(RequestType) of
-      true when QuerySchema=/=undefined ->
-	QGen = jsongen:json(QuerySchema),
-	{ok,eqc_gen:pick(QGen)};
-      false when QuerySchema=/=undefined ->
-	QGen = jsongen:json(QuerySchema),
-	{ok,eqc_gen:pick(QGen)};
-      false when Schema=/=undefined ->
-	QGen = jsongen:json(Schema),
-	{ok,eqc_gen:pick(QGen)};
-      _ ->
-	undefined
-    end,
-  {Body,QueryParameters}.
-
-may_have_body(get) ->
-  false;
-may_have_body(delete) ->
-  false;
-may_have_body(_) ->
-  true.
-
 extract_dynamic_links(Link,Term,Object) ->
   S = link_schema(Link),
   LD = link_def(Link),
@@ -151,7 +104,7 @@ extract_links_from_subterms(FollowedLink,{struct,Proplist},Term,Pointer,Object,H
 
 intern_object(Term) ->
   %% This is far from process safe...
-  case jsg_store:get(Term) of
+  case jsg_store:get({term,Term}) of
     {ok,N} -> N;
     _ -> 
       Counter =
@@ -162,7 +115,7 @@ intern_object(Term) ->
 	    jsg_store:put(object_counter,0),
 	    0
 	end,
-      jsg_store:put(Term,Counter),
+      jsg_store:put({term,Term},Counter),
       jsg_store:put({object,Counter},Term),
       jsg_store:put(object_counter,Counter+1),
       Counter
