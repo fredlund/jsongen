@@ -150,29 +150,70 @@ hexchr(N) when N >= 10 ->
 hexchr(N) when N < 10 ->
   N + $0.
 
-var_lookup(Name, Link={link,Props}) ->
-  io:format("Name is ~p~n",[Name]),
-  {Object,Pointer} =
-    case string:tokens(atom_to_list(Name), ".") of
-      [NameString] ->
-	Num = proplists:get_value(object,Props),
-	{ok,JSONTerm} = jsg_store:get({object,Num}),
-	{JSONTerm,NameString};
-      [Title,JPointer] ->
-	History = proplists:get_value(history,Props),
-	{_,Num} = lists:keyfind(Title,1,History),
-	{ok,JSONTerm} = jsg_store:get({object,Num}),
-	{JSONTerm,JPointer}
-    end,
-  Pointers = string:tokens(Pointer,"/"),
-  case jsg_jsonref:deref(Pointers,Object) of
-    undefined ->
-      io:format("*** Error: could not lookup ~p in ~p~n",[Name,Link]),
+parse_number(String) ->
+  parse_number(String,[]).
+parse_number([Ch|Rest],Acc) ->
+  if
+    Ch>=$0, Ch=<$9 ->
+      parse_number(Rest,[Ch|Acc]);
+    Acc==[] ->
+      [Ch|Rest];
+    true ->
+      {lists:reverse(Acc),[Ch|Rest]}
+  end;
+parse_number([],Acc) when Acc==[] ->
+  [];
+parse_number([],Acc) ->
+  {lists:reverse(Acc),[]}.
+
+var_lookup(Name, Context={Link,Object,Location}) ->
+  NameList = atom_to_list(Name),
+  case string:tokens(atom_to_list(Name), ".") of
+    [Title,JPointer] ->
+      %%io:format("an absolute link ~p:~p~n",[Title,JPointer]),
+      History = jsg_links:link_history(Link),
+      %%io:format("history=~n~p~n",[History]),
+      {_,Num} = lists:keyfind(Title,1,History),
+      {ok,HistoryObject} = jsg_store:get({object,Num}),
+      PointerList = string:tokens(JPointer,"/"),
+      try_deref(Link,PointerList,HistoryObject,Name);
+    [NameString] ->
+      {ok,RealObject} = jsg_store:get({object,Object}),
+      case parse_number(NameList) of
+	{Number,Rest} -> 
+	  PointerList = string:tokens(Rest,"/"),
+	  try_deref_relative(Link,Number,PointerList,RealObject,Location,Name);
+	[$*|Rest] ->
+	  PointerList = string:tokens(Rest,"/"),
+	  try_deref_relative(Link,any,PointerList,RealObject,Location,Name);
+	Rest ->
+	  PointerList = string:tokens(Rest,"/"),
+	  try_deref_relative(Link,0,PointerList,RealObject,Location,Name)
+      end
+  end.
+ 
+try_deref(Link,Pointer,Object,Name) ->
+  case jsg_jsonref:deref(Pointer,Object) of
+    false ->
+      io:format
+	("*** Error: for link~n~p~ncould not lookup ~p (~p) in ~p~n",
+	 [Link,Name,Pointer,Object]),
       throw(bad);
-    Result ->
+    {ok,Result} ->
       binary_to_list(Result)
   end.
-      
-      
+
+try_deref_relative(Link,LevelsUp,AbsolutePointer,Object,CurrentPointer,Name) ->
+  case jsg_jsonref:deref_relative_pointer(LevelsUp,AbsolutePointer,Object,CurrentPointer) of
+    false ->
+      io:format
+	("*** Error: for link~n~p~ncould not do relative lookup ~p (~p:~p)~nin ~p~n(at ~p)~n",
+	 [Link,Name,LevelsUp,AbsolutePointer,Object,CurrentPointer]),
+      throw(bad);
+    {ok,Result} ->
+      binary_to_list(Result)
+  end.
+
+     
   
   

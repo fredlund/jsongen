@@ -137,20 +137,22 @@ postcondition(State,Call,Result) ->
   case Call of
     {_, _, follow_link, _, _} ->
       io:format
-	("number of dynamic links=~p~nafter call~n~s~nsize of result=~p flat_size=~p"++
-	   " size of state=~p flat state=~p~n",
-	 [sets:size(State#state.dynamic_links),
-	  format_http_call(Call),
-	  erts_debug:size(Result),
-	  erts_debug:flat_size(Result),
-	  erts_debug:size(State),
-	  erts_debug:flat_size(State)]),
-      case (erts_debug:flat_size(State)/erts_debug:size(State))>10 of
-	true ->
-	  io:format("*** flat_size is BIG:~n~p~n",[State]);
-	false ->
-	  ok
-      end;
+	("number of dynamic links=~p~n",
+	 [sets:size(State#state.dynamic_links)]);
+     %% io:format
+      %%("after call~n~s~nsize of result=~p flat_size=~p"++
+	%%   " size of state=~p flat state=~p~n",
+	 %%format_http_call(Call),
+	 %%erts_debug:size(Result),
+	 %%erts_debug:flat_size(Result),
+	 %%erts_debug:size(State),
+	 %%erts_debug:flat_size(State)]),
+      %%case (erts_debug:flat_size(State)/erts_debug:size(State))>10 of
+	%%true ->
+	  %%io:format("*** flat_size is BIG:~n~p~n",[State]);
+	%%false ->
+	 %% ok
+      %%end;
     _ ->
       ok
   end,
@@ -273,7 +275,8 @@ next_state_int(State,Result,Call) ->
 	    case response_has_body(Result) of
 	      true ->
 		JSONbody = mochijson2:decode(http_body(Result)),
-		jsg_links:extract_dynamic_links(Link,JSONbody);
+		jsg_links:extract_dynamic_links
+		  (Link,JSONbody,jsg_links:intern_object(JSONbody));
 	      _ ->
 		[]
 	    end,
@@ -324,7 +327,7 @@ initial_links() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 gen_http_request(Link) ->
-  PreURI = jsg_links:compute_uri(Link),
+  PreURI = jsg_links:link_calculated_href(Link),
   RequestType = jsg_links:link_request_type(Link),
   {Body,QueryParms} = jsg_links:generate_argument(Link),
   EncodedParms = encode_generated_parameters(QueryParms),
@@ -611,17 +614,17 @@ prop_ok() ->
 	  ?MODULE,
 	  Cmds,
 	  begin
-	    io:format("Res size is ~p~n",[erts_debug:size(Res)]),
-	    io:format("DS size is ~p~n",[erts_debug:size(DS)]),
-	    io:format("length(H)=~p~n",[length(H)]),
-	    [{P1,P2,P3}|_] = lists:reverse(H),
-	    io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
-	    io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
-	    io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
+	    %%io:format("Res size is ~p~n",[erts_debug:size(Res)]),
+	    %%io:format("DS size is ~p~n",[erts_debug:size(DS)]),
+	    %%io:format("length(H)=~p~n",[length(H)]),
+	    %%[{P1,P2,P3}|_] = lists:reverse(H),
+	    %%io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
+	    %%io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
+	    %%io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
 	    %%io:format("P1=~p~n",[P1]),
 	    %%io:format("P2=~p~n",[P2]),
 	    %%io:format("P3=~p~n",[P3]),
-	    io:format("H size is ~p~n",[erts_debug:size(H)]),
+	    %%io:format("H size is ~p~n",[erts_debug:size(H)]),
 	    if
 	      Res == ok ->
 		true;
@@ -818,7 +821,10 @@ collect_links(Files) ->
 
 collect_links_from_file(File) ->
   FileSchema = {struct,[{<<"$ref">>,list_to_binary(File)}]},
-  collect_schema_links(FileSchema,false).
+  lists:map
+    (fun (Link={link,Props}) ->
+	 {link,[{calculated_href,jsg_links:link_href(Link)}|Props]}
+     end, collect_schema_links(FileSchema,false)).
 
 collect_schema_links(RawSchema, DependsOnObject) ->
   Schema = jsg_links:get_schema(RawSchema),

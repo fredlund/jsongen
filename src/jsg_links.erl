@@ -72,19 +72,16 @@ extract_dynamic_links(Link,Term,Object) ->
       undefined ->
 	[];
       SchemaDesc ->
-	extract_links(SchemaDesc,Term,Object,NewHistory)
+	extract_links(Link,SchemaDesc,Term,[],Object,NewHistory)
     end,
   lists:map
     (fun ({link,Props}) -> 
-	 case proplists:get_value(history,Props) of
-	   undefined ->
-	     {link,[{history,NewHistory}|Props]};
-	   OldHistory ->
-	     {link,[{history,NewHistory}|proplists:delete(history,Props)]}
-	 end
+	 {link,
+	  [{object,Object},{history,NewHistory}|
+	   proplists:delete(history,Props)]}
      end, DynamicLinks).
 
-extract_links(Sch,Term,Object,History) ->
+extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
   Schema = {struct,Proplist} = get_schema(Sch),
   case proplists:get_value(<<"type">>,Proplist) of
     undefined ->
@@ -96,47 +93,51 @@ extract_links(Sch,Term,Object,History) ->
       ShallowLinks =
 	lists:map
 	  (fun (Link={link,Props}) ->
-	       NewProps = [{object,Object}|Props],
-	       NewLink = {link,NewProps},
 	       Href = link_href(Link),
 	       Template = uri_template:parse(binary_to_list(Href)),
-	       NewLink
+	       CHREF = uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template),
+	       {link,[{calculated_href,CHREF}|Props]}
 	   end,
 	   Links),
-      %%io:format("Shallow links are:~n~p~n",[ShallowLinks]),
-      DeepLinks = extract_links_from_subterms(Schema,Term,Object,History),
-      %%io:format("Deep links are:~n~p~n",[DeepLinks]),
+      DeepLinks =
+	extract_links_from_subterms
+	  (FollowedLink,Schema,Term,Pointer,Object,History),
       ShallowLinks++DeepLinks;
 
     <<"array">> ->
       case proplists:get_value(<<"items">>,Proplist) of
 	ItemSchemaDesc={struct,_} ->
-	  lists:flatmap
-	    (fun (SubItem) ->
-		 extract_links(ItemSchemaDesc,SubItem,Object,History)
-	     end,
-	     Term);
+	  {_,Result} =
+	    lists:foldl
+	      (fun (SubItem,{Index,Acc}) ->
+		   SubItemLinks =
+		     extract_links
+		       (FollowedLink,ItemSchemaDesc,SubItem,[Index|Pointer],
+			Object,History),
+		   {Index+1,SubItemLinks++Acc}
+	       end,
+	       {0,[]},
+	       Term),
+	  Result;
 	_ -> []
       end;
     
     _Other -> []
   end.
 
-extract_links_from_subterms({struct,Proplist},Term,Object,History) ->
+extract_links_from_subterms(FollowedLink,{struct,Proplist},Term,Pointer,Object,History) ->
   case proplists:get_value(<<"properties">>,Proplist) of
     undefined -> [];
     {struct,Properties} ->
       lists:flatmap
 	(fun ({Property,Def}) ->
-	     %%io:format("Property: ~p~n",[Property]),
 	     {struct,Props} = Term,
-	     %%io:format("Term props are ~p~n",[Props]),
 	     case proplists:get_value(Property,Props) of
 	       undefined ->
 		 [];
 	       SubProp ->
-		 %%io:format("SubProp is ~p~n",[SubProp]),
-		 extract_links(Def,SubProp,Object,History)
+		 extract_links
+		   (FollowedLink,Def,SubProp,[binary_to_list(Property)|Pointer],Object,History)
 	     end
 	 end, Properties)
   end.
@@ -257,6 +258,8 @@ link_history(Link) ->
   {link,LD} = Link,
   proplists:get_value(history,LD,[]).
 
-	     
+link_calculated_href(Link) ->	     
+  {link,LD} = Link,
+  proplists:get_value(calculated_href,LD,[]).
       
   

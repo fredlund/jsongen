@@ -131,25 +131,51 @@ unref({struct, JsonDict}, RootJsonTerm) ->
         _ -> {ok, JsonTerm} = jsg_json:decode_url(URL)
       end,
       % io:format("Dereferencing ~p on ~s~n",[Pointer,jsg_json:encode(JsonTerm)]),
-      deref(Pointer,JsonTerm)
+      {ok,Term} = deref(Pointer,JsonTerm),
+      Term
   end.
 
 %% @doc Evaluates the json pointer Pointer in the json value JsonTerm.
 -spec deref(Pointer::jsonpointer(),
-            JsonTerm::jsg_json:json_term()) -> jsg_json:json_term().
-deref([],JsonTerm) -> JsonTerm;
+            JsonTerm::jsg_json:json_term()) -> {ok,jsg_json:json_term()} | false.
+deref([],JsonTerm) -> {ok,JsonTerm};
 deref([Key|Pointer],JsonTerm) when is_list(JsonTerm) -> %% Array
-  case list_is_integer(Key) of
-    true ->
-      Index = list_to_integer(Key),
-      deref(Pointer,lists:nth(Index + 1,JsonTerm))
+  Index = to_integer(Key),
+  case Index>length(JsonTerm) of
+    false ->
+      deref(Pointer,lists:nth(Index + 1,JsonTerm));
+    true -> 
+      io:format
+	("*** Error: access to out-of-bounds index ~p in~n~p~n",
+	 [Index,JsonTerm]),
+      false
   end;
-deref([Key|Pointer],{struct, JSON_dict}) -> %% Object
+deref([Key|Pointer],S={struct, JSON_dict}) -> %% Object
+  io:format
+    ("deref: ~p,~n~p~n~n",
+     [Key,S]),
   Key_decoded = decode_escaped(Key),
   Key_bin = list_to_binary(Key_decoded),
   JsonTerm = proplists:get_value(Key_bin,JSON_dict),
-  deref(Pointer,JsonTerm).
+  if 
+    JsonTerm=/=undefined ->
+      deref(Pointer,JsonTerm);
+    true ->
+      io:format
+	("*** Error: missing key ~p in~n~p~n",
+	 [Key_bin,S]),
+      false
+  end;
+deref([Key|_],JsonTerm) -> 
+  io:format
+    ("*** Error: mismatch between key ~p and~n~p~n",
+     [Key,JsonTerm]),
+  false.
 
+to_integer(Key) when is_integer(Key) ->
+  Key;
+to_integer(Key) when is_list(Key) ->
+  list_to_integer(Key).
 
 %% CBE
 %% @doc Evaluates the json pointer Pointer in the json value JsonTerm and 
@@ -206,7 +232,46 @@ url_pointer(URI) ->
             end,
   {URL,Pointer}.
 
+deref_relative_pointer(LevelsUp,Continuation,Term,CurrentPointer) 
+  when is_integer(LevelsUp), LevelsUp>=0 ->
+  io:format("drp:~p ~p~n~p~n~p~n",[LevelsUp,Continuation,Term,CurrentPointer]),
+  case LevelsUp =< length(CurrentPointer) of
+    true ->
+      {NewPointer,_} = lists:split(LevelsUp,CurrentPointer),
+      case Continuation of
+	AbsolutePointer when is_list(AbsolutePointer) ->
+	  case deref(NewPointer,Term) of
+	    {ok,Start} ->
+	      deref(AbsolutePointer,Start);
+	    false ->
+	      io:format
+		("*** Error: internal error: "++
+		   "Pointer ~p cannot be resolved in~n~p~n",
+		 [NewPointer,Term]),
+	      throw(bad)
+	  end;
+	$# when NewPointer=/=[] ->
+	  lists:last(NewPointer);
+	_ ->
+	  false
+      end;
+    _ -> false
+  end;
+deref_relative_pointer(any,Continuation,Term,CurrentPointer) ->
+  deref_relative_pointer1(0,length(CurrentPointer),Continuation,Term,CurrentPointer).
 
+deref_relative_pointer1(N,PointerLen,Continuation,Term,CurrentPointer) ->
+  if
+    N > PointerLen ->
+      false;
+    true ->
+      case deref_relative_pointer(N,Continuation,Term,CurrentPointer) of
+	Result = {ok,_} ->
+	  Result;
+	false ->
+	  deref_relative_pointer1(N+1,PointerLen,Continuation,Term,CurrentPointer)
+      end
+  end.
 
 %% @doc Generates all valid pairs {P,V} where P is a JSON Pointer and
 %% V is its derreferenced value in a given JSON value.
