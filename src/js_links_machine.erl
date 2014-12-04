@@ -73,7 +73,7 @@ compose_alternatives_int(_State,Alternatives) ->
   eqc_gen:oneof(Alternatives).
 
 initialize() ->
-  jsg_store:open_clean_db(),
+  %%jsg_store:open_clean_db(),
   jsg_utils:clear_schema_cache(),
 %%  {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
 %%  io:format
@@ -225,9 +225,7 @@ validate_call_result_body(Call,Result) ->
 		 %%[RealTargetSchema,
 		  %%Body]),
 	      Validator = get_option(validator),
-	      try Validator:validate(RealTargetSchema,Body) of
-		  true -> true;
-		  false -> false
+	      try Validator:validate(RealTargetSchema,Body)
 	      catch _Class:Reason ->
 		  io:format
 		    ("~n*** Error: postcondition error: for http call~n~s~n"++
@@ -690,9 +688,9 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   print_commands(Rest).
   
 test() ->
-  jsg_store:put(stats,[]),
   Validator = get_option(validator),
   Validator:start_validator(),
+  jsg_store:put(stats,[]),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
     false ->
       io:format("~n~n***FAILED~n");

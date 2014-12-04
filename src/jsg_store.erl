@@ -1,6 +1,6 @@
 -module(jsg_store).
 
--export([put/2,get/1]).
+-export([put/2,get/1,open_clean_db/0]).
 
 put(Key,Value) ->
   ensure_open(),
@@ -21,8 +21,8 @@ ensure_open() ->
   end.
 
 open_clean_db() ->
-  open_db(),
-  ets:delete_all(jsg_store).
+  ensure_open(),
+  ets:delete_all_objects(jsg_store).
 
 open_db() ->
   spawn(fun () ->

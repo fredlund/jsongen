@@ -91,12 +91,19 @@ extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
     <<"object">> ->
       Links = js_links_machine:collect_schema_links(Sch,true),
       ShallowLinks =
-	lists:map
+	lists:flatmap
 	  (fun (Link={link,Props}) ->
 	       Href = link_href(Link),
 	       Template = uri_template:parse(binary_to_list(Href)),
-	       CHREF = uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template),
-	       {link,[{calculated_href,CHREF}|Props]}
+	       try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
+		   CHREF -> [{link,[{calculated_href,CHREF}|Props]}]
+	       catch _:_ ->
+		   io:format
+		     ("*** Warning: skipping link ~p due to problems "++
+			"resolving href~n",
+		      [link_title(Link)]),
+		   []
+	       end
 	   end,
 	   Links),
       DeepLinks =

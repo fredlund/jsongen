@@ -140,20 +140,23 @@ unref({struct, JsonDict}, RootJsonTerm) ->
             JsonTerm::jsg_json:json_term()) -> {ok,jsg_json:json_term()} | false.
 deref([],JsonTerm) -> {ok,JsonTerm};
 deref([Key|Pointer],JsonTerm) when is_list(JsonTerm) -> %% Array
-  Index = to_integer(Key),
-  case Index>length(JsonTerm) of
-    false ->
-      deref(Pointer,lists:nth(Index + 1,JsonTerm));
-    true -> 
-      io:format
-	("*** Error: access to out-of-bounds index ~p in~n~p~n",
-	 [Index,JsonTerm]),
-      false
+  case to_integer(Key) of
+    {ok,Index} ->
+      case Index>length(JsonTerm) of
+	false ->
+	  deref(Pointer,lists:nth(Index + 1,JsonTerm));
+	true -> 
+	  %%io:format
+	    %%("*** Error: access to out-of-bounds index ~p in~n~p~n",
+	     %%[Index,JsonTerm]),
+	  false
+      end;
+    _ -> false
   end;
 deref([Key|Pointer],S={struct, JSON_dict}) -> %% Object
-  io:format
-    ("deref: ~p,~n~p~n~n",
-     [Key,S]),
+  %%io:format
+    %%("deref: ~p,~n~p~n~n",
+     %%[Key,S]),
   Key_decoded = decode_escaped(Key),
   Key_bin = list_to_binary(Key_decoded),
   JsonTerm = proplists:get_value(Key_bin,JSON_dict),
@@ -161,21 +164,22 @@ deref([Key|Pointer],S={struct, JSON_dict}) -> %% Object
     JsonTerm=/=undefined ->
       deref(Pointer,JsonTerm);
     true ->
-      io:format
-	("*** Error: missing key ~p in~n~p~n",
-	 [Key_bin,S]),
+      %%io:format
+	%%("*** Error: missing key ~p in~n~p~n",
+	 %%[Key_bin,S]),
       false
   end;
 deref([Key|_],JsonTerm) -> 
-  io:format
-    ("*** Error: mismatch between key ~p and~n~p~n",
-     [Key,JsonTerm]),
+  %%io:format
+    %%("*** Error: mismatch between key ~p and~n~p~n",
+     %%[Key,JsonTerm]),
   false.
 
 to_integer(Key) when is_integer(Key) ->
-  Key;
+  {ok,Key};
 to_integer(Key) when is_list(Key) ->
-  list_to_integer(Key).
+  try list_to_integer(Key)
+  catch _:_ -> false end.
 
 %% CBE
 %% @doc Evaluates the json pointer Pointer in the json value JsonTerm and 
@@ -234,10 +238,11 @@ url_pointer(URI) ->
 
 deref_relative_pointer(LevelsUp,Continuation,Term,CurrentPointer) 
   when is_integer(LevelsUp), LevelsUp>=0 ->
-  io:format("drp:~p ~p~n~p~n~p~n",[LevelsUp,Continuation,Term,CurrentPointer]),
-  case LevelsUp =< length(CurrentPointer) of
+  %%io:format("drp:~p ~p~n~p~n~p~n",[LevelsUp,Continuation,Term,CurrentPointer]),
+  PointerLen = length(CurrentPointer),
+  case LevelsUp =< PointerLen of
     true ->
-      {NewPointer,_} = lists:split(LevelsUp,CurrentPointer),
+      {NewPointer,_} = lists:split(PointerLen-LevelsUp,CurrentPointer),
       case Continuation of
 	AbsolutePointer when is_list(AbsolutePointer) ->
 	  case deref(NewPointer,Term) of
