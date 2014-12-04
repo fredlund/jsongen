@@ -64,10 +64,7 @@ encode_var({Key, Value}) ->
   {Key, percent_encode(Value)}.
 
 expand({var, Var, Default}, Values) ->
-  case var_lookup(Var, Values) of
-    none when Default=/=void -> Default;
-    {Var, Value} -> Value
-  end;
+ var_lookup(Var, Values);
 expand({opt, Arg, Vars}, Values) ->
   expand_list(Vars, Values, fun(Value, Acc) -> expand_opt(Arg, Value, Acc) end);
 expand({neg, Arg, Vars}, Values) ->
@@ -153,22 +150,28 @@ hexchr(N) when N >= 10 ->
 hexchr(N) when N < 10 ->
   N + $0.
 
-var_lookup(Name, {link,Props}) ->
+var_lookup(Name, Link={link,Props}) ->
   io:format("Name is ~p~n",[Name]),
   {Object,Pointer} =
-    case string:tokens(Name, ".") of
-      [_] ->
+    case string:tokens(atom_to_list(Name), ".") of
+      [NameString] ->
 	Num = proplists:get_value(object,Props),
 	{ok,JSONTerm} = jsg_store:get({object,Num}),
-	{JSONTerm,Name};
+	{JSONTerm,NameString};
       [Title,JPointer] ->
 	History = proplists:get_value(history,Props),
 	{_,Num} = lists:keyfind(Title,1,History),
 	{ok,JSONTerm} = jsg_store:get({object,Num}),
 	{JSONTerm,JPointer}
     end,
-  Pointer = string:tokens(Pointer,"/"),
-  jsg_jsonref:deref(Object,Pointer).
+  Pointers = string:tokens(Pointer,"/"),
+  case jsg_jsonref:deref(Pointers,Object) of
+    undefined ->
+      io:format("*** Error: could not lookup ~p in ~p~n",[Name,Link]),
+      throw(bad);
+    Result ->
+      binary_to_list(Result)
+  end.
       
       
   

@@ -273,8 +273,7 @@ next_state_int(State,Result,Call) ->
 	    case response_has_body(Result) of
 	      true ->
 		JSONbody = mochijson2:decode(http_body(Result)),
-		Term = jsg_links:intern_object(JSONbody),
-		jsg_links:extract_dynamic_links(Link,JSONbody,Term);
+		jsg_links:extract_dynamic_links(Link,JSONbody);
 	      _ ->
 		[]
 	    end,

@@ -155,6 +155,7 @@ intern_object(Term) ->
 	    0
 	end,
       jsg_store:put(Term,Counter),
+      jsg_store:put({object,Counter},Term),
       jsg_store:put(object_counter,Counter+1),
       Counter
   end.
