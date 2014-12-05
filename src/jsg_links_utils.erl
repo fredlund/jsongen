@@ -14,7 +14,7 @@ private_state(State) ->
   State#state.private_state.
 
 remove_dynamic_links(State) ->
-  State#state{dynamic_links=sets:new()}.
+  State#state{dynamic_links=jsl_dynamic_links:initialize(20)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

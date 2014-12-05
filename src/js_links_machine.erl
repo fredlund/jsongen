@@ -483,7 +483,10 @@ encode_parameters([{Key,Value}|Rest]) ->
       Rest==[] -> "";
       true -> "&"++encode_parameters(Rest)
     end,
-  Key++"="++Value++Continuation.
+  Key++"="++encode(Value)++Continuation.
+
+encode(String) when is_list(String) ->
+  http_uri:encode(String).
 
 http_request(PreURI,Type,Body,QueryParms,Link) ->
   %%io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
