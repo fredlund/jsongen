@@ -50,26 +50,38 @@ command(State) ->
 command_int(State) ->
   if
     State#state.initialized ->
-      ?LET
-	(Link,
-	 begin
-	   Alternatives =
-	     [
-	      Link ||
-	       Link <-
-		 State#state.static_links++
-		 (jsl_dynamic_links:links(State#state.dynamic_links)),
-	       link_permitted(State,Link)
-	     ],
-	   compose_alternatives(State,Alternatives)
-	 end,
-	 ?LET(Parms,
-	      gen_http_request(Link),
-	      {call, ?MODULE, follow_link, [Link,Parms]}));
-
-    true ->
-      {call, ?MODULE, initialize, []}
+      case jsl_dynamic_links:is_empty(State#state.dynamic_links) of
+	true ->
+	  ?LET(FinalLink,
+	       eqc_gen:oneof(State#state.static_links),
+	       gen_call(FinalLink));
+	
+	false ->
+	  ?LET
+	     (FinalLink,
+	      eqc_gen:
+		frequency
+		  ([{7,
+		     ?LET
+			(Title,
+			 eqc_gen:oneof
+			   (jsl_dynamic_links:titles
+			      (State#state.dynamic_links)),
+			 eqc_gen:oneof
+			   (jsl_dynamic_links:links
+			      (Title,State#state.dynamic_links)))},
+		    {1,
+		     eqc_gen:oneof(State#state.static_links)}]),
+	      gen_call(FinalLink))
+      end;
+    
+    true -> {call, ?MODULE, initialize, []}
   end.
+
+gen_call(Link) ->
+  ?LET(Parms,
+       gen_http_request(Link),
+       {call, ?MODULE, follow_link, [Link,Parms]}).
 
 compose_alternatives(State,Alternatives) ->
   make_call
@@ -153,8 +165,8 @@ postcondition(State,Call,Result) ->
 		 {_,N} -> lists:keyreplace(Title,1,Counts,{Title,N+1});
 		 false -> lists:keystore(Title,1,Counts,{Title,1})
 	       end
-	   end, [], jsl_dynamic_links:links(State#state.dynamic_links)),
-      io:format("Distribution: ~p~n",[Distribution]);
+	   end, [], jsl_dynamic_links:links(State#state.dynamic_links));
+      %%io:format("Distribution: ~p~n",[Distribution]);
      %% io:format
       %%("after call~n~s~nsize of result=~p flat_size=~p"++
 	%%   " size of state=~p flat state=~p~n",

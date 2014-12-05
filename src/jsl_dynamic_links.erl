@@ -7,6 +7,9 @@
 initialize(Limit) ->
   #dlinks{limit=Limit,links=[],size=0}.
 
+is_empty(Struct) ->
+  Struct#dlinks.links==[].
+
 add_link(Link,Struct) ->
   Title = jsg_links:link_title(Link),
   NewSet =
