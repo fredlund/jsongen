@@ -10,14 +10,38 @@ initialize(Limit) ->
 is_empty(Struct) ->
   Struct#dlinks.links==[].
 
+intern_link(Link) ->
+  %% This is far from process safe...
+  case jsg_store:get({link,Link}) of
+    {ok,N} -> N;
+    _ -> 
+      Counter =
+	case jsg_store:get(object_counter) of
+	  {ok,Cnt} ->
+	    Cnt;
+	  _ ->
+	    jsg_store:put(object_counter,0),
+	    0
+	end,
+      jsg_store:put({link,Link},Counter),
+      jsg_store:put({reverse_link,Counter},Link),
+      jsg_store:put(object_counter,Counter+1),
+      Counter
+  end.
+
+get_link(Counter) ->
+  {_,Link} = jsg_store:get({reverse_link,Counter}),
+  Link.
+
 add_link(Link,Struct) ->
   Title = jsg_links:link_title(Link),
+  LinkCounter = intern_link(Link),
   NewSet =
     case lists:keyfind(Title,1,Struct#dlinks.links) of
       false ->
-	ordsets:add_element(Link,ordsets:new());
+	ordsets:add_element(LinkCounter,ordsets:new());
       {_,S} ->
-	ordsets:add_element(Link,S)
+	ordsets:add_element(LinkCounter,S)
     end,
   {AdjustedSet,NewSize} =
     begin
@@ -38,11 +62,12 @@ add_link(Link,Struct) ->
 
 is_element(Link,Struct) ->
   Title = jsg_links:link_title(Link),
+  Counter = intern_link(Link),
   case lists:keyfind(Title,1,Struct#dlinks.links) of
     false ->
       false;
     {_,S} ->
-      ordsets:is_element(Link,S)
+      ordsets:is_element(Counter,S)
   end.
 
 size(Struct) ->
@@ -53,10 +78,12 @@ titles(Struct) ->
 
 links(Title,Struct) ->
   {_,Set} = lists:keyfind(Title,1,Struct#dlinks.links),
-  ordsets:to_list(Set).
+  lists:map(fun get_link/1, ordsets:to_list(Set)).
 
 links(Struct) ->
-  lists:flatmap(fun ({_,Links}) -> Links end, Struct#dlinks.links).
+  lists:map
+    (fun get_link/1,
+     lists:flatmap(fun ({_,Links}) -> Links end, Struct#dlinks.links)).
 		
 
       
