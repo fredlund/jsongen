@@ -30,9 +30,9 @@ initial_state() ->
 	void
     end,
   #state
-    {static_links=sets:from_list(initial_links()),
+    {static_links=initial_links(),
      initialized=false,
-     dynamic_links=sets:new(),
+     dynamic_links=jsl_dynamic_links:initialize(20),
      private_state=PrivateState}.
 
 command(State) ->
@@ -50,20 +50,38 @@ command(State) ->
 command_int(State) ->
   if
     State#state.initialized ->
-      Alternatives =
-	[
-	 modify_link(State,Link,gen_link(State,Link)) ||
-	  Link <-
-	    sets:to_list
-	      (sets:union
-		 (State#state.static_links,
-		  State#state.dynamic_links)),
-	  link_permitted(State,Link)
-	],
-      compose_alternatives(State,Alternatives);
-    true ->
-      {call, ?MODULE, initialize, []}
+      case jsl_dynamic_links:is_empty(State#state.dynamic_links) of
+	true ->
+	  ?LET(FinalLink,
+	       eqc_gen:oneof(State#state.static_links),
+	       gen_call(FinalLink));
+	
+	false ->
+	  ?LET
+	     (FinalLink,
+	      eqc_gen:
+		frequency
+		  ([{7,
+		     ?LET
+			(Title,
+			 eqc_gen:oneof
+			   (jsl_dynamic_links:titles
+			      (State#state.dynamic_links)),
+			 eqc_gen:oneof
+			   (jsl_dynamic_links:links
+			      (Title,State#state.dynamic_links)))},
+		    {1,
+		     eqc_gen:oneof(State#state.static_links)}]),
+	      gen_call(FinalLink))
+      end;
+    
+    true -> {call, ?MODULE, initialize, []}
   end.
+
+gen_call(Link) ->
+  ?LET(Parms,
+       gen_http_request(Link),
+       {call, ?MODULE, follow_link, [Link,Parms]}).
 
 compose_alternatives(State,Alternatives) ->
   make_call
@@ -73,30 +91,33 @@ compose_alternatives_int(_State,Alternatives) ->
   eqc_gen:oneof(Alternatives).
 
 initialize() ->
+  %%jsg_store:open_clean_db(),
   jsg_utils:clear_schema_cache(),
-%%  {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
-%%  io:format
-%%    ("~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
-%%     [self(),
-%%      ProcessMemory,
-%%      Mem/(1024.0*1024.0*1024.0),
-%%      erlang:memory()]),
-  %%io:format("~n~nNew test:~n"),
+  true = ets:match_delete(jsg_store,{{object,'_'},'_'}),
+  true = ets:match_delete(jsg_store,{{term,'_'},'_'}),
+  true = ets:match_delete(jsg_store,{{link,'_'},'_'}),
+  true = ets:match_delete(jsg_store,{{reverse_link,'_'},'_'}),
+  if
+    false ->
+      {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
+      io:format
+	("~n~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
+	 [self(),
+	  ProcessMemory,
+	  Mem/(1024.0*1024.0*1024.0),
+	  erlang:memory()]);
+    true ->
+      ok
+  end,
   httpc:reset_cookies().
 
 callouts(_,_) ->
   ?EMPTY.
 
-gen_link(State,Link) ->
-  make_call(gen_link,fun gen_link_int/2,[State,Link]).
-
-gen_link_int(_State,Link) ->
-  {call, ?MODULE, follow_link, [Link,gen_http_request(Link)]}.
-
 modify_link(State,Link,Result) ->
   make_call(modify_link,fun modify_link_int/3,[State,Link,Result]).
 
-modify_link_int(_State,Link,Result) ->
+modify_link_int(_State,_Link,Result) ->
   Result.
 
 link_permitted(State,Link) ->
@@ -125,17 +146,50 @@ precondition_int(State,Call) ->
   case Call of
     {_, _, follow_link, [Link,_], _} ->
       (State#state.initialized==true) andalso
-      ((sets:is_element(Link,State#state.static_links) orelse
-	sets:is_element(Link,State#state.dynamic_links)) andalso
-       link_permitted(State,Link));
+      ((jsg_links:link_type(Link)==static)
+       orelse jsl_dynamic_links:is_element(Link,State#state.dynamic_links))
+	andalso link_permitted(State,Link);
     _ ->
       State#state.initialized==false
   end.
 
 postcondition(State,Call,Result) ->
+  case Call of
+    {_, _, follow_link, _, _} ->
+      %%io:format
+	%%("number of dynamic links=~p:~n",
+	 %%[jsl_dynamic_links:size(State#state.dynamic_links)]),
+      Distribution = 
+	lists:foldl
+	  (fun (Link,Counts) ->
+	       Title = jsg_links:link_title(Link),
+	       case lists:keyfind(Title,1,Counts) of
+		 {_,N} -> lists:keyreplace(Title,1,Counts,{Title,N+1});
+		 false -> lists:keystore(Title,1,Counts,{Title,1})
+	       end
+	   end, [], jsl_dynamic_links:links(State#state.dynamic_links));
+      %%io:format("Distribution: ~p~n",[Distribution]);
+     %% io:format
+      %%("after call~n~s~nsize of result=~p flat_size=~p"++
+	%%   " size of state=~p flat state=~p~n",
+	 %%format_http_call(Call),
+	 %%erts_debug:size(Result),
+	 %%erts_debug:flat_size(Result),
+	 %%erts_debug:size(State),
+	 %%erts_debug:flat_size(State)]),
+      %%case (erts_debug:flat_size(State)/erts_debug:size(State))>10 of
+	%%true ->
+	  %%io:format("*** flat_size is BIG:~n~p~n",[State]);
+	%%false ->
+	 %% ok
+      %%end;
+    _ ->
+      ok
+  end,
   try
     case Call of
       {_, _, follow_link, _, _} ->
+	io:format("making call at follow_link~n",[]),
 	make_call(postcondition,fun postcondition_int/3,[State,Call,Result]);
       _ ->
 	postcondition_int(State,Call,Result)
@@ -162,9 +216,12 @@ postcondition_int(_State,Call,Result) ->
 		 [format_http_call(Call),Other]),
 	      false
 	  end;
-	_ -> false
+	_ ->
+	  io:format("validation failed~n"),
+	  false
       end;
-    _ -> true
+    _ ->
+      true
   end.
 
 validate_call_not_error_result(Call,Result) ->
@@ -202,9 +259,7 @@ validate_call_result_body(Call,Result) ->
 		 %%[RealTargetSchema,
 		  %%Body]),
 	      Validator = get_option(validator),
-	      try Validator:validate(RealTargetSchema,Body) of
-		  true -> true;
-		  false -> false
+	      try Validator:validate(RealTargetSchema,Body)
 	      catch _Class:Reason ->
 		  io:format
 		    ("~n*** Error: postcondition error: for http call~n~s~n"++
@@ -247,20 +302,24 @@ next_state_int(State,Result,Call) ->
       State#state{initialized=true};
     {_, ?MODULE, follow_link, [Link,_], _} ->
       case Result of
-	%% Maybe we should not only extract links on success...
-	{ok,{{_,200,_},_Headers,_Body}} ->
-	  %%io:format("normal result: extracting links~n",[]),
-	  NewLinks =
-	    jsg_links:extract_dynamic_links
-	      (Link,
-	       mochijson2:decode(http_body(Result))),
-	  %%io:format
-	    %%("NewLinks are~n~p~n",[NewLinks]),
+	{ok,{{_,_Code,_},_Headers,_Body}} ->
+	  LinksToAdd =
+	    case response_has_body(Result) of
+	      true ->
+		JSONbody = mochijson2:decode(http_body(Result)),
+		jsg_links:extract_dynamic_links
+		  (Link,JSONbody,jsg_links:intern_object(JSONbody));
+	      _ ->
+		[]
+	    end,
 	  State#state
-	    {dynamic_links=
-	       sets:union
-		 (sets:from_list(NewLinks),
-		  State#state.dynamic_links)};
+	    {
+	    dynamic_links=
+	      lists:foldl
+		(fun (DLink,DLs) ->
+		     jsl_dynamic_links:add_link(DLink,DLs)
+		 end, State#state.dynamic_links, LinksToAdd)
+	   };
 	_Other ->
 	  State
       end;
@@ -301,17 +360,54 @@ initial_links() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 gen_http_request(Link) ->
-  PreURI = jsg_links:compute_uri(Link),
+  ?LET({Body,QueryParms},
+       {generate_body(Link),generate_parameters(Link)},
+       begin
+	 PreURI = jsg_links:link_calculated_href(Link),
+	 RequestType = jsg_links:link_request_type(Link),
+	 EncodedParms = encode_generated_parameters(QueryParms),
+	 case re:split(PreURI,"\\?") of
+	   [_] ->
+	     {PreURI,RequestType,Body,EncodedParms};
+	   [BinaryURI,BinaryParms] -> 
+	     {binary_to_list(BinaryURI),RequestType,Body,
+	      split_parms(BinaryParms)++EncodedParms}
+	 end
+       end).
+
+generate_body(Link) ->
+  Sch = jsg_links:link_def(Link),
+  Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
   RequestType = jsg_links:link_request_type(Link),
-  {Body,QueryParms} = jsg_links:generate_argument(Link),
-  EncodedParms = encode_generated_parameters(QueryParms),
-  case re:split(PreURI,"\\?") of
-    [_] ->
-      {PreURI,RequestType,Body,EncodedParms};
-    [BinaryURI,BinaryParms] -> 
-      {binary_to_list(BinaryURI),RequestType,Body,
-       split_parms(BinaryParms)++EncodedParms}
+  case may_have_body(RequestType) of
+    true when Schema=/=undefined -> 
+      jsongen:json(Schema);
+    _ -> 
+      undefined
   end.
+
+generate_parameters(Link) ->
+  Sch = jsg_links:link_def(Link),
+  Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
+  QuerySchema = jsg_jsonschema:propertyValue(Sch,"querySchema"),
+  RequestType = jsg_links:link_request_type(Link),
+  case may_have_body(RequestType) of
+    true when QuerySchema=/=undefined ->
+      jsongen:json(QuerySchema);
+    false when QuerySchema=/=undefined ->
+      jsongen:json(QuerySchema);
+    false when Schema=/=undefined ->
+      jsongen:json(Schema);
+    _ ->
+      undefined
+  end.
+
+may_have_body(get) ->
+  false;
+may_have_body(delete) ->
+  false;
+may_have_body(_) ->
+  true.
 
 split_parms(BinaryParms) ->
   case re:split(BinaryParms,"&") of
@@ -323,9 +419,6 @@ split_parms(BinaryParms) ->
   end.
 
 follow_link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
-  %%io:format
-    %%("~nfollow_link:~n~p~n URI is ~p; request ~p~n",
-     %%[Link,URI,RequestType]),
   case jsg_links:link_title(Link) of
     String when is_list(String) ->
       Key = list_to_atom(String),
@@ -408,7 +501,10 @@ encode_parameters([{Key,Value}|Rest]) ->
       Rest==[] -> "";
       true -> "&"++encode_parameters(Rest)
     end,
-  Key++"="++Value++Continuation.
+  Key++"="++encode(Value)++Continuation.
+
+encode(String) when is_list(String) ->
+  http_uri:encode(String).
 
 http_request(PreURI,Type,Body,QueryParms,Link) ->
   %%io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
@@ -444,7 +540,7 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
 	  case TargetSchema of
 	    undefined ->
 	      eqc_gen:pick(jsongen:anyType());
-	    Schema ->
+	    _ ->
 	      eqc_gen:pick(jsongen:json(TargetSchema))
 	  end,
 	EncodedBody = mochijson2:encode(ResponseBody),
@@ -588,17 +684,18 @@ prop_ok() ->
 	  ?MODULE,
 	  Cmds,
 	  begin
-%%	    io:format("Res size is ~p~n",[erts_debug:size(Res)]),
-%%	    io:format("DS size is ~p~n",[erts_debug:size(DS)]),
-%%	    io:format("length(H)=~p~n",[length(H)]),
-%%	    [{P1,P2,P3}|_] = lists:reverse(H),
-%%	    io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
-%%	    io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
-%%	    io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
-%%	    io:format("P1=~p~n",[P1]),
-%%	    io:format("P2=~p~n",[P2]),
-%%	    io:format("P3=~p~n",[P3]),
+	    %%io:format("Res size is ~p~n",[erts_debug:size(Res)]),
+	    %%io:format("DS size is ~p~n",[erts_debug:size(DS)]),
+	    %%io:format("length(H)=~p~n",[length(H)]),
+	    %%[{P1,P2,P3}|_] = lists:reverse(H),
+	    %%io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
+	    %%io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
+	    %%io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
+	    %%io:format("P1=~p~n",[P1]),
+	    %%io:format("P2=~p~n",[P2]),
+	    %%io:format("P3=~p~n",[P3]),
 	    %%io:format("H size is ~p~n",[erts_debug:size(H)]),
+	    %%io:format("H=~p~nDS=~p~n",[H,DS]),
 	    if
 	      Res == ok ->
 		true;
@@ -664,9 +761,10 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   print_commands(Rest).
   
 test() ->
-  jsg_store:put(stats,[]),
   Validator = get_option(validator),
+  io:format("Validator is ~p~n",[Validator]),
   Validator:start_validator(),
+  jsg_store:put(stats,[]),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
     false ->
       io:format("~n~n***FAILED~n");
@@ -795,9 +893,13 @@ collect_links(Files) ->
 
 collect_links_from_file(File) ->
   FileSchema = {struct,[{<<"$ref">>,list_to_binary(File)}]},
-  collect_schema_links(FileSchema,false,{vars,[]}).
+  lists:map
+    (fun (Link={link,Props}) ->
+	 {link,[{type,static},
+		{calculated_href,jsg_links:link_href(Link)}|Props]}
+     end, collect_schema_links(FileSchema,false)).
 
-collect_schema_links(RawSchema, DependsOnObject, Vars) ->
+collect_schema_links(RawSchema, DependsOnObject) ->
   Schema = jsg_links:get_schema(RawSchema),
   %% Find all schemas, and retrieve links
   case jsg_jsonschema:links(Schema) of
@@ -809,7 +911,7 @@ collect_schema_links(RawSchema, DependsOnObject, Vars) ->
 	     Dependency = depends_on_object_properties(Link),
 	     if
 	       Dependency==DependsOnObject ->
-		 [{link,[{link,N},{schema,RawSchema},Vars]}|Ls];
+		 [{link,[{link,N},{schema,RawSchema}]}|Ls];
 	       true ->
 		 Ls
 	     end

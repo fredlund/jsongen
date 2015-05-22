@@ -15,88 +15,26 @@
 -define(LOG(X,Y),true).
 -endif.
 
-
-%% Given a set of file corresponding to JSON schemas,
-%% traverse the schemas to find (non-relative) link definitions.
-
-compute_uri(Link={link,LinkData}) ->
-  Href = link_href(Link),
-  Template = uri_template:parse(binary_to_list(Href)),
-  Variables = 
-    lists:filter
-      (fun ({_,Value}) -> is_integer(Value) orelse is_binary(Value) end,
-       proplists:get_value(vars,LinkData)),
-  %%io:format("compute_uri: variables are~n~p~n",[Variables]),
-  uri_template:sub(Variables,binary_to_list(Href)).
-
-generate_argument(Link) ->
-  jsg_store:put(eqc_gen_context,Link),
-  S = get_schema(link_schema(Link)),
-  Sch = link_def(Link),
-  Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
-  QuerySchema = jsg_jsonschema:propertyValue(Sch,"querySchema"),
-  RequestType = link_request_type(Link),
-  Body = 
-    case may_have_body(RequestType) of
-      true when Schema=/=undefined -> 
-	BodyGen = jsongen:json(Schema),
-	{ok,eqc_gen:pick(BodyGen)};
-      _ -> 
-	undefined
-    end,
-  QueryParameters =
-    case may_have_body(RequestType) of
-      true when QuerySchema=/=undefined ->
-	QGen = jsongen:json(QuerySchema),
-	{ok,eqc_gen:pick(QGen)};
-      false when QuerySchema=/=undefined ->
-	QGen = jsongen:json(QuerySchema),
-	{ok,eqc_gen:pick(QGen)};
-      false when Schema=/=undefined ->
-	QGen = jsongen:json(Schema),
-	{ok,eqc_gen:pick(QGen)};
-      _ ->
-	undefined
-    end,
-  {Body,QueryParameters}.
-
-may_have_body(get) ->
-  false;
-may_have_body(delete) ->
-  false;
-may_have_body(_) ->
-  true.
-
-extract_dynamic_links(Link,JSONBody) ->
+extract_dynamic_links(Link,Term,Object) ->
   S = link_schema(Link),
   LD = link_def(Link),
-  V = link_vars(Link),
   Title = link_title(Link),
-  NewHistory = [Title|link_history(Link)],
-  %%io:format("extract_dynamic_links(~p)~nSch=~p~n",[Link,LD]),
-  Result =
+  NewHistory = [{Title,Object}|link_history(Link)],
+  DynamicLinks =
     case jsg_jsonschema:propertyValue(LD,"targetSchema") of
       undefined ->
 	[];
       SchemaDesc ->
-	extract_links
-	  (SchemaDesc,JSONBody,V,NewHistory)
+	extract_links(Link,SchemaDesc,Term,[],Object,NewHistory)
     end,
-  %%io:format
-    %%("extract_links(~p) from~n~p~nyields~n~p~n",
-    %%[Link,JSONBody,Result]),
   lists:map
     (fun ({link,Props}) -> 
-	 case proplists:get_value(history,Props) of
-	   undefined ->
-	     {link,[{history,NewHistory}|Props]};
-	   OldHistory ->
-	     {link,[{history,NewHistory}|proplists:delete(history,Props)]}
-	 end
-     end, Result).
+	 {link,
+	  [{type,dynamic},{object,Object},{history,NewHistory}|
+	   proplists:delete(history,Props)]}
+     end, DynamicLinks).
 
-extract_links(Sch,Term,V,History) ->
-  %%io:format("~nSchema is ~p; Term=~n~p~n",[Sch,Term]),
+extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
   Schema = {struct,Proplist} = get_schema(Sch),
   case proplists:get_value(<<"type">>,Proplist) of
     undefined ->
@@ -104,98 +42,112 @@ extract_links(Sch,Term,V,History) ->
       [];
 
     <<"object">> ->
-      Links = js_links_machine:collect_schema_links(Sch,true,V),
-      NewVars = update_vars(Term,V),
-      EnvVars = lists:map(fun ({Key,_}) -> Key end, NewVars),
+      Links = js_links_machine:collect_schema_links(Sch,true),
       ShallowLinks =
 	lists:flatmap
 	  (fun (Link={link,Props}) ->
-	       NewProps = [{object,Term}|Props],
-	       NewLink = {link,NewProps},
 	       Href = link_href(Link),
 	       Template = uri_template:parse(binary_to_list(Href)),
-	       TemplateVars = 
-		 lists:filter(fun (T) ->
-				  case T of 
-				    {var,_,_} -> true;
-				    _ -> false
-				  end
-			      end, Template),
-	       case check_vars_exists(TemplateVars,EnvVars,NewLink,History) of
-		 true ->
-		   [{link,[{vars,NewVars}|proplists:delete(vars,NewProps)]}];
-		 false ->
+	       %% We should handle relative URIs here...
+	       try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
+		   CHREF ->
+		   ComposedCHREF = composed_uri(CHREF,Link,FollowedLink,Object),
+		   [{link,[{calculated_href,CHREF}|Props]}]
+	       catch _:_ ->
+		   io:format
+		     ("*** Warning: skipping link ~p due to problems "++
+			"resolving href~n",
+		      [link_title(Link)]),
 		   []
 	       end
 	   end,
 	   Links),
-      %%io:format("Shallow links are:~n~p~n",[ShallowLinks]),
-      DeepLinks = extract_links_from_subterms(Schema,Term,NewVars,History),
-      %%io:format("Deep links are:~n~p~n",[DeepLinks]),
+      DeepLinks =
+	extract_links_from_subterms
+	  (FollowedLink,Schema,Term,Pointer,Object,History),
       ShallowLinks++DeepLinks;
-	
+
     <<"array">> ->
       case proplists:get_value(<<"items">>,Proplist) of
 	ItemSchemaDesc={struct,_} ->
-	  lists:flatmap
-	    (fun (SubItem) ->
-		 extract_links(ItemSchemaDesc,SubItem,V,History)
-	     end,
-	     Term);
+	  {_,Result} =
+	    lists:foldl
+	      (fun (SubItem,{Index,Acc}) ->
+		   SubItemLinks =
+		     extract_links
+		       (FollowedLink,ItemSchemaDesc,SubItem,[Index|Pointer],
+			Object,History),
+		   {Index+1,SubItemLinks++Acc}
+	       end,
+	       {0,[]},
+	       Term),
+	  Result;
 	_ -> []
       end;
     
     _Other -> []
   end.
 
-extract_links_from_subterms({struct,Proplist},Term,V,History) ->
+extract_links_from_subterms(FollowedLink,{struct,Proplist},Term,Pointer,Object,History) ->
   case proplists:get_value(<<"properties">>,Proplist) of
     undefined -> [];
     {struct,Properties} ->
       lists:flatmap
 	(fun ({Property,Def}) ->
-	     %%io:format("Property: ~p~n",[Property]),
 	     {struct,Props} = Term,
-	     %%io:format("Term props are ~p~n",[Props]),
 	     case proplists:get_value(Property,Props) of
 	       undefined ->
 		 [];
 	       SubProp ->
-		 %%io:format("SubProp is ~p~n",[SubProp]),
-		 extract_links(Def,SubProp,V,History)
+		 extract_links
+		   (FollowedLink,Def,SubProp,[binary_to_list(Property)|Pointer],Object,History)
 	     end
 	 end, Properties)
   end.
 
-update_vars(Object,OldVars) ->
-  NewVars =
-    case Object of
-      {struct,Proplist} ->
-	lists:foldl
-	  (fun ({Key,Value},Acc) ->
-	       AtomKey = list_to_atom(binary_to_list(Key)),
-	       [{AtomKey,Value}|proplists:delete(AtomKey,Acc)]
-	   end, OldVars, Proplist)
-    end,
-  %%io:format
-    %%("new_vars: from ~p and object~n~p~ncomputes ~p~n",
-     %%[OldVars,Object,NewVars]),
-  NewVars.
+intern_object(Term) ->
+  %% This is far from process safe...
+  case jsg_store:get({term,Term}) of
+    {ok,N} -> N;
+    _ -> 
+      Counter =
+	case jsg_store:get(object_counter) of
+	  {ok,Cnt} ->
+	    Cnt;
+	  _ ->
+	    jsg_store:put(object_counter,0),
+	    0
+	end,
+      jsg_store:put({term,Term},Counter),
+      jsg_store:put({object,Counter},Term),
+      jsg_store:put(object_counter,Counter+1),
+      Counter
+  end.
 
-check_vars_exists([],_EnvVars,_Link,_History) ->
-  true;
-check_vars_exists([{var,Name,_}|LinkVars],EnvVars,Link,History) ->
-  case not(lists:member(Name,EnvVars)) of
+composed_uri(Ref,Link,FollowedLink,Object) ->
+  io:format("~nRef is ~p~nLink is ~p~nFollowedLink=~p~nObject=~p~n~n",[Ref,Link,FollowedLink,Object]),
+  {ok,Node} = jsg_store:get(java_node),
+  io:format("p1~n"),
+  RefURI = java:new(Node,'java.net.URI',[Ref]),
+  io:format("p2~n"),
+  Calculated_Ref = binary_to_list(jsg_links:link_calculated_href(FollowedLink)),
+  io:format("p3 calculated=~p~n",[Calculated_Ref]),
+  PreviousURI = java:new(Node,'java.net.URI',[Calculated_Ref]),
+  io:format("p4~n"),
+  case java:call(RefURI,isAbsolute,[]) of
     true ->
-      io:format
-	("*** Warning: variable ~p not found when generating link~n~p~n"++
-	   "Variables=~p~n"++
-	   "Link history: ~p~n"++
-	   "*** Warning: Not generating link.~n~n",
-	 [Name,jsg_links:print_link(Link),EnvVars,lists:reverse(History)]),
-      false;
+      io:format("p7~n"),
+      Ref;
     false ->
-      check_vars_exists(LinkVars,EnvVars,Link,History)
+      io:format("p6~n"),
+      Result =
+	java:string_to_list
+	  (java:call
+	     (java:call(PreviousURI,resolve,[RefURI]),
+	      toString,
+	      [])),
+      io:format("~p~n",[Result]),
+      Result
   end.
 
 get_schema(Value={struct,Proplist}) ->
@@ -291,14 +243,16 @@ link_num(Link) ->
   {link,LD} = Link,
   proplists:get_value(link,LD).
 
-link_vars(Link) ->
-  {link,LD} = Link,
-  proplists:get_value(vars,LD).
-
 link_history(Link) ->
   {link,LD} = Link,
   proplists:get_value(history,LD,[]).
 
-	     
+link_calculated_href(Link) ->	     
+  {link,LD} = Link,
+  proplists:get_value(calculated_href,LD,[]).
+
+link_type(Link) ->	     
+  {link,LD} = Link,
+  proplists:get_value(type,LD,[]).
       
   

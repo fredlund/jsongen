@@ -33,7 +33,8 @@ start_validator() ->
   Factory =
     java:call_static
       (N,'com.github.fge.jsonschema.main.JsonSchemaFactory','byDefault',[]),
-  jsg_store:put(java_validator,Factory).
+  jsg_store:put(java_validator,Factory),
+  jsg_store:put(java_node,N).
 
 validate(RawSchema,JSON) ->
   {ok,Factory} = 

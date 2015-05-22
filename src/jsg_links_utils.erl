@@ -3,6 +3,7 @@
 -include("jsongen.hrl").
 
 -export([private_state/1,set_private_state/2,freq_alternatives/2,var/2]).
+-export([remove_dynamic_links/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -12,16 +13,19 @@ set_private_state(NewPrivateState,State) ->
 private_state(State) ->
   State#state.private_state.
 
+remove_dynamic_links(State) ->
+  State#state{dynamic_links=jsl_dynamic_links:initialize(20)}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 freq_alternatives(Freqs,Alternatives) ->
   FreqAlternatives = 
     lists:map
-      (fun (Gen={call, _, follow_link, [Link,_]}) ->
+      (fun (Link) ->
 	   RequestType = jsg_links:link_request_type(Link),
 	   Href = jsg_links:link_href(Link),
 	   freq_comp
-	     (Gen,
+	     (Link,
 	      binary_to_list(Href),
 	      RequestType,
 	      Freqs,
