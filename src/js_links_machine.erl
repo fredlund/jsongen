@@ -95,6 +95,8 @@ initialize() ->
   jsg_utils:clear_schema_cache(),
   true = ets:match_delete(jsg_store,{{object,'_'},'_'}),
   true = ets:match_delete(jsg_store,{{term,'_'},'_'}),
+  true = ets:match_delete(jsg_store,{{link,'_'},'_'}),
+  true = ets:match_delete(jsg_store,{{reverse_link,'_'},'_'}),
   if
     false ->
       {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
@@ -154,9 +156,9 @@ precondition_int(State,Call) ->
 postcondition(State,Call,Result) ->
   case Call of
     {_, _, follow_link, _, _} ->
-      io:format
-	("number of dynamic links=~p:~n",
-	 [jsl_dynamic_links:size(State#state.dynamic_links)]),
+      %%io:format
+	%%("number of dynamic links=~p:~n",
+	 %%[jsl_dynamic_links:size(State#state.dynamic_links)]),
       Distribution = 
 	lists:foldl
 	  (fun (Link,Counts) ->
