@@ -187,6 +187,7 @@ postcondition(State,Call,Result) ->
   try
     case Call of
       {_, _, follow_link, _, _} ->
+	io:format("making call at follow_link~n",[]),
 	make_call(postcondition,fun postcondition_int/3,[State,Call,Result]);
       _ ->
 	postcondition_int(State,Call,Result)
@@ -213,9 +214,12 @@ postcondition_int(_State,Call,Result) ->
 		 [format_http_call(Call),Other]),
 	      false
 	  end;
-	_ -> false
+	_ ->
+	  io:format("validation failed~n"),
+	  false
       end;
-    _ -> true
+    _ ->
+      true
   end.
 
 validate_call_not_error_result(Call,Result) ->
@@ -756,6 +760,7 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   
 test() ->
   Validator = get_option(validator),
+  io:format("Validator is ~p~n",[Validator]),
   Validator:start_validator(),
   jsg_store:put(stats,[]),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of

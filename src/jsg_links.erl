@@ -48,8 +48,11 @@ extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
 	  (fun (Link={link,Props}) ->
 	       Href = link_href(Link),
 	       Template = uri_template:parse(binary_to_list(Href)),
+	       %% We should handle relative URIs here...
 	       try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
-		   CHREF -> [{link,[{calculated_href,CHREF}|Props]}]
+		   CHREF ->
+		   ComposedCHREF = composed_uri(CHREF,Link,FollowedLink,Object),
+		   [{link,[{calculated_href,CHREF}|Props]}]
 	       catch _:_ ->
 		   io:format
 		     ("*** Warning: skipping link ~p due to problems "++
@@ -119,6 +122,32 @@ intern_object(Term) ->
       jsg_store:put({object,Counter},Term),
       jsg_store:put(object_counter,Counter+1),
       Counter
+  end.
+
+composed_uri(Ref,Link,FollowedLink,Object) ->
+  io:format("~nRef is ~p~nLink is ~p~nFollowedLink=~p~nObject=~p~n~n",[Ref,Link,FollowedLink,Object]),
+  {ok,Node} = jsg_store:get(java_node),
+  io:format("p1~n"),
+  RefURI = java:new(Node,'java.net.URI',[Ref]),
+  io:format("p2~n"),
+  Calculated_Ref = binary_to_list(jsg_links:link_calculated_href(FollowedLink)),
+  io:format("p3 calculated=~p~n",[Calculated_Ref]),
+  PreviousURI = java:new(Node,'java.net.URI',[Calculated_Ref]),
+  io:format("p4~n"),
+  case java:call(RefURI,isAbsolute,[]) of
+    true ->
+      io:format("p7~n"),
+      Ref;
+    false ->
+      io:format("p6~n"),
+      Result =
+	java:string_to_list
+	  (java:call
+	     (java:call(PreviousURI,resolve,[RefURI]),
+	      toString,
+	      [])),
+      io:format("~p~n",[Result]),
+      Result
   end.
 
 get_schema(Value={struct,Proplist}) ->
