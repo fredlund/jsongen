@@ -33,7 +33,7 @@
 %% Inspired by eqc_install for the QuickCheck tool
 %% (thanks to John Hughes for his kind assistance).
 
--module(java_erlang_install).
+-module(jsongen_install).
 -export([install/0,install/3]).
 
 install() ->
@@ -41,7 +41,7 @@ install() ->
     Ebin = filename:dirname(Erlang),
     Erts = filename:dirname(Ebin),
     Lib = filename:dirname(Erts),
-    ThisModule = code:where_is_file("java_erlang_install.beam"),
+    ThisModule = code:where_is_file("jsongen_install.beam"),
     ThisModuleLocation = filename:dirname(filename:dirname(ThisModule)),
     Version = find_version(),
     install(Version,ThisModuleLocation,Lib).
@@ -50,7 +50,7 @@ install(Version,BuildDir,Lib) ->
     Dir = BuildDir++"-"++Version,
     io:format("Version=~p BuildDir=~p Lib=~p Dir=~p~n",[Version,Lib,BuildDir,Dir]),
     io:format("Installation program for JavaErlang.~n~n",[]),
-    ToDir = Lib++"/java_erlang-"++Version,
+    ToDir = Lib++"/jsongen-"++Version,
     ToDelete = conflicts(ToDir),
     io:format("This will install ~s~nin the directory ~s~n",[Version,Lib]),
     if
@@ -80,15 +80,15 @@ conflicts(ToDir) ->
     end.
 
 install(From,ToDir) ->
-    copy_java_erlang(From,ToDir),
+    copy_jsongen(From,ToDir),
     io:format("JavaErlang is installed successfully.\n",[]),
     code:add_paths([ToDir++"/ebin"]).
 
 find_version() ->
-    ok = application:ensure_started(java_erlang),
+    ok = application:ensure_started(jsongen),
     java:version().
 
-copy_java_erlang(From,ToDir) ->
+copy_jsongen(From,ToDir) ->
     case copy(From,ToDir) of
 	ok ->
 	    ok;
