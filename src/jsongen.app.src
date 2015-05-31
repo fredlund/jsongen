@@ -1,0 +1,15 @@
+{application, jsongen,
+ [{description, "Testing of web services communicating using JSON"}
+ ,{vsn, "1.0"}
+ ,{registered, []}
+ ,{mod, {'jsongen_app', []}}
+ ,{applications, [kernel, stdlib]}
+ ,{env, []}
+ ,{modules, ['java',
+             'java_erlang_app',
+             'java_erlang_sup',
+             'java_proxy',
+             'java_resource',
+             'java_to_erlang'
+            ]}
+ ]}.

@@ -153,7 +153,7 @@ deref([Key|Pointer],JsonTerm) when is_list(JsonTerm) -> %% Array
       end;
     _ -> false
   end;
-deref([Key|Pointer],S={struct, JSON_dict}) -> %% Object
+deref([Key|Pointer],_S={struct, JSON_dict}) -> %% Object
   %%io:format
     %%("deref: ~p,~n~p~n~n",
      %%[Key,S]),
@@ -169,7 +169,7 @@ deref([Key|Pointer],S={struct, JSON_dict}) -> %% Object
 	 %%[Key_bin,S]),
       false
   end;
-deref([Key|_],JsonTerm) -> 
+deref([_Key|_],_JsonTerm) -> 
   %%io:format
     %%("*** Error: mismatch between key ~p and~n~p~n",
      %%[Key,JsonTerm]),

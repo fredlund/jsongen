@@ -97,18 +97,6 @@ initialize() ->
   true = ets:match_delete(jsg_store,{{term,'_'},'_'}),
   true = ets:match_delete(jsg_store,{{link,'_'},'_'}),
   true = ets:match_delete(jsg_store,{{reverse_link,'_'},'_'}),
-  if
-    false ->
-      {memory,Mem} = ProcessMemory = erlang:process_info(self(),memory),
-      io:format
-	("~n~n~p: process memory: ~p (~p GB)~ntotal:~n~p~n",
-	 [self(),
-	  ProcessMemory,
-	  Mem/(1024.0*1024.0*1024.0),
-	  erlang:memory()]);
-    true ->
-      ok
-  end,
   httpc:reset_cookies().
 
 callouts(_,_) ->
@@ -159,7 +147,7 @@ postcondition(State,Call,Result) ->
       %%io:format
 	%%("number of dynamic links=~p:~n",
 	 %%[jsl_dynamic_links:size(State#state.dynamic_links)]),
-      Distribution = 
+      _Distribution = 
 	lists:foldl
 	  (fun (Link,Counts) ->
 	       Title = jsg_links:link_title(Link),
@@ -189,7 +177,6 @@ postcondition(State,Call,Result) ->
   try
     case Call of
       {_, _, follow_link, _, _} ->
-	io:format("making call at follow_link~n",[]),
 	make_call(postcondition,fun postcondition_int/3,[State,Call,Result]);
       _ ->
 	postcondition_int(State,Call,Result)

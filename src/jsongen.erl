@@ -1043,6 +1043,11 @@ ceiling(X) ->
     end.
 
 version() ->
-  ?JSONGEN_VERSION.
+    case [ Vsn || {jsongen, _, Vsn} <- application:loaded_applications() ] of
+        [] ->
+            "unknown";
+        [Vsn] ->
+            Vsn
+    end.
   
 

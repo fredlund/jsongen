@@ -16,7 +16,7 @@
 -endif.
 
 extract_dynamic_links(Link,Term,Object) ->
-  S = link_schema(Link),
+  _S = link_schema(Link),
   LD = link_def(Link),
   Title = link_title(Link),
   NewHistory = [{Title,Object}|link_history(Link)],
@@ -52,7 +52,7 @@ extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
 	       try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
 		   CHREF ->
 		   ComposedCHREF = composed_uri(CHREF,Link,FollowedLink,Object),
-		   [{link,[{calculated_href,CHREF}|Props]}]
+		   [{link,[{calculated_href,list_to_binary(ComposedCHREF)}|Props]}]
 	       catch _:_ ->
 		   io:format
 		     ("*** Warning: skipping link ~p due to problems "++
@@ -124,33 +124,26 @@ intern_object(Term) ->
       Counter
   end.
 
-composed_uri(Ref,Link,FollowedLink,Object) ->
-  io:format("~nRef is ~p~nLink is ~p~nFollowedLink=~p~nObject=~p~n~n",[Ref,Link,FollowedLink,Object]),
+composed_uri(Ref,_Link,FollowedLink,_Object) ->
+  %%io:format("~nRef is ~p~nLink is ~p~nFollowedLink=~p~nObject=~p~n~n",[Ref,Link,FollowedLink,Object]),
   {ok,Node} = jsg_store:get(java_node),
-  io:format("p1~n"),
   RefURI = java:new(Node,'java.net.URI',[Ref]),
-  io:format("p2~n"),
   Calculated_Ref = binary_to_list(jsg_links:link_calculated_href(FollowedLink)),
-  io:format("p3 calculated=~p~n",[Calculated_Ref]),
   PreviousURI = java:new(Node,'java.net.URI',[Calculated_Ref]),
-  io:format("p4~n"),
   case java:call(RefURI,isAbsolute,[]) of
     true ->
-      io:format("p7~n"),
       Ref;
     false ->
-      io:format("p6~n"),
       Result =
 	java:string_to_list
 	  (java:call
 	     (java:call(PreviousURI,resolve,[RefURI]),
 	      toString,
 	      [])),
-      io:format("~p~n",[Result]),
       Result
   end.
 
-get_schema(Value={struct,Proplist}) ->
+get_schema(Value={struct,_Proplist}) ->
   get_schema(Value,{struct,[]});
 get_schema([Child,Root]) ->
   get_schema(Child,Root).
@@ -159,7 +152,7 @@ get_schema(Value={struct,Proplist},Root) ->
   case proplists:get_value(<<"$ref">>,Proplist) of
     undefined ->
       Value;
-    Ref ->
+    _Ref ->
       %%io:format("Ref is ~p Root is~n~p~n",[Ref,Root]),
       jsg_jsonref:unref(Value,Root)
   end.

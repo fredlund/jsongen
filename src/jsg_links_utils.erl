@@ -35,11 +35,11 @@ freq_alternatives(Freqs,Alternatives) ->
 
 freq_comp(Generator,_String,_,[],Default) ->
   {Default,Generator};
-freq_comp(Generator,String,RequestType,
-	  [{Weight,whatever,""}|Rest],Default) ->
+freq_comp(Generator,_String,_RequestType,
+	  [{Weight,whatever,""}|_Rest],_Default) ->
   {Weight,Generator};
-freq_comp(Generator,String,RequestType,
-	  [{Weight,RequestType,""}|Rest],Default) ->
+freq_comp(Generator,_String,RequestType,
+	  [{Weight,RequestType,""}|_Rest],_Default) ->
   {Weight,Generator};
 freq_comp(Generator,String,RequestType1,
 	  [{Weight,RequestType2,First}|Rest],Default) ->

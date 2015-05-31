@@ -63,7 +63,7 @@ encode_var({Key, {list, List}}) ->
 encode_var({Key, Value}) ->
   {Key, percent_encode(Value)}.
 
-expand({var, Var, Default}, Values) ->
+expand({var, Var, _Default}, Values) ->
  var_lookup(Var, Values);
 expand({opt, Arg, Vars}, Values) ->
   expand_list(Vars, Values, fun(Value, Acc) -> expand_opt(Arg, Value, Acc) end);
@@ -166,7 +166,7 @@ parse_number([],Acc) when Acc==[] ->
 parse_number([],Acc) ->
   {lists:reverse(Acc),[]}.
 
-var_lookup(Name, Context={Link,Object,Location}) ->
+var_lookup(Name, _Context={Link,Object,Location}) ->
   NameList = atom_to_list(Name),
   case string:tokens(atom_to_list(Name), ".") of
     [Title,JPointer] ->
@@ -177,7 +177,7 @@ var_lookup(Name, Context={Link,Object,Location}) ->
       {ok,HistoryObject} = jsg_store:get({object,Num}),
       PointerList = string:tokens(JPointer,"/"),
       try_deref(Link,PointerList,HistoryObject,Name);
-    [NameString] ->
+    [_NameString] ->
       {ok,RealObject} = jsg_store:get({object,Object}),
       case parse_number(NameList) of
 	{Number,Rest} -> 
