@@ -50,6 +50,13 @@ install(Version,BuildDir,Lib) ->
     io:format("Installation program for Jsongen.~n~n",[]),
     io:format("Version=~p BuildDir=~p Lib=~p~n",[Version,BuildDir,Lib]),
     ToDir = Lib++"/jsongen-"++Version,
+    if
+	BuildDir == ToDir ->
+	    io:format("*** Error: source and destination are the same~n"),
+	    throw(bad);
+	true ->
+	    ok
+    end,
     ToDelete = conflicts(ToDir),
     io:format("This will install ~s~nin the directory ~s~n",[Version,Lib]),
     if
