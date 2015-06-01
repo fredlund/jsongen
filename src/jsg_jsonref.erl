@@ -111,10 +111,6 @@
 %%    primary resource.  The fragment's format and resolution is therefore
 %%    dependent on the media type [RFC2046] of a potentially retrieved
 
-%% @doc Dereferences a JSON Reference (a JSON object, which contains a member named "$ref", which has a JSON string value.  Example:
-%% 
-%%    { "$ref": "http://example.com/example.json#/foo/bar" }
-
 %% @doc Returns the json value indicated by the JsonRef using
 %% RootJsonTerm as root document in case no URL part exists in the
 %% URI.
@@ -280,58 +276,6 @@ deref_relative_pointer1(N,PointerLen,Continuation,Term,CurrentPointer) ->
 
 %% @doc Generates all valid pairs {P,V} where P is a JSON Pointer and
 %% V is its derreferenced value in a given JSON value.
-%% angel@angel-laptop:~/projects/sci/prowess/code/jsongen$ erl -pa ebin
-%% Eshell V5.10.3  (abort with ^G)
-%% 1>  {ok,JT} = jsg_jsg_json:decode_url("test/in/users.json").
-%% {ok,{struct,[{<<"users">>,
-%%               [{struct,[{<<"id">>,1},
-%%                         {<<"username">>,<<"davidwalsh">>},
-%%                         {<<"numPosts">>,404},
-%%                         {<<"realName">>,<<"David Walsh">>}]},
-%%                {struct,[{<<"id">>,2},
-%%                         {<<"username">>,<<"russianprince">>},
-%%                         {<<"numPosts">>,12},
-%%                         {<<"realName">>,<<"Andrei Arshavin">>}]}]}]}}
-%% 2>  jsonref:gen(JT).
-%% [{[],
-%%   {struct,[{<<"users">>,
-%%             [{struct,[{<<"id">>,1},
-%%                       {<<"username">>,<<"davidwalsh">>},
-%%                       {<<"numPosts">>,404},
-%%                       {<<"realName">>,<<"David Walsh">>}]},
-%%              {struct,[{<<"id">>,2},
-%%                       {<<"username">>,<<"russianprince">>},
-%%                       {<<"numPosts">>,12},
-%%                       {<<"realName">>,<<"Andrei Arshavin">>}]}]}]}},
-%%  {[<<"users">>],
-%%   [{struct,[{<<"id">>,1},
-%%             {<<"username">>,<<"davidwalsh">>},
-%%             {<<"numPosts">>,404},
-%%             {<<"realName">>,<<"David Walsh">>}]},
-%%    {struct,[{<<"id">>,2},
-%%             {<<"username">>,<<"russianprince">>},
-%%             {<<"numPosts">>,12},
-%%             {<<"realName">>,<<"Andrei Arshavin">>}]}]},
-%%  {[<<"users">>,"0"],
-%%   {struct,[{<<"id">>,1},
-%%            {<<"username">>,<<"davidwalsh">>},
-%%            {<<"numPosts">>,404},
-%%            {<<"realName">>,<<"David Walsh">>}]}},
-%%  {[<<"users">>,"0",<<"id">>],1},
-%%  {[<<"users">>,"0",<<"username">>],<<"davidwalsh">>},
-%%  {[<<"users">>,"0",<<"numPosts">>],404},
-%%  {[<<"users">>,"0",<<"realName">>],<<"David Walsh">>},
-%%  {[<<"users">>,"1"],
-%%   {struct,[{<<"id">>,2},
-%%            {<<"username">>,<<"russianprince">>},
-%%            {<<"numPosts">>,12},
-%%            {<<"realName">>,<<"Andrei Arshavin">>}]}},
-%%  {[<<"users">>,"1",<<"id">>],2},
-%%  {[<<"users">>,"1",<<"username">>],<<"russianprince">>},
-%%  {[<<"users">>,"1",<<"numPosts">>],12},
-%%  {[<<"users">>,"1",<<"realName">>],<<"Andrei Arshavin">>}]
-%% 3>  [ {P,V} || {P,V} <- jsonref:gen(JT), V == <<"davidwalsh">> ].
-%% [{[<<"users">>,"0",<<"username">>],<<"davidwalsh">>}]
 -spec gen(jsg_jsg_json:json_term()) -> [{jsonpointer(),jsg_jsg_json:json_term()}].
 gen(JsonTerm) when is_list(JsonTerm) -> % Array
   Indices = lists:map(fun erlang:integer_to_list/1,
