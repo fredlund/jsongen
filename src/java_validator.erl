@@ -2,7 +2,11 @@
 -compile(export_all).
 
 start_validator() ->
-  case code:which(java) of
+    case jsg_store:get(java_validator) of
+	{ok,_} ->
+	    ok;
+	_ ->
+	    case code:which(java) of
     non_existing ->
       io:format
 	("*** Error: the Java Erlang library is not accessible.~n"),
@@ -37,14 +41,17 @@ start_validator() ->
   {ok,N} =
     java:start_node
       ([
-	{add_to_java_classpath,Jars}
+	{add_to_java_classpath,Jars},
+	{java_exception_as_value,true}
        %%,{java_verbose,"FINE"}
        ]),
   Factory =
-    java:call_static
-      (N,'com.github.fge.jsonschema.main.JsonSchemaFactory','byDefault',[]),
+	ensure_not_exception
+	(java:call_static
+	   (N,'com.github.fge.jsonschema.main.JsonSchemaFactory','byDefault',[])),
   jsg_store:put(java_validator,Factory),
-  jsg_store:put(java_node,N).
+  jsg_store:put(java_node,N)
+    end.
 
 validate(RawSchema,JSON) ->
   {ok,Factory} = 
@@ -54,11 +61,12 @@ validate(RawSchema,JSON) ->
   JSONText =
     binary_to_list(iolist_to_binary(JSON)),
   JavaJson =
-    java:call_static
+	ensure_not_exception(
+   java:call_static
       (N,
        'com.github.fge.jackson.JsonLoader',
        'fromString',
-       [JSONText]),
+       [JSONText])),
   Validator =
     case jsg_store:get({java_schema,RawSchema}) of
       {ok,V} ->
@@ -69,18 +77,20 @@ validate(RawSchema,JSON) ->
 	AbsSchema =
 	  mk_absolute_refs(CWD,RawSchema),
 	JavaSchema =
+		ensure_not_exception(
 	  java:call_static
 	    (N,
 	     'com.github.fge.jackson.JsonLoader',
 	     'fromString',
-	     [binary_to_list(iolist_to_binary(mochijson2:encode(AbsSchema)))]),
+	     [binary_to_list(iolist_to_binary(mochijson2:encode(AbsSchema)))])),
 	SchemaValidator =
-	  java:call(Factory,getJsonSchema,[JavaSchema]),
+		ensure_not_exception(
+	  java:call(Factory,getJsonSchema,[JavaSchema])),
 	jsg_store:put({java_schema,RawSchema},SchemaValidator),
 	SchemaValidator
     end,
-  Report = java:call(Validator,validate,[JavaJson]),
-  case java:call(Report,isSuccess,[]) of
+  Report = ensure_not_exception(java:call(Validator,validate,[JavaJson])),
+  case ensure_not_exception(java:call(Report,isSuccess,[])) of
     true ->
       true;
     false ->
@@ -88,12 +98,12 @@ validate(RawSchema,JSON) ->
 	("*** Error: validation error~n~s~ndoes not validate against~n~p~n",
 	 [JSONText,RawSchema]),
       BadLevels =
-	[java:call_static
+	[ensure_not_exception(java:call_static
 	   (N,'com.github.fge.jsonschema.core.report.LogLevel',valueOf,
-	    ["ERROR"]),
-	 java:call_static
+	    ["ERROR"])),
+	 ensure_not_exception(java:call_static
 	   (N,'com.github.fge.jsonschema.core.report.LogLevel',valueOf,
-	    ["FATAL"])],
+	    ["FATAL"]))],
       do_print_report(BadLevels,Report),
       false
   end.
@@ -122,16 +132,16 @@ mk_absolute_refs(_CWD,V) ->
   V.
 
 do_print_report(BadLevels,Report) ->
-  do_print_report1(BadLevels,java:call(Report,iterator,[])).
+  do_print_report1(BadLevels,ensure_not_exception(java:call(Report,iterator,[]))).
 do_print_report1(BadLevels,ReportIterator) ->
   case java:call(ReportIterator,hasNext,[]) of
     true ->
       Item = java:call(ReportIterator,next,[]),
-      LogLevel = java:call(Item,getLogLevel,[]),
+      LogLevel = ensure_not_exception(java:call(Item,getLogLevel,[])),
       case lists:any(fun (BadLevel) -> java:eq(LogLevel,BadLevel) end, BadLevels) of
 	true ->
-	  Message = java:call(Item,getMessage,[]),
-	  io:format("Validation message: ~s~n",[java:string_to_list(Message)]);
+	  Message = ensure_not_exception(java:call(Item,getMessage,[])),
+	  io:format("Validation message: ~s~n",[ensure_not_exception(java:string_to_list(Message))]);
 	false ->
 	  ok
       end,
@@ -140,6 +150,15 @@ do_print_report1(BadLevels,ReportIterator) ->
       ok
   end.
   
+ensure_not_exception({java_exception,Exc}) ->
+    io:format("Java error: "),
+    java:print_stacktrace(Exc),
+    throw(bad);
+ensure_not_exception(null) ->
+    io:format("null pointer returned~n"),
+    throw(bad);
+ensure_not_exception(Other) ->
+    Other.
 
 	
 	

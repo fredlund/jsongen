@@ -249,10 +249,10 @@ validate_call_result_body(Call,Result) ->
 	      try Validator:validate(RealTargetSchema,Body)
 	      catch _Class:Reason ->
 		  io:format
-		    ("~n*** Error: postcondition error: for http call~n~s~n"++
+		    ("~n*** Error: postcondition exception error: for http call~n~s~n"++
 		       "the JSON value~n~s~n"++
 		       "did not validate against the schema~n~s~n"++
-		       "due to error~n~p~n",
+		       "due to exception error~n~p~n",
 		     [format_http_call(Call),
 		      Body,
 		      mochijson2:encode(RealTargetSchema),
