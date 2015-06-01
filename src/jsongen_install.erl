@@ -27,9 +27,9 @@
 %% @author Lars-Ake Fredlund (lfredlund@fi.upm.es)
 %% @copyright 2011 Lars-Ake Fredlund
 %%
-%% Install JavaErlang in the Erlang lib directory.  This program
-%% should be run in the root directory of a JavaErlang distribution,
-%% which ought to contain a java_erlang-xxx directory.
+%% Install Jsongen in the Erlang lib directory.  This program
+%% should be run in the root directory of a Jsongen distribution,
+%% which ought to contain a jsongen-xxx directory.
 %% Inspired by eqc_install for the QuickCheck tool
 %% (thanks to John Hughes for his kind assistance).
 
@@ -47,16 +47,15 @@ install() ->
     install(Version,ThisModuleLocation,Lib).
 
 install(Version,BuildDir,Lib) ->
-    Dir = BuildDir++"-"++Version,
-    io:format("Version=~p BuildDir=~p Lib=~p Dir=~p~n",[Version,Lib,BuildDir,Dir]),
-    io:format("Installation program for JavaErlang.~n~n",[]),
+    io:format("Installation program for Jsongen.~n~n",[]),
+    io:format("Version=~p BuildDir=~p Lib=~p~n",[Version,BuildDir,Lib]),
     ToDir = Lib++"/jsongen-"++Version,
     ToDelete = conflicts(ToDir),
     io:format("This will install ~s~nin the directory ~s~n",[Version,Lib]),
     if
 	ToDelete=/=[] ->
 	    io:format
-	      ("This will delete conflicting versions of JavaErlang, namely\n"++
+	      ("This will delete conflicting versions of Jsongen, namely\n"++
 		   "    ~p\n",
 	       [ToDelete]);
 	true ->
@@ -65,7 +64,17 @@ install(Version,BuildDir,Lib) ->
     case io:get_line("Proceed? ") of
 	"y\n" ->
 	    delete_conflicts(ToDelete),
-	    install(BuildDir,ToDir);
+	    copy_jsongen(BuildDir,ToDir,true),
+	    code:add_paths([ToDir++"/ebin"]),
+	    PreBuildDir = filename:dirname(BuildDir),
+	    ToDirPriv = ToDir++"/priv",
+	    PrivLibs = ["java_erlang","jesse","json_schema_validator","mochijson2"],
+	    lists:foreach
+		(fun (PrivLib) ->
+			 copy(PreBuildDir++"/"++PrivLib,
+			      ToDirPriv++"/"++PrivLib,
+			      true)
+		 end, PrivLibs);
 	_ ->
 	    io:format("Cancelling install--answer \"y\" at this point to proceed.\n"),
 	    throw(installation_cancelled)
@@ -79,60 +88,64 @@ conflicts(ToDir) ->
 	    []
     end.
 
-install(From,ToDir) ->
-    copy_jsongen(From,ToDir),
-    io:format("JavaErlang is installed successfully.\n",[]),
-    code:add_paths([ToDir++"/ebin"]).
-
 find_version() ->
     ok = application:ensure_started(jsongen),
-    java:version().
+    jsongen:version().
 
-copy_jsongen(From,ToDir) ->
-    case copy(From,ToDir) of
+copy_jsongen(From,ToDir,MkDir) ->
+    case copy(From,ToDir,MkDir) of
 	ok ->
 	    ok;
 	eaccess ->
 	    io:format
-	      ("*** Error: failed to copy JavaErlang -- "++
+	      ("*** Error: failed to copy Jsongen -- "++
 		   "rerun as Administrator or superuser?\n",
 	       []),
 	    exit(eaccess);
 	{error,eaccess} ->
 	    io:format
-	      ("*** Error: failed to copy JavaErlang -- "++
+	      ("*** Error: failed to copy Jsongen -- "++
 		   "rerun as Administrator or superuser?\n",
 	       []),
 	    exit(eaccess);
 	Error ->
 	    io:format
-	      ("*** Error: failed to copy JavaErlang -- "++
+	      ("*** Error: failed to copy Jsongen -- "++
 		   "copy returned~n~p??~n",
 	       [Error]),
 	    exit(Error)
     end.
 
-copy(From,To) ->
+copy(From,To,MkDir) ->
     case file:list_dir(From) of
 	{ok,Files} ->
-	    case file:make_dir(To) of
-		ok ->
+	    Result = 
+	    if
+		MkDir ->
+		    case file:make_dir(To) of
+			ok -> ok;
+			OtherMkDir -> 
+			    io:format
+			      ("*** Error: failed to create directory ~s due to ~p~n",
+			       [To,OtherMkDir]),
+			    OtherMkDir
+		    end;
+		true -> ok
+	    end,
+	    if
+		Result==ok ->
 		    lists:foldl
 		      (fun (File,ok) ->
 			       FromFile = From++"/"++File,
 			       ToFile = To++"/"++File,
-			       copy(FromFile,ToFile);
+			       copy(FromFile,ToFile,true);
 			   (_,Status) ->
 			       Status
 		       end, ok, Files);
-		OtherMkDir -> 
-		    io:format
-		      ("*** Error: failed to create directory ~s due to ~p~n",
-		       [To,OtherMkDir]),
-		    OtherMkDir
+		true -> Result
 	    end;
 	_ -> 
-	    case file:copy(From,To) of
+	    case file:copy(From,To,true) of
 		{ok,_} -> ok;
 		OtherCopy -> 
 		    io:format

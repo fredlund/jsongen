@@ -12,22 +12,32 @@ start_validator() ->
   end,
   ModuleLocation =
     code:which(?MODULE),
-  JarLocation =
+  JarDir1 =
     filename:dirname(ModuleLocation)++
-    "/../priv/json-schema-validator-2.2.5-lib.jar",
-  case file:read_file_info(JarLocation) of
-    {error,_} ->
-      io:format
-	("*** Error: could not access the java validator jar file.~n"++
-	   "It should be located at "++JarLocation++"~n"),
-      throw(bad);
-    {ok,_} -> 
-      ok
-  end,
+    "/../../json_schema_validator/build/libs",
+    Jars = 
+	case file:list_dir(JarDir1) of
+	    {ok,L1} when L1=/=[] -> 
+		lists:map(fun (Jar) -> JarDir1++"/"++Jar end, L1);
+	    _ ->
+		JarDir2 = 
+		    filename:dirname(ModuleLocation)++
+		    "/../priv/json_schema_validator/build/libs",
+		case file:list_dir(JarDir2) of
+		    {ok,L2} when L2=/=[] -> 
+			lists:map(fun (Jar) -> JarDir2++"/"++Jar end, L2);
+		    _ ->
+			io:format
+			  ("*** Error: could not access the java validator jar file.~n"++
+			       "It should be located in ~p~n",
+			   [JarDir2]),
+			throw(bad)
+		end
+	end,
   {ok,N} =
     java:start_node
       ([
-	{add_to_java_classpath,[JarLocation]}
+	{add_to_java_classpath,Jars}
        %%,{java_verbose,"FINE"}
        ]),
   Factory =
