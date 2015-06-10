@@ -153,7 +153,7 @@ get_schema(Value={struct,Proplist},Root) ->
     undefined ->
       Value;
     _Ref ->
-      %%io:format("Ref is ~p Root is~n~p~n",[Ref,Root]),
+      %%io:format("Ref is ~p Root is~n~p~n",[_Ref,Root]),
       jsg_jsonref:unref(Value,Root)
   end.
 

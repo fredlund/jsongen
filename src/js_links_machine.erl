@@ -144,9 +144,6 @@ precondition_int(State,Call) ->
 postcondition(State,Call,Result) ->
   case Call of
     {_, _, follow_link, _, _} ->
-      %%io:format
-	%%("number of dynamic links=~p:~n",
-	 %%[jsl_dynamic_links:size(State#state.dynamic_links)]),
       _Distribution = 
 	lists:foldl
 	  (fun (Link,Counts) ->
@@ -156,21 +153,6 @@ postcondition(State,Call,Result) ->
 		 false -> lists:keystore(Title,1,Counts,{Title,1})
 	       end
 	   end, [], jsl_dynamic_links:links(State#state.dynamic_links));
-      %%io:format("Distribution: ~p~n",[Distribution]);
-     %% io:format
-      %%("after call~n~s~nsize of result=~p flat_size=~p"++
-	%%   " size of state=~p flat state=~p~n",
-	 %%format_http_call(Call),
-	 %%erts_debug:size(Result),
-	 %%erts_debug:flat_size(Result),
-	 %%erts_debug:size(State),
-	 %%erts_debug:flat_size(State)]),
-      %%case (erts_debug:flat_size(State)/erts_debug:size(State))>10 of
-	%%true ->
-	  %%io:format("*** flat_size is BIG:~n~p~n",[State]);
-	%%false ->
-	 %% ok
-      %%end;
     _ ->
       ok
   end,
@@ -241,10 +223,6 @@ validate_call_result_body(Call,Result) ->
 	      false;
 	    true ->
 	      Body = http_body(Result),
-	      %%io:format
-		%%("Checking schema ~p~nagainst~n~s~n",
-		 %%[RealTargetSchema,
-		  %%Body]),
 	      Validator = get_option(validator),
 	      try Validator:validate(RealTargetSchema,Body)
 	      catch _Class:Reason ->
@@ -540,6 +518,10 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
     true -> io:format("http request took ~p milliseconds~n",[ElapsedTime/1000]);
     false -> ok
   end,
+  case get_option(show_http_result) of
+    true -> io:format("result: ~p~n", [Result]);
+    false -> ok
+  end,
   Result.
 
 http_result_type({ok,_}) ->
@@ -749,7 +731,6 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   
 test() ->
   Validator = get_option(validator),
-  io:format("Validator is ~p~n",[Validator]),
   Validator:start_validator(),
   jsg_store:put(stats,[]),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
@@ -759,6 +740,9 @@ test() ->
       io:format("~n~nPASSED~n",[])
   end,
   print_stats().
+
+run_statem(Files) ->
+  run_statem(void,Files).
 
 run_statem(PrivateModule,Files) ->
   run_statem(PrivateModule,Files,[]).
@@ -824,6 +808,7 @@ check_and_set_options(Options) ->
 	   timeout when is_integer(Value),Value>0 -> ParsedOption;
 	   simulation_mode when is_boolean(Value) -> ParsedOption;
 	   show_http_timing when is_boolean(Value) -> ParsedOption;
+	   show_http_result when is_boolean(Value) -> ParsedOption;
 	   show_uri when is_boolean(Value) -> ParsedOption;
 	   validator when is_atom(Value) -> ParsedOption;
 	   Other ->
