@@ -35,62 +35,15 @@ initial_state() ->
      dynamic_links=jsl_dynamic_links:initialize(20),
      private_state=PrivateState}.
 
-command(State) ->
-  try make_call(command,fun command_int/1,[State])
-  catch Class:Reason ->
-      io:format
-	("~n*** Error: command/1 raises exception ~p~n",
-	 [Reason]),
-      StackTrace = erlang:get_stacktrace(),
-      erlang:raise(Class,Reason,StackTrace)
-  end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% add metadata -- not sure it is necessary...
+start_pre(State) ->
+  not(State#state.initialized).
 
-command_int(State) ->
-  if
-    State#state.initialized ->
-      case jsl_dynamic_links:is_empty(State#state.dynamic_links) of
-	true ->
-	  ?LET(FinalLink,
-	       eqc_gen:oneof(State#state.static_links),
-	       gen_call(FinalLink));
-	
-	false ->
-	  ?LET
-	     (FinalLink,
-	      eqc_gen:
-		frequency
-		  ([{7,
-		     ?LET
-			(Title,
-			 eqc_gen:oneof
-			   (jsl_dynamic_links:titles
-			      (State#state.dynamic_links)),
-			 eqc_gen:oneof
-			   (jsl_dynamic_links:links
-			      (Title,State#state.dynamic_links)))},
-		    {1,
-		     eqc_gen:oneof(State#state.static_links)}]),
-	      gen_call(FinalLink))
-      end;
-    
-    true -> {call, ?MODULE, initialize, []}
-  end.
+start_args(_State) ->
+  [].
 
-gen_call(Link) ->
-  ?LET(Parms,
-       gen_http_request(Link),
-       {call, ?MODULE, follow_link, [Link,Parms]}).
-
-compose_alternatives(State,Alternatives) ->
-  make_call
-    (compose_alternatives,fun compose_alternatives_int/2,[State,Alternatives]).
-
-compose_alternatives_int(_State,Alternatives) ->
-  eqc_gen:oneof(Alternatives).
-
-initialize() ->
+start() ->
   %%jsg_store:open_clean_db(),
   jsg_utils:clear_schema_cache(),
   true = ets:match_delete(jsg_store,{{object,'_'},'_'}),
@@ -99,14 +52,45 @@ initialize() ->
   true = ets:match_delete(jsg_store,{{reverse_link,'_'},'_'}),
   httpc:reset_cookies().
 
-callouts(_,_) ->
-  ?EMPTY.
+start_post(State,_,_) ->
+  State#state{initialized=true}.
 
-modify_link(State,Link,Result) ->
-  make_call(modify_link,fun modify_link_int/3,[State,Link,Result]).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-modify_link_int(_State,_Link,Result) ->
-  Result.
+link_pre(State) ->
+  State#state.initialized.
+
+link_args(State) ->
+  case jsl_dynamic_links:is_empty(State#state.dynamic_links) of
+    true ->
+      ?LET(FinalLink,
+	   eqc_gen:oneof(State#state.static_links),
+	   gen_call(FinalLink));
+    false ->
+      ?LET
+	 (FinalLink,
+	  eqc_gen:
+	     frequency
+	       ([{7,
+		  ?LET
+		    (Title,
+		     eqc_gen:oneof
+		       (jsl_dynamic_links:titles
+			  (State#state.dynamic_links)),
+		     eqc_gen:oneof
+		       (jsl_dynamic_links:links
+			  (Title,State#state.dynamic_links)))},
+		{1,
+		 eqc_gen:oneof(State#state.static_links)}]),
+	   gen_call(FinalLink))
+      end.
+
+link_pre(State,[Link,_]) ->
+  (State#state.initialized==true) 
+    andalso ((jsg_links:link_type(Link)==static)
+	     orelse 
+	     jsl_dynamic_links:is_element(Link,State#state.dynamic_links))
+    andalso link_permitted(State,Link).
 
 link_permitted(State,Link) ->
   make_call(link_permitted,fun link_permitted_int/2,[State,Link]).
@@ -114,73 +98,13 @@ link_permitted(State,Link) ->
 link_permitted_int(_State,_Link) ->
   true.
 
-precondition(State,Call) ->
-  try
-    case Call of
-      {_, _, follow_link, _, _} ->
-	make_call(precondition,fun precondition_int/2,[State,Call]);
-      _ ->
-	precondition_int(State,Call)
-    end
-  catch Class:Reason ->
-      io:format
-	("Warning: precondition/2 raises exception ~p~n",
-	 [Reason]),
-      StackTrace = erlang:get_stacktrace(),
-      erlang:raise(Class,Reason,StackTrace)
-  end.
+gen_call(Link) ->
+  ?LET(Parms,
+       gen_http_request(Link),
+       [Link,Parms]).
 
-precondition_int(State,Call) ->
-  case Call of
-    {_, _, follow_link, [Link,_], _} ->
-      (State#state.initialized==true) andalso
-      ((jsg_links:link_type(Link)==static)
-       orelse jsl_dynamic_links:is_element(Link,State#state.dynamic_links))
-	andalso link_permitted(State,Link);
-    _ ->
-      State#state.initialized==false
-  end.
-
-postcondition(State,Call,Result) ->
-  case Call of
-    {_, _, follow_link, _, _} ->
-      %%io:format
-	%%("number of dynamic links=~p:~n",
-	 %%[jsl_dynamic_links:size(State#state.dynamic_links)]),
-      _Distribution = 
-	lists:foldl
-	  (fun (Link,Counts) ->
-	       Title = jsg_links:link_title(Link),
-	       case lists:keyfind(Title,1,Counts) of
-		 {_,N} -> lists:keyreplace(Title,1,Counts,{Title,N+1});
-		 false -> lists:keystore(Title,1,Counts,{Title,1})
-	       end
-	   end, [], jsl_dynamic_links:links(State#state.dynamic_links));
-      %%io:format("Distribution: ~p~n",[Distribution]);
-     %% io:format
-      %%("after call~n~s~nsize of result=~p flat_size=~p"++
-	%%   " size of state=~p flat state=~p~n",
-	 %%format_http_call(Call),
-	 %%erts_debug:size(Result),
-	 %%erts_debug:flat_size(Result),
-	 %%erts_debug:size(State),
-	 %%erts_debug:flat_size(State)]),
-      %%case (erts_debug:flat_size(State)/erts_debug:size(State))>10 of
-	%%true ->
-	  %%io:format("*** flat_size is BIG:~n~p~n",[State]);
-	%%false ->
-	 %% ok
-      %%end;
-    _ ->
-      ok
-  end,
-  try
-    case Call of
-      {_, _, follow_link, _, _} ->
-	make_call(postcondition,fun postcondition_int/3,[State,Call,Result]);
-      _ ->
-	postcondition_int(State,Call,Result)
-    end
+link_post(State,Args,Result) ->
+  try make_call(postcondition,fun postcondition_int/3,[State,Args,Result])
   catch Class:Reason ->
       io:format
 	("Warning: postcondition/3 raises exception ~p~n",
@@ -189,92 +113,69 @@ postcondition(State,Call,Result) ->
       erlang:raise(Class,Reason,StackTrace)
   end.
 
-postcondition_int(_State,Call,Result) ->
-  case Call of
-    {_, _, follow_link, _, _} ->
-      case validate_call_not_error_result(Call,Result) of
-	true ->
-	  case http_result_code(Result) of
-	    200 ->
-	      validate_call_result_body(Call,Result);
-	    Other ->
-	      io:format
-		("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code 200~n",
-		 [format_http_call(Call),Other]),
-	      false
-	  end;
-	_ ->
-	  io:format("validation failed~n"),
+postcondition_int(_State,Args,Result) ->
+  case validate_call_not_error_result(Args,Result) of
+    true ->
+      case http_result_code(Result) of
+	200 ->
+	  validate_call_result_body(Args,Result);
+	Other ->
+	  io:format
+	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code 200~n",
+	     [format_http_call(Args),Other]),
 	  false
       end;
     _ ->
-      true
+      io:format("validation failed~n"),
+      false
   end.
 
-validate_call_not_error_result(Call,Result) ->
-  case Call of
-    {_, _, follow_link, _, _} ->
-      case http_result_type(Result) of
-	ok ->
-	  true;
-	{error,_Error} ->
-	  io:format
-	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
-	     [format_http_call(Call),http_error(Result)]),
-	  false
-      end;
-    _ -> true
+validate_call_not_error_result(Args,Result) ->
+  case http_result_type(Result) of
+    ok ->
+      true;
+    {error,_Error} ->
+      io:format
+	("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
+	 [format_http_call(Args),http_error(Result)]),
+      false
   end.
 
-validate_call_result_body(Call,Result) ->
-  case Call of
-    {_, _, follow_link, _, _} ->
-      Link = jsg_links:link_def(call_link(Call)),
-      Schema = jsg_links:link_schema(call_link(Call)),
-      case jsg_jsonschema:propertyValue(Link,"targetSchema") of
-	undefined ->
-	  true;
-	TargetSchema ->
-	  RealTargetSchema = jsg_links:get_schema(TargetSchema,Schema),
-	  case response_has_json_body(Result) of
-	    false ->
-	      false;
-	    true ->
-	      Body = http_body(Result),
-	      %%io:format
-		%%("Checking schema ~p~nagainst~n~s~n",
-		 %%[RealTargetSchema,
-		  %%Body]),
-	      Validator = get_option(validator),
-	      try Validator:validate(RealTargetSchema,Body)
-	      catch _Class:Reason ->
-		  io:format
-		    ("~n*** Error: postcondition error: for http call~n~s~n"++
-		       "the JSON value~n~s~n"++
-		       "did not validate against the schema~n~s~n"++
-		       "due to error~n~p~n",
-		     [format_http_call(Call),
-		      Body,
-		      mochijson2:encode(RealTargetSchema),
-		      Reason]),
-		  io:format
-		    ("Stacktrace:~n~p~n",
-		     [erlang:get_stacktrace()]),
-		  false
-	      end
+validate_call_result_body(Args,Result) ->
+  Link = jsg_links:link_def(call_link(Args)),
+  Schema = jsg_links:link_schema(call_link(Args)),
+  case jsg_jsonschema:propertyValue(Link,"targetSchema") of
+    undefined ->
+      true;
+    TargetSchema ->
+      RealTargetSchema = jsg_links:get_schema(TargetSchema,Schema),
+      case response_has_json_body(Result) of
+	false ->
+	  false;
+	true ->
+	  Body = http_body(Result),
+	  Validator = get_option(validator),
+	  try Validator:validate(RealTargetSchema,Body)
+	  catch _Class:Reason ->
+	      io:format
+		("~n*** Error: postcondition error: for http call~n~s~n"++
+		   "the JSON value~n~s~n"++
+		   "did not validate against the schema~n~s~n"++
+		   "due to error~n~p~n",
+		 [format_http_call(Args),
+		  Body,
+		  mochijson2:encode(RealTargetSchema),
+		  Reason]),
+	      io:format
+		("Stacktrace:~n~p~n",
+		 [erlang:get_stacktrace()]),
+	      false
 	  end
-      end;
-    _ -> true
+      end
   end.
 
-next_state(State,Result,Call) ->
-  try
-    case Call of
-      {_, _, follow_link, _, _} ->
-	make_call(next_state,fun next_state_int/3,[State,Result,Call]);
-      _ ->
-	next_state_int(State,Result,Call)
-    end
+link_next(State,Result,Args) ->
+  try make_call(next_state,fun next_state_int/3,[State,Result,Args])
   catch Class:Reason ->
       io:format
 	("Warning: next_state/3 raises exception ~p~n",
@@ -283,34 +184,28 @@ next_state(State,Result,Call) ->
       erlang:raise(Class,Reason,StackTrace)
   end.
 
-next_state_int(State,Result,Call) ->
-  case Call of
-    {_, ?MODULE, initialize, _, _} ->
-      State#state{initialized=true};
-    {_, ?MODULE, follow_link, [Link,_], _} ->
-      case Result of
-	{ok,{{_,_Code,_},_Headers,_Body}} ->
-	  LinksToAdd =
-	    case response_has_body(Result) of
-	      true ->
-		JSONbody = mochijson2:decode(http_body(Result)),
-		jsg_links:extract_dynamic_links
-		  (Link,JSONbody,jsg_links:intern_object(JSONbody));
-	      _ ->
-		[]
-	    end,
-	  State#state
-	    {
-	    dynamic_links=
-	      lists:foldl
-		(fun (DLink,DLs) ->
-		     jsl_dynamic_links:add_link(DLink,DLs)
-		 end, State#state.dynamic_links, LinksToAdd)
-	   };
-	_Other ->
-	  State
-      end;
-    _ -> ?LOG("Call was~n~p~n",[Call]), State
+next_state_int(State,Result,[Link,_]) ->
+  case Result of
+    {ok,{{_,_Code,_},_Headers,_Body}} ->
+      LinksToAdd =
+	case response_has_body(Result) of
+	  true ->
+	    JSONbody = mochijson2:decode(http_body(Result)),
+	    jsg_links:extract_dynamic_links
+	      (Link,JSONbody,jsg_links:intern_object(JSONbody));
+	  _ ->
+	    []
+	end,
+      State#state
+	{
+	dynamic_links=
+	  lists:foldl
+	    (fun (DLink,DLs) ->
+		 jsl_dynamic_links:add_link(DLink,DLs)
+	     end, State#state.dynamic_links, LinksToAdd)
+       };
+    _Other ->
+      State
   end.
 
 make_call(ExternalFunction,InternalFunction,Args) ->
@@ -405,7 +300,7 @@ split_parms(BinaryParms) ->
       lists:flatmap(fun split_parms/1, Assignments)
   end.
 
-follow_link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
+link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   case jsg_links:link_title(Link) of
     String when is_list(String) ->
       Key = list_to_atom(String),
@@ -436,11 +331,8 @@ follow_link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
       Result
   end.
 
-format_http_call(Call) ->
-  case Call of
-    {_, ?MODULE, follow_link, [_,{URI,RequestType,Body,Params}], _} ->
-      format_http_call(URI,RequestType,Body,Params)
-  end.
+format_http_call([_,{URI,RequestType,Body,Params}]) ->
+  format_http_call(URI,RequestType,Body,Params).
 
 format_http_call(PreURI,RequestType,Body,Params) ->
   BodyString =
@@ -854,18 +746,12 @@ get_option(Atom) when is_atom(Atom) ->
 call_link_title(Call) ->
   jsg_links:link_title(call_link(Call)).
 
-call_link(Call) ->
-  case Call of
-    {call, ?MODULE, follow_link, [Link,_], _} ->
-      Link
-  end.
+call_link([Link,_]) ->
+  Link.
 
-json_call_body(Call) ->
-  case Call of
-    {call, ?MODULE, follow_link, [_,{_,_,BodyArg,_}], _} ->
-      case BodyArg of
-	{ok,Body} -> Body
-      end
+json_call_body([_,{_,_,BodyArg,_}]) ->
+  case BodyArg of
+    {ok,Body} -> Body
   end.
 
 get_json_body(Result) ->
