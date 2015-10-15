@@ -1,6 +1,43 @@
 @title Welcome to the jsongen library.
 @author Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)
 @doc Jsongen is a library for generating QuickCheck (quviq.com) generators from descriptions of JSON data using JSON schemas.
+
+<h2>Build, Test, and Generate Markdown Docs</h2>
+
+<p>
+Jsongen requires <a href="http://www.rebar3.org">rebar3</a> for
+building and testing.  See <a
+href="http://www.rebar3.org/v3.0/docs/getting-started">here</a> for
+getting started with rebar3.
+</p>
+<p>
+To compile, execute the following command:<br/>
+```
+$ rebar3 compile
+'''
+</p>
+
+<p>
+After compilation Erlang beam files will be left in the
+directory _build/default/lib/jsongen/ebin/.
+</p>
+
+<p>
+Should you wish to install the Jsongen library in the standard
+Erlang library structure, the following commands can be used:<br />
+
+```
+$ make install
+```
+</p>
+
+<p>
+To generate Markdown docs, execute the following command:<br/>
+```
+$ env ERL_LIBS=$PWD/_build/default/lib/edown rebar3 edoc
+'''
+</p>
+
 @end
 
 

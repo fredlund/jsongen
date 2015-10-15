@@ -1,4 +1,4 @@
-%% Copyright (c) 2014, Lars-Ake Fredlund
+%% Copyright (c) 2011, Lars-Ake Fredlund
 %% All rights reserved.
 %%
 %% Redistribution and use in source and binary forms, with or without
@@ -27,185 +27,171 @@
 %% @author Lars-Ake Fredlund (lfredlund@fi.upm.es)
 %% @copyright 2011 Lars-Ake Fredlund
 %%
-%% Install pulse_time in the Erlang lib directory.  This program
-%% should be run in the root directory of a pulse_time distribution,
-%% which ought to contain a pulse_time-xxx directory.
+%% Install Jsongen in the Erlang lib directory.  This program
+%% should be run in the root directory of a Jsongen distribution,
+%% which ought to contain a jsongen-xxx directory.
 %% Inspired by eqc_install for the QuickCheck tool
 %% (thanks to John Hughes for his kind assistance).
 
 -module(jsongen_install).
--export([install/0, install/1]).
+-export([install/0,install/3]).
 
 install() ->
-  Erlang = code:where_is_file("erlang.beam"),
-  Ebin = filename:dirname(Erlang),
-  Erts = filename:dirname(Ebin),
-  Lib = filename:dirname(Erts),
-  install(Lib).
+    Erlang = code:where_is_file("erlang.beam"),
+    Ebin = filename:dirname(Erlang),
+    Erts = filename:dirname(Ebin),
+    Lib = filename:dirname(Erts),
+    ThisModule = code:where_is_file("jsongen_install.beam"),
+    ThisModuleLocation = filename:dirname(filename:dirname(ThisModule)),
+    Version = find_version(),
+    install(Version,ThisModuleLocation,Lib).
 
-install(Lib) ->
-  io:format("Installation program for jsongen.~n~n",[]),
-  {ok,Dir} = find_jsongen_distribution(),
-  ToDelete = conflicts(Lib,filename:basename(Dir)),
-  Version = version(Dir),
-  io:format("This will install ~s~nin the directory ~s~n",[Version,Lib]),
-  if
-    ToDelete=/=[] ->
-      io:format
-	("This will delete conflicting versions of jsongen, namely\n"++
-	 "    ~p\n",
-	 [ToDelete]);
-    true ->
-      ok
-  end,
-  case io:get_line("Proceed? ") of
-    "y\n" ->
-      delete_conflicts(ToDelete),
-      install(Lib,Dir);
-    _ ->
-      io:format("Cancelling install--answer \"y\" at this point to proceed.\n"),
-      throw(installation_cancelled)
-  end.
+install(Version,BuildDir,Lib) ->
+    io:format("Installation program for Jsongen.~n~n",[]),
+    io:format("Version=~p BuildDir=~p Lib=~p~n",[Version,BuildDir,Lib]),
+    ToDir = Lib++"/jsongen-"++Version,
+    if
+	BuildDir == ToDir ->
+	    io:format("*** Error: source and destination are the same~n"),
+	    throw(bad);
+	true ->
+	    ok
+    end,
+    ToDelete = conflicts(ToDir),
+    io:format("This will install ~s~nin the directory ~s~n",[Version,Lib]),
+    if
+	ToDelete=/=[] ->
+	    io:format
+	      ("This will delete conflicting versions of Jsongen, namely\n"++
+		   "    ~p\n",
+	       [ToDelete]);
+	true ->
+	    ok
+    end,
+    case io:get_line("Proceed? ") of
+	"y\n" ->
+	    delete_conflicts(ToDelete),
+	    copy_jsongen(BuildDir,ToDir,true),
+	    code:add_paths([ToDir++"/ebin"]),
+	    PreBuildDir = filename:dirname(BuildDir),
+	    ToDirPriv = ToDir++"/priv",
+	    PrivLibs = ["java_erlang","jesse","json_schema_validator","mochijson2"],
+	    lists:foreach
+		(fun (PrivLib) ->
+			 copy(PreBuildDir++"/"++PrivLib,
+			      ToDirPriv++"/"++PrivLib,
+			      true)
+		 end, PrivLibs);
+	_ ->
+	    io:format("Cancelling install--answer \"y\" at this point to proceed.\n"),
+	    throw(installation_cancelled)
+    end.
 
-conflicts(Lib,Dir) ->
-  FullDir = Lib++"/"++Dir,
-  case file:read_file_info(FullDir) of
-    {ok,_} ->
-      [FullDir];
-    _ ->
-      []
-  end.
+conflicts(ToDir) ->
+    case file:read_file_info(ToDir) of
+	{ok,_} ->
+	    [ToDir];
+	_ ->
+	    []
+    end.
 
-find_jsongen_distribution() ->
-  OwnLocation = filename:dirname(code:which(?MODULE)),
-  {ok,Files} = file:list_dir(OwnLocation),
-  MatchingFiles =
-    lists:foldl
-      (fun (FileName,AccFound) ->
-	   case {string:str(FileName,"jsongen-"),filelib:is_dir(FileName)} of
-	     {N,true} when N=/=0 -> [FileName|AccFound];
-	     _ -> AccFound
-	   end
-       end, [], Files),
-  case MatchingFiles of
-    [Dir] ->
-      {ok,OwnLocation++"/"++Dir};
-    [] -> 
-      io:format
-	("*** Error: cannot find jsongen to install.~n"++
-	 "There should be a directory named ``jsongen-...'' in ~s.~n",
-	 [OwnLocation]),
-      throw(jsongen_not_found);
-    [_|_] ->
-      io:format
-	("*** Error: multiple jsongen versions available to install in ~s.~n"++
-	 [OwnLocation]),
-      throw(jsongen_not_found)
-  end.
+find_version() ->
+    ok = application:ensure_started(jsongen),
+    jsongen:version().
 
-version(Dir) ->
-  case code:is_loaded(jsongen) of
-    {file,_} ->
-      jsongen:version();
-    false ->
-      case code:load_abs(Dir++"/ebin/jsongen") of
-	{module,_} ->
-	  jsongen:version();
-	{error,_} ->
-	  throw(unknown_version)
-      end
-  end.
-
-install(Lib,Dir) ->
-  copy_jsongen(Lib,Dir),
-  io:format("jsongen is installed successfully.\n",[]),
-  code:add_paths([Lib++"/"++Dir++"/ebin"]).
-
-copy_jsongen(Lib,Dir) ->
-  AppDir = filename:basename(Dir),
-  case copy(Dir,Lib++"/"++AppDir) of
-    ok ->
-      ok;
-    eaccess ->
-      io:format
-	("*** Error: failed to copy jsongen -- "++
-	 "rerun as Administrator or superuser?\n",
-	 []),
-      exit(eaccess);
-    {error,eaccess} ->
-      io:format
-	("*** Error: failed to copy jsongen -- "++
-	 "rerun as Administrator or superuser?\n",
-	 []),
-      exit(eaccess);
-    Error ->
-      io:format
-	("*** Error: failed to copy jsongen -- "++
-	 "copy returned~n~p??~n",
-	 [Error]),
-      exit(Error)
-  end.
-
-copy(From,To) ->
-  case file:list_dir(From) of
-    {ok,Files} ->
-      case file:make_dir(To) of
+copy_jsongen(From,ToDir,MkDir) ->
+    case copy(From,ToDir,MkDir) of
 	ok ->
-	  lists:foldl
-	    (fun (File,ok) ->
-		 FromFile = From++"/"++File,
-		 ToFile = To++"/"++File,
-		 copy(FromFile,ToFile);
-		 (_,Status) ->
-		 Status
-	     end, ok, Files);
-	OtherMkDir -> 
-	  io:format
-	    ("*** Error: failed to create directory ~s due to ~p~n",
-	     [To,OtherMkDir]),
-	  OtherMkDir
-      end;
-    _ -> 
-      case file:copy(From,To) of
-	{ok,_} -> ok;
-	OtherCopy -> 
-	  io:format
-	    ("*** Error: failed to copy ~s to ~s due to ~p~n",
-	     [From,To,OtherCopy]),
-	  OtherCopy
-      end
-  end.
+	    ok;
+	eaccess ->
+	    io:format
+	      ("*** Error: failed to copy Jsongen -- "++
+		   "rerun as Administrator or superuser?\n",
+	       []),
+	    exit(eaccess);
+	{error,eaccess} ->
+	    io:format
+	      ("*** Error: failed to copy Jsongen -- "++
+		   "rerun as Administrator or superuser?\n",
+	       []),
+	    exit(eaccess);
+	Error ->
+	    io:format
+	      ("*** Error: failed to copy Jsongen -- "++
+		   "copy returned~n~p??~n",
+	       [Error]),
+	    exit(Error)
+    end.
+
+copy(From,To,MkDir) ->
+    case file:list_dir(From) of
+	{ok,Files} ->
+	    Result = 
+	    if
+		MkDir ->
+		    case file:make_dir(To) of
+			ok -> ok;
+			OtherMkDir -> 
+			    io:format
+			      ("*** Error: failed to create directory ~s due to ~p~n",
+			       [To,OtherMkDir]),
+			    OtherMkDir
+		    end;
+		true -> ok
+	    end,
+	    if
+		Result==ok ->
+		    lists:foldl
+		      (fun (File,ok) ->
+			       FromFile = From++"/"++File,
+			       ToFile = To++"/"++File,
+			       copy(FromFile,ToFile,true);
+			   (_,Status) ->
+			       Status
+		       end, ok, Files);
+		true -> Result
+	    end;
+	_ -> 
+	    case file:copy(From,To,true) of
+		{ok,_} -> ok;
+		OtherCopy -> 
+		    io:format
+		      ("*** Error: failed to copy ~s to ~s due to ~p~n",
+		       [From,To,OtherCopy]),
+		    OtherCopy
+	    end
+    end.
 
 delete_conflicts(ToDelete) ->
-  lists:foreach
-    (fun (Version) ->
-	 delete_recursive(Version)
-     end, ToDelete).
+    lists:foreach
+      (fun (Version) ->
+	       delete_recursive(Version)
+       end, ToDelete).
 
 delete_recursive(F) ->
-  case file:list_dir(F) of
-    {ok,Files} ->
-      lists:foreach
-	(fun (File) -> delete_recursive(F++"/"++File) end,
-	 Files),
-      case file:del_dir(F) of
-	ok ->
-	  ok;
-	Err ->
-	  io:format
-	    ("*** Error: could not delete directory ~s: ~p\n",
-	     [F,Err]),
-	  Err
-      end;
-    _ ->
-      case file:delete(F) of
-	ok ->
-	  ok;
-	Err ->
-	  io:format
-	    ("*** Error: could not delete file ~s: ~p\n",
-	     [F,Err]),
-	  Err
-      end
-  end.
+    case file:list_dir(F) of
+	{ok,Files} ->
+	    lists:foreach
+	      (fun (File) -> delete_recursive(F++"/"++File) end,
+	       Files),
+	    case file:del_dir(F) of
+		ok ->
+		    ok;
+		Err ->
+		    io:format
+		      ("*** Error: could not delete directory ~s: ~p\n",
+		       [F,Err]),
+		    Err
+	    end;
+	_ ->
+	    case file:delete(F) of
+		ok ->
+		    ok;
+		Err ->
+		    io:format
+		      ("*** Error: could not delete file ~s: ~p\n",
+		       [F,Err]),
+		    Err
+	    end
+    end.
 

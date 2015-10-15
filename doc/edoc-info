@@ -1,0 +1,9 @@
+%% encoding: UTF-8
+{application,jsongen}.
+{packages,[]}.
+{modules,[java_validator,jesse_validator,js_links_machine,
+          jsg_gen_string_from_regexp,jsg_json,jsg_json_validate,jsg_jsonref,
+          jsg_jsonschema,jsg_links,jsg_links_utils,jsg_main,jsg_regexp_parse,
+          jsg_regexp_parser,jsg_regexp_scan,jsg_rtest,jsg_store,jsg_urigen,
+          jsg_utils,jsl_dynamic_links,jsongen,jsongen_app,jsongen_install,
+          jsongen_sup,jsongen_validator,uri_template]}.

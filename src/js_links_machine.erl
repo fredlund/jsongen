@@ -432,6 +432,10 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
     true -> io:format("http request took ~p milliseconds~n",[ElapsedTime/1000]);
     false -> ok
   end,
+  case get_option(show_http_result) of
+    true -> io:format("result: ~p~n", [Result]);
+    false -> ok
+  end,
   Result.
 
 http_result_type({ok,_}) ->
@@ -641,7 +645,6 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
   
 test() ->
   Validator = get_option(validator),
-  io:format("Validator is ~p~n",[Validator]),
   Validator:start_validator(),
   jsg_store:put(stats,[]),
   case eqc:quickcheck(eqc:on_output(fun eqc_printer/2,prop_ok())) of
@@ -651,6 +654,9 @@ test() ->
       io:format("~n~nPASSED~n",[])
   end,
   print_stats().
+
+run_statem(Files) ->
+  run_statem(void,Files).
 
 run_statem(PrivateModule,Files) ->
   run_statem(PrivateModule,Files,[]).
@@ -716,6 +722,7 @@ check_and_set_options(Options) ->
 	   timeout when is_integer(Value),Value>0 -> ParsedOption;
 	   simulation_mode when is_boolean(Value) -> ParsedOption;
 	   show_http_timing when is_boolean(Value) -> ParsedOption;
+	   show_http_result when is_boolean(Value) -> ParsedOption;
 	   show_uri when is_boolean(Value) -> ParsedOption;
 	   validator when is_atom(Value) -> ParsedOption;
 	   Other ->
