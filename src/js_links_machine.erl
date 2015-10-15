@@ -7,6 +7,8 @@
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
 -include_lib("jsongen.hrl").
 
+%% Super fragile below
+-record(eqc_statem_history,{state, args, features, result}).
 
 %%-define(debug,true).
 
@@ -52,7 +54,7 @@ start() ->
   true = ets:match_delete(jsg_store,{{reverse_link,'_'},'_'}),
   httpc:reset_cookies().
 
-start_post(State,_,_) ->
+start_next(State,_,_) ->
   State#state{initialized=true}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -142,8 +144,8 @@ validate_call_not_error_result(Args,Result) ->
   end.
 
 validate_call_result_body(Args,Result) ->
-  Link = jsg_links:link_def(call_link(Args)),
-  Schema = jsg_links:link_schema(call_link(Args)),
+  Link = jsg_links:link_def(args_link(Args)),
+  Schema = jsg_links:link_schema(args_link(Args)),
   case jsg_jsonschema:propertyValue(Link,"targetSchema") of
     undefined ->
       true;
@@ -594,9 +596,9 @@ print_counterexample(Cmds,H,_DS,Reason) ->
   ReturnValues = 
     case Reason of
       {exception,_} ->
-	(lists:map(fun ({_,_,Result}) -> Result end, H))++[Reason];
+	(lists:map(fun (Item) -> Item#eqc_statem_history.result end, H))++[Reason];
       _ ->
-	(lists:map(fun ({_,_,Result}) -> Result end, H))
+	(lists:map(fun (Item) -> Item#eqc_statem_history.result end, H))
     end,
   io:format("~nCommand sequence:~n"),
   io:format("---------------~n~n"),
@@ -605,9 +607,9 @@ print_counterexample(Cmds,H,_DS,Reason) ->
 
 print_commands([]) ->
   ok;
-print_commands([{_Call={call,_,initialize,_,_},_Result}|Rest]) ->
+print_commands([{_Call={call,_,start,_,_},_Result}|Rest]) ->
   print_commands(Rest);
-print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
+print_commands([{Call={call,_,link,Args,_},Result}|Rest]) ->
   Title = call_link_title(Call),
   TitleString = 
     if 
@@ -640,8 +642,11 @@ print_commands([{Call={call,_,follow_link,_,_},Result}|Rest]) ->
     end,
   io:format
     ("~saccess ~s~s~n~n",
-     [TitleString,format_http_call(Call),ResultString]),
-  print_commands(Rest).
+     [TitleString,format_http_call(Args),ResultString]),
+  print_commands(Rest);
+print_commands([{Call,_Result}|_Rest]) ->
+  io:format("seeing Call ~p~n",[Call]),
+  throw(bad).
   
 test() ->
   Validator = get_option(validator),
@@ -753,7 +758,13 @@ get_option(Atom) when is_atom(Atom) ->
 call_link_title(Call) ->
   jsg_links:link_title(call_link(Call)).
 
-call_link([Link,_]) ->
+call_link({call,_,_,[Link,_],_}) ->
+  Link.
+
+args_link_title(Call) ->
+  jsg_links:link_title(args_link(Call)).
+
+args_link([Link,_]) ->
   Link.
 
 json_call_body([_,{_,_,BodyArg,_}]) ->
