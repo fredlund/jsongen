@@ -2,7 +2,7 @@ compile:
 	rebar3 compile
 
 docs:
-	env ERL_LIBS=$PWD/_build/default/lib/edown rebar3 edoc
+	env ERL_LIBS=$(shell pwd)/_build/default/lib/edown rebar3 edoc
 
 build:
 	make compile
