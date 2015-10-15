@@ -7,6 +7,7 @@ put(Key,Value) ->
   ets:insert(jsg_store,{Key,Value}).
 
 get(Key) ->
+  ensure_open(),
   try ets:lookup(jsg_store,Key) of
     [{Key,Value}] -> {ok,Value};
     _ -> false
