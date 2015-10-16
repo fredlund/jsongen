@@ -2,56 +2,56 @@
 -compile(export_all).
 
 start_validator() ->
-    case jsg_store:get(java_validator) of
-	{ok,_} ->
-	    ok;
-	_ ->
-	    case code:which(java) of
-    non_existing ->
-      io:format
-	("*** Error: the Java Erlang library is not accessible.~n"),
-      throw(bad);
+  case jsg_store:get(java_validator) of
+    {ok,_} ->
+      ok;
     _ ->
-      ok
-  end,
-  ModuleLocation =
-    code:which(?MODULE),
-  JarDir1 =
-    filename:dirname(ModuleLocation)++
-    "/../../json_schema_validator/build/libs",
-    Jars = 
+      case code:which(java) of
+	non_existing ->
+	  io:format
+	    ("*** Error: the Java Erlang library is not accessible.~n"),
+	  throw(bad);
+	_ ->
+	  ok
+      end,
+      ModuleLocation =
+	code:which(?MODULE),
+      JarDir1 =
+	filename:dirname(ModuleLocation)++
+	"/../../json_schema_validator/build/libs",
+      Jars = 
 	case file:list_dir(JarDir1) of
-	    {ok,L1} when L1=/=[] -> 
-		lists:map(fun (Jar) -> JarDir1++"/"++Jar end, L1);
-	    _ ->
-		JarDir2 = 
-		    filename:dirname(ModuleLocation)++
-		    "/../priv/json_schema_validator/build/libs",
-		case file:list_dir(JarDir2) of
-		    {ok,L2} when L2=/=[] -> 
-			lists:map(fun (Jar) -> JarDir2++"/"++Jar end, L2);
-		    _ ->
-			io:format
-			  ("*** Error: could not access the java validator jar file.~n"++
-			       "It should be located in ~p~n",
-			   [JarDir2]),
-			throw(bad)
-		end
+	  {ok,L1} when L1=/=[] -> 
+	    lists:map(fun (Jar) -> JarDir1++"/"++Jar end, L1);
+	  _ ->
+	    JarDir2 = 
+	      filename:dirname(ModuleLocation)++
+	      "/../priv/json_schema_validator/build/libs",
+	    case file:list_dir(JarDir2) of
+	      {ok,L2} when L2=/=[] -> 
+		lists:map(fun (Jar) -> JarDir2++"/"++Jar end, L2);
+	      _ ->
+		io:format
+		  ("*** Error: could not access the java validator jar file.~n"++
+		     "It should be located in ~p~n",
+		   [JarDir2]),
+		throw(bad)
+	    end
 	end,
-  {ok,N} =
-    java:start_node
-      ([
-	{add_to_java_classpath,Jars},
-	{java_exception_as_value,true}
-       %%,{java_verbose,"FINE"}
-       ]),
-  Factory =
+      {ok,N} =
+	java:start_node
+	  ([
+	    {add_to_java_classpath,Jars},
+	    {java_exception_as_value,true}
+	    %%,{java_verbose,"FINE"}
+	   ]),
+      Factory =
 	ensure_not_exception
-	(java:call_static
-	   (N,'com.github.fge.jsonschema.main.JsonSchemaFactory','byDefault',[])),
-  jsg_store:put(java_validator,Factory),
-  jsg_store:put(java_node,N)
-    end.
+	  (java:call_static
+	     (N,'com.github.fge.jsonschema.main.JsonSchemaFactory','byDefault',[])),
+      jsg_store:put(java_validator,Factory),
+      jsg_store:put(java_node,N)
+  end.
 
 validate(RawSchema,JSON) ->
   {ok,Factory} = 
