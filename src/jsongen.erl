@@ -261,9 +261,9 @@ gen_typed_schema(Schema,Options) ->
       
       case {Min, Max} of
 	{undefined, undefined} -> multiple_of(Multiple);
-	{Min, undefined} -> multiple_of_min(Multiple, Min);
-	{undefined, Max} -> multiple_of_max(Multiple, Max);
-	{Min, Max} -> multiple_of_min_max(Multiple, Min,Max)
+	{_Min, undefined} -> multiple_of_min(Multiple, Min);
+	{undefined, _Max} -> multiple_of_max(Multiple, Max);
+	{_Min, _Max} -> multiple_of_min_max(Multiple, Min,Max)
       end;
     
     %% Number
@@ -356,14 +356,15 @@ gen_typed_schema(Schema,Options) ->
       ReqProps = [{P,S} || {P,S} <- Properties, lists:member(P, Required)],
       OptProps = [{P,S} || {P,S} <- Properties, not lists:member(P, Required)],       
       MinOpts = MinProperties - length(ReqProps),
-
+	  
+      AddP = 
       case AdditionalProperties of 
         false -> 
-          AddP = undefined;
+          undefined;
         true -> 
-          AddP = {};
+          {};
         AddSchema ->
-          AddP = AddSchema
+          AddSchema
       end,
 
       ?LOG("Max Properties: ~p~n",[MaxProperties]),
@@ -735,7 +736,7 @@ number_mul_max(Mul,Max,MaxExc) ->
 	    ?LET(N, nat(), MaxMul - Mul * N)
     end.
 
--spec number_mul_min_max(integer() | float(), integer() | float(), integer() | float(), tuple(boolean(), boolean())) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
+%% -spec number_mul_min_max(integer() | float(), integer() | float(), integer() | float(), tuple(boolean(), boolean())) ->  eqc:gen_gen(integer()) | eqc:gen_gen(float()).
 number_mul_min_max(Mul,Min,Max,{MinExc,MaxExc}) ->
     ?LOG("Min/Mul is ~p~n",[(Min/Mul)]),
     MinMul = case (Min/Mul) == trunc(Min/Mul) of
