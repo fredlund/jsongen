@@ -5,12 +5,13 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 This module contains functions for parsing a JSON schema.
+
 Copyright (c) 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
 
 __Authors:__ [`Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)`](mailto:Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund
   (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)).
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -29,14 +30,13 @@ a mochijson2 Erlang term.</td></tr></table>
 
 ### read_schema/1 ###
 
-
 <pre><code>
 read_schema(URL::string()) -&gt; {ok, <a href="jsg_json.md#type-json_term">jsg_json:json_term()</a>} | {error, any()}
 </code></pre>
 <br />
 
-
 Reads a JSON schema in textual format, converting it into
 a mochijson2 Erlang term.
 The function argument can either
 be on the form "http:...", "file:..." or a filename.
+

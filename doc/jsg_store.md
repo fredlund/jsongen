@@ -4,7 +4,6 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 <a name="index"></a>
 
 ## Function Index ##
@@ -23,18 +22,15 @@
 
 `get(Key) -> any()`
 
-
 <a name="open_clean_db-0"></a>
 
 ### open_clean_db/0 ###
 
 `open_clean_db() -> any()`
 
-
 <a name="put-2"></a>
 
 ### put/2 ###
 
 `put(Key, Value) -> any()`
-
 

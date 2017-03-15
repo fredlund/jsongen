@@ -6,9 +6,9 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 This module contains functions for transforming
 JSON data from text to a mochijson2 Erlang term, and back.
+
 Copyright (c) 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
 
 __Authors:__ [`Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)`](mailto:Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund
@@ -24,7 +24,6 @@ __Authors:__ [`Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund  (lfredlun
 ### <a name="type-json_array">json_array()</a> ###
 
 
-
 <pre><code>
 json_array() = [<a href="#type-json_term">json_term()</a>]
 </code></pre>
@@ -32,9 +31,7 @@ json_array() = [<a href="#type-json_term">json_term()</a>]
 
 
 
-
 ### <a name="type-json_dict">json_dict()</a> ###
-
 
 
 <pre><code>
@@ -44,9 +41,7 @@ json_dict() = [{binary() | atom(), <a href="#type-json_term">json_term()</a>}]
 
 
 
-
 ### <a name="type-json_object">json_object()</a> ###
-
 
 
 <pre><code>
@@ -56,9 +51,7 @@ json_object() = {struct, <a href="#type-json_dict">json_dict()</a>}
 
 
 
-
 ### <a name="type-json_term">json_term()</a> ###
-
 
 
 <pre><code>
@@ -68,15 +61,12 @@ json_term() = null | true | false | binary() | atom() | number() | <a href="#typ
 
 
 
-
 ### <a name="type-json_text">json_text()</a> ###
-
 
 
 <pre><code>
 json_text() = iolist()
 </code></pre>
-
 
 <a name="index"></a>
 
@@ -98,7 +88,6 @@ into its textual representation.</td></tr></table>
 
 ### decode/1 ###
 
-
 <pre><code>
 decode(JsonString::<a href="#type-json_text">json_text()</a>) -&gt; <a href="#type-json_term">json_term()</a>
 </code></pre>
@@ -106,25 +95,24 @@ decode(JsonString::<a href="#type-json_text">json_text()</a>) -&gt; <a href="#ty
 
 Translates a JSON value (as text) into a mochijson2 Erlang term
 representing the value.
+
 <a name="decode_url-1"></a>
 
 ### decode_url/1 ###
-
 
 <pre><code>
 decode_url(URL::string()) -&gt; {ok, <a href="#type-json_term">json_term()</a>} | {error, any()}
 </code></pre>
 <br />
 
-
 Reads a JSON schema in textual format, converting it into
 a mochijson2 Erlang term.
 The function argument can either
 be on the form "http:...", "file:..." or a filename.
+
 <a name="encode-1"></a>
 
 ### encode/1 ###
-
 
 <pre><code>
 encode(JsonErlang::<a href="#type-json_term">json_term()</a>) -&gt; <a href="#type-json_text">json_text()</a>
@@ -133,3 +121,4 @@ encode(JsonErlang::<a href="#type-json_term">json_term()</a>) -&gt; <a href="#ty
 
 Translates a mochijson2 Erlang term representing a JSON value
 into its textual representation.
+

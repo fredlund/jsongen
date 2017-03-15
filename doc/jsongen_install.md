@@ -13,6 +13,7 @@ Inspired by eqc_install for the QuickCheck tool
 (thanks to John Hughes for his kind assistance).
 
 __Authors:__ [`Lars-Ake Fredlund (lfredlund@fi.upm.es)`](mailto:Lars-Ake Fredlund (lfredlund@fi.upm.es)).
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -31,11 +32,9 @@ __Authors:__ [`Lars-Ake Fredlund (lfredlund@fi.upm.es)`](mailto:Lars-Ake Fredlun
 
 `install() -> any()`
 
-
 <a name="install-3"></a>
 
 ### install/3 ###
 
 `install(Version, BuildDir, Lib) -> any()`
-
 

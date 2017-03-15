@@ -5,9 +5,13 @@ docs:
 	env ERL_LIBS=$(shell pwd)/_build/default/lib/edown rebar3 edoc
 
 build:
+	make priv
 	make compile
 	make docs
 	make javalib
+
+priv:
+	mkdir -p priv
 
 javalib:
 	(cd _build/default/lib; rm -rf json_schema_validator; git clone https://github.com/fge/json-schema-validator.git json_schema_validator; cd json_schema_validator; ./gradlew build)

@@ -4,7 +4,6 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 <a name="index"></a>
 
 ## Function Index ##
@@ -23,11 +22,9 @@
 
 `check() -> any()`
 
-
 <a name="test_schema_file-1"></a>
 
 ### test_schema_file/1 ###
 
 `test_schema_file(X1) -> any()`
-
 

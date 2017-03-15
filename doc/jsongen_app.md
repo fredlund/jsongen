@@ -5,9 +5,10 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 java_erlang public API.
+
 __Behaviours:__ [`application`](application.md).
+
 <a name="index"></a>
 
 ## Function Index ##
@@ -26,11 +27,9 @@ __Behaviours:__ [`application`](application.md).
 
 `start(StartType, StartArgs) -> any()`
 
-
 <a name="stop-1"></a>
 
 ### stop/1 ###
 
 `stop(State) -> any()`
-
 

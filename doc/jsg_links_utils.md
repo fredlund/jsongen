@@ -4,7 +4,6 @@
 * [Function Index](#index)
 * [Function Details](#functions)
 
-
 <a name="index"></a>
 
 ## Function Index ##
@@ -23,13 +22,11 @@
 
 `freq_alternatives(Freqs, Alternatives) -> any()`
 
-
 <a name="private_state-1"></a>
 
 ### private_state/1 ###
 
 `private_state(State) -> any()`
-
 
 <a name="remove_dynamic_links-1"></a>
 
@@ -37,18 +34,15 @@
 
 `remove_dynamic_links(State) -> any()`
 
-
 <a name="set_private_state-2"></a>
 
 ### set_private_state/2 ###
 
 `set_private_state(NewPrivateState, State) -> any()`
 
-
 <a name="var-2"></a>
 
 ### var/2 ###
 
 `var(Spec, X2) -> any()`
-
 

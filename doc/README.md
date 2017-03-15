@@ -9,13 +9,9 @@ Jsongen is a library for generating QuickCheck (quviq.com) generators from descr
 
 ## Build, Test, and Generate Markdown Docs ##
 
-
 Jsongen requires [rebar3](http://www.rebar3.org) for
 building and testing.  See [here](http://www.rebar3.org/v3.0/docs/getting-started) for
 getting started with rebar3.
-
-
-
 
 To compile, execute the following command:<br />
 
@@ -24,12 +20,8 @@ $ rebar3 compile
 ```
 
 
-
-
 After compilation Erlang beam files will be left in the
 directory _build/default/lib/jsongen/ebin/.
-
-
 
 Should you wish to install the Jsongen library in the standard
 Erlang library structure, the following commands can be used:<br />
@@ -43,7 +35,6 @@ To generate Markdown docs, execute the following command:<br/>
 ```
 $ env ERL_LIBS=$PWD/_build/default/lib/edown rebar3 edoc
 ```
-
 
 
 
