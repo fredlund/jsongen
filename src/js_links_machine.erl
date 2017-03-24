@@ -105,6 +105,12 @@ gen_call(Link) ->
        gen_http_request(Link),
        [Link,Parms]).
 
+link_post(_State,Args,{'EXIT',Error}) ->
+  io:format
+    ("~n*** Error: when calling generating/issuing the http call~n~s~n"++
+       "Erlang raised the exception~n~p~n",
+     [format_http_call(Args),Error]),
+  error(bad_link);
 link_post(State,Args,Result) ->
   try make_call(postcondition,fun postcondition_int/3,[State,Args,Result])
   catch Class:Reason ->
@@ -252,7 +258,7 @@ gen_http_request(Link) ->
 	 EncodedParms = encode_generated_parameters(QueryParms),
 	 case re:split(PreURI,"\\?") of
 	   [_] ->
-	     {PreURI,RequestType,Body,EncodedParms};
+	     {binary_to_list(PreURI),RequestType,Body,EncodedParms};
 	   [BinaryURI,BinaryParms] -> 
 	     {binary_to_list(BinaryURI),RequestType,Body,
 	      split_parms(BinaryParms)++EncodedParms}
@@ -388,7 +394,6 @@ encode(String) when is_list(String) ->
   http_uri:encode(String).
 
 http_request(PreURI,Type,Body,QueryParms,Link) ->
-  %%io:format("URI: ~s cookies are ~p~n",[PreURI,httpc:which_cookies()]),
   URI =
     case QueryParms of
       [] -> PreURI;
@@ -405,7 +410,6 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
     end,
   Timeout = get_option(timeout),
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
-  %%io:format("Request=~p~n",[Request]),
   case get_option(show_uri) of
     true -> io:format("Accessing URI ~p~n",[URI]);
     false -> ok
@@ -667,6 +671,27 @@ run_statem(PrivateModule,Files) ->
   run_statem(PrivateModule,Files,[]).
 
 run_statem(PrivateModule,Files,Options) ->
+  if
+    is_list(Files) ->
+      lists:foreach
+	(fun (File) ->
+	     if
+	       is_list(File) -> ok;
+	       true ->
+		 io:format
+		   ("~n*** Error: the argument ~p (files) to run_statem "++
+		      " is not contain a list of files.~n",
+		    [Files]),
+		 throw(badarg)
+	     end
+	 end, Files);
+    true -> 
+      io:format
+	("~n*** Error: the argument ~p (files) to run_statem "++
+	   " is not contain a list of files.~n",
+	 [Files]),
+      throw(badarg)
+  end,
   inets:start(),
   case proplists:get_value(cookies,Options) of
     true ->
