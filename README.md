@@ -2,7 +2,7 @@
 
 # Welcome to the jsongen library. #
 
-__Authors:__ [`Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)`](mailto:Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)).
+__Authors:__ [`Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)`].
 
 Jsongen is a library for generating QuickCheck (quviq.com) generators from descriptions of JSON data using JSON schemas.
 
