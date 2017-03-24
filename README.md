@@ -28,6 +28,9 @@ Erlang library structure, the following commands can be used:<br />
 ```
 $ make install
 ```
+Note that it may be required to run the above command
+as a "superuser" if the Erlang libraries are installed
+in a "non-user writeable" directory.
 </p>
 
 <p>
