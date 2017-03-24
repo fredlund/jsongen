@@ -4,8 +4,12 @@
 
 __Authors:__ [`Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)`].
 
-Jsongen is a library for generating QuickCheck (quviq.com) generators from descriptions of JSON data using JSON schemas.
-
+Jsongen is a library that permits to:
+* automatically derive QuickCheck (quviq.com) generators from descriptions
+of JSON data using [JSON schemas](http://json-schema.org/documentation.html)
+* automatically
+explore the web links that may be present in JSON schemas, validating
+that returned JSON data conforms to the schema specifications.
 
 ## Build, Test, and Generate Markdown Docs ##
 
@@ -18,7 +22,6 @@ To compile, execute the following command:<br />
 ```
 $ rebar3 compile
 ```
-
 
 After compilation Erlang beam files will be left in the
 directory _build/default/lib/jsongen/ebin/.
