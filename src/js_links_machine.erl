@@ -271,7 +271,7 @@ generate_body(Link) ->
   RequestType = jsg_links:link_request_type(Link),
   case may_have_body(RequestType) of
     true when Schema=/=undefined -> 
-      jsongen:json(Schema);
+      {ok,jsongen:json(Schema)};
     _ -> 
       undefined
   end.
