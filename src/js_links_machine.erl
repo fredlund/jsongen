@@ -8,7 +8,7 @@
 -include_lib("jsongen.hrl").
 
 %% Super fragile below
--record(eqc_statem_history,{state, args, features, result}).
+-record(eqc_statem_history,{state, args, call, features, result}).
 
 %%-define(debug,true).
 
@@ -203,12 +203,12 @@ validate_response_code(Args, Result, Link, Schema) ->
   end.
 
 get_status_code(Schema={struct, ListOfValues}) ->
-  case ListOfValues of
-    [{<<"oneOf">>, JsonSchemaList}] ->
-      lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
-     _ ->
-      jsg_jsonschema:propertyValue(Schema, "status")
-  end.
+    case ListOfValues of
+	[{<<"oneOf">>, JsonSchemaList}] ->
+	    lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
+	_ ->
+	    jsg_jsonschema:propertyValue(Schema, "status")
+    end.
 
 link_next(State,Result,Args) ->
   try make_call(next_state,fun next_state_int/3,[State,Result,Args])
@@ -353,7 +353,8 @@ link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
   case response_has_body(Result) of
     true ->
       ResponseBody = http_body(Result),
-      case length(ResponseBody)>1024 of
+      case false of
+      %% case length(ResponseBody)>1024 of
 	true ->
 	  jsg_store:put(last_body,{body,ResponseBody}),
 	  {P1,{P2,P3,_}} = Result,

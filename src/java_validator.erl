@@ -95,8 +95,8 @@ validate(RawSchema,JSON) ->
       true;
     false ->
       io:format
-	("*** Error: validation error~n~s~ndoes not validate against~n~p~n",
-	 [JSONText,RawSchema]),
+	("*** Error: validation error~n~s~ndoes not validate against~n~s~n",
+	 [JSONText,jiffy:encode(jiffy:decode(mochijson2:encode(RawSchema)), [pretty])]),
       BadLevels =
 	[ensure_not_exception(java:call_static
 	   (N,'com.github.fge.jsonschema.core.report.LogLevel',valueOf,
