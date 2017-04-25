@@ -100,7 +100,7 @@ link_permitted(State,Link) ->
 link_permitted_int(_State,_Link) ->
   true.
 
-gen_call(Link) ->
+gen_call(Link) -> % generator :: [Link, {BinaryUri,Requesttype,Body,Parms}]
   ?LET(Parms,
        gen_http_request(Link),
        [Link,Parms]).
@@ -277,19 +277,19 @@ initial_links() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-gen_http_request(Link) ->
+gen_http_request(Link) -> % generator :: [{BinaryUri,Requesttype,Body,Parms}]
   ?LET({Body,QueryParms},
        {generate_body(Link),generate_parameters(Link)},
        begin
 	 PreURI = jsg_links:link_calculated_href(Link),
 	 RequestType = jsg_links:link_request_type(Link),
-	 EncodedParms = encode_generated_parameters(QueryParms),
+	 EncodedParms = encode_generated_parameters(QueryParms), % enco..ters :: [{key,value}]
 	 case re:split(PreURI,"\\?") of
 	   [_] ->
 	     {binary_to_list(PreURI),RequestType,Body,EncodedParms};
 	   [BinaryURI,BinaryParms] -> 
 	     {binary_to_list(BinaryURI),RequestType,Body,
-	      split_parms(BinaryParms)++EncodedParms}
+	      split_parms(BinaryParms)++EncodedParms} % split_parms :: [{key,value}]
 	 end
        end).
 

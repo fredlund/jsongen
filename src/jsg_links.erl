@@ -242,10 +242,43 @@ link_history(Link) ->
 
 link_calculated_href(Link) ->	     
   {link,LD} = Link,
-  proplists:get_value(calculated_href,LD,[]).
+  substitute(proplists:get_value(calculated_href,LD,[])).
 
 link_type(Link) ->	     
   {link,LD} = Link,
   proplists:get_value(type,LD,[]).
+
+substitute(Href) -> % Regex para la sustitución '{:[^}]*}'
+    {ok, MP} = re:compile("#([^#]*)#"),
+    case re:run(Href, MP, [global, {capture, all, list}]) of %% {match,N} = re:run(S,"{:([^}]*)}", [global,{capture, all, list}]).
+	nomatch -> Href;
+	{match,N} ->  %% 1- Llamar a jsongen con los generadores correspondientes.
+	    Values =
+		lists:map(fun([_P,S]) ->
+				  FS = {struct,[{<<"$ref">>,list_to_binary(S)}]},
+				  Schema = jsg_links:get_schema(FS),
+				  Gen = ?LET(V, %% Todos los valores tienen que ser string para ser concatenados
+					     ?SUCHTHAT(X, % Valores no vacios
+						       jsongen:json(Schema),
+						       lists:flatten(io_lib:format("~p",[X])) > 0 andalso 
+						       lists:flatten(io_lib:format("~p",[X])) =/= "<<>>"
+						      ),
+					     begin
+						 Str = lists:flatten(io_lib:format("~p",[V])),
+						 {ok, Picos } = re:compile("<<\"|\">>"),
+						 re:replace(Str, Picos, "", [global, {return, list}])
+					     end
+					    ),
+				  eqc_gen:pick(Gen)
+			  end, N),
+	    %% 2- Hacer un replace de cada valor generado
+	    {ok, RE} = re:compile("#[^#]*#"),
+	    [First | Tail] = re:split(Href, RE, [{return,list}]),
+	    Build = lists:zipwith(fun(A,B) -> B ++ A end, Tail, Values),
+	    %% 3- Devolver el Link resultante
+	    H = lists:flatten([First | Build]),
+	    list_to_binary(H)
+    end.
+
       
   
