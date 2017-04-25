@@ -7,7 +7,7 @@
 -module(jsg_json).
 
 -export([decode/1, decode_url/1,
-         encode/1]).
+         encode/1, pretty_json/1]).
 
 -define(JSONLIB, mochijson2).
 
@@ -89,3 +89,5 @@ decode_url1([$f,$i,$l,$e,$:|Filename]) ->
 decode_url1(URL) ->
   decode_url1([$f,$i,$l,$e,$:|URL]).
 
+pretty_json(Json) ->
+  jiffy:encode(jiffy:decode(Json), [pretty]).
