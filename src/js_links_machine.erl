@@ -124,15 +124,10 @@ link_post(State,Args,Result) ->
 postcondition_int(_State,Args,Result) ->
   case validate_call_not_error_result(Args,Result) of
     true ->
-      case http_result_code(Result) of
-	200 ->
-	  validate_call_result_body(Args,Result);
-	Other ->
-	  io:format
-	    ("~n*** Error: postcondition error: for http call~n~s~nhttp responded with result code ~p, expected result code 200~n",
-	     [format_http_call(Args),Other]),
-	  false
-      end;
+      Link = jsg_links:link_def(args_link(Args)),
+      Schema = jsg_links:link_schema(args_link(Args)),
+      validate_call_result_body(Args, Result, Link, Schema) and
+          validate_response_code(Args, Result, Link, Schema);
     _ ->
       io:format("validation failed~n"),
       false
@@ -149,9 +144,7 @@ validate_call_not_error_result(Args,Result) ->
       false
   end.
 
-validate_call_result_body(Args,Result) ->
-  Link = jsg_links:link_def(args_link(Args)),
-  Schema = jsg_links:link_schema(args_link(Args)),
+validate_call_result_body(Args,Result,Link,Schema) ->
   case jsg_jsonschema:propertyValue(Link,"targetSchema") of
     undefined ->
       true;
@@ -180,6 +173,41 @@ validate_call_result_body(Args,Result) ->
 	      false
 	  end
       end
+  end.
+
+validate_response_code(Args, Result, Link, Schema) ->
+  case jsg_jsonschema:propertyValue(Link, "targetSchema") of
+    undefined -> true;
+    TargetSchema ->
+      RealTargetSchema = jsg_links:get_schema(TargetSchema, Schema),
+      SchemaStatusCode = get_status_code(RealTargetSchema),
+        case
+          case SchemaStatusCode of
+            undefined ->
+              http_result_code(Result) == 200;
+            SchemaStatusCode when is_list(SchemaStatusCode) ->
+              lists:member(http_result_code(Result), SchemaStatusCode);
+            SchemaStatusCode ->
+              SchemaStatusCode == http_result_code(Result)
+            end
+          of
+            false ->
+              io:format
+                ("~n*** Error: postcondition error: for http call~n~s~n"++
+                    "the HTTP response code: ~p~n"++
+                    "expected: ~p~n",
+                 [format_http_call(Args), SchemaStatusCode, http_result_code(Result)]),
+              false;
+           true -> true
+        end
+  end.
+
+get_status_code(Schema={struct, ListOfValues}) ->
+  case ListOfValues of
+    [{<<"oneOf">>, JsonSchemaList}] ->
+      lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
+     _ ->
+      jsg_jsonschema:propertyValue(Schema, "status")
   end.
 
 link_next(State,Result,Args) ->
