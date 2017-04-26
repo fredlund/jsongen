@@ -159,10 +159,13 @@ validate_call_result_body(Args,Result,Link,Schema) ->
 	  try Validator:validate(RealTargetSchema,Body)
 	  catch _Class:Reason ->
 	      io:format
-		("~n*** Error: postcondition error: for http call~n~s~n"++
-		   "the JSON value~n~s~n"++
-		   "did not validate against the schema~n~s~n"++
-		   "due to error~n~p~n",
+		("~n***************************************************~n " ++ 
+		     "ERROR [postcondition error] [WRONG BODY]~n " ++
+		     "for http call~n~s~n"++
+		     "the JSON value~n~s~n"++
+		     "did not validate against the schema~n~s~n"++
+		     "due to error~n~p~n"++
+		     "~n***************************************************~n",
 		 [format_http_call(Args),
 		  Body,
 		  mochijson2:encode(RealTargetSchema),
@@ -193,10 +196,14 @@ validate_response_code(Args, Result, Link, Schema) ->
           of
             false ->
               io:format
-                ("~n*** Error: postcondition error: for http call~n~s~n"++
-                    "the HTTP response code: ~p~n"++
-                    "expected: ~p~n",
-                 [format_http_call(Args), SchemaStatusCode, http_result_code(Result)]),
+                ("~n***************************************************~n" ++
+		     "ERROR [postcondition error] [WRONG HTTP STATUS CODE]~n"++
+		     "for http call~n~s~n"++
+		     "the HTTP response code was: ~p~n"++
+		     "but expected: ~p~n" ++
+		     "~n***************************************************~n"
+		,
+                 [format_http_call(Args), http_result_code(Result),SchemaStatusCode]),
               false;
            true -> true
         end
@@ -206,6 +213,12 @@ get_status_code(Schema={struct, ListOfValues}) ->
     case ListOfValues of
 	[{<<"oneOf">>, JsonSchemaList}] ->
 	    lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
+	[{<<"anyOf">>, JsonSchemaList}] ->
+	    lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
+	%% [{<<"allOf">>, JsonSchemaList}] ->
+	%%     lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
+	%% [{<<"none">>, JsonSchemaList}] ->
+	%%     lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
 	_ ->
 	    jsg_jsonschema:propertyValue(Schema, "status")
     end.

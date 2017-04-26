@@ -94,10 +94,14 @@ validate(RawSchema,JSON) ->
     true ->
       true;
     false ->
-      io:format
-	("*** Error: validation error~n~s~ndoes not validate against~n~s~n",
-	 [jsg_json:pretty_json(JSONText),
-	  jsg_json:pretty_json(mochijson2:encode(RawSchema))]),
+	  io:format
+	    ("~n***************************************************~n " ++ 
+		 "ERROR [postcondition error] [WRONG BODY]~n " ++
+		 "the JSON value~n~s~n"++
+		 "did not validate against the schema~n~s~n"++
+		 "~n***************************************************~n",
+	     [jsg_json:pretty_json(JSONText),
+	      jsg_json:pretty_json(mochijson2:encode(RawSchema))]),
       BadLevels =
 	[ensure_not_exception(java:call_static
 	   (N,'com.github.fge.jsonschema.core.report.LogLevel',valueOf,
