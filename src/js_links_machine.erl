@@ -14,7 +14,7 @@
 
 -ifdef(debug).
 -define(LOG(X,Y),
-	io:format("{~p,~p}: ~s~n", [?MODULE,?LINE,io_lib:format(X,Y)])).
+        io:format("{~p,~p}: ~s~n", [?MODULE,?LINE,io_lib:format(X,Y)])).
 -else.
 -define(LOG(X,Y),true).
 -endif.
@@ -24,12 +24,12 @@ api_spec() ->
   #api_spec{}.
 
 initial_state() ->
-  PrivateState = 
+  PrivateState =
     case exists_private_function(initial_state,0) of
       true ->
-	(private_module()):initial_state();
+        (private_module()):initial_state();
       false ->
-	void
+        void
     end,
   #state
     {static_links=initial_links(),
@@ -66,32 +66,32 @@ link_args(State) ->
   case jsl_dynamic_links:is_empty(State#state.dynamic_links) of
     true ->
       ?LET(FinalLink,
-	   eqc_gen:oneof(State#state.static_links),
-	   gen_call(FinalLink));
+           eqc_gen:oneof(State#state.static_links),
+           gen_call(FinalLink));
     false ->
       ?LET
-	 (FinalLink,
-	  eqc_gen:
-	     frequency
-	       ([{7,
-		  ?LET
-		    (Title,
-		     eqc_gen:oneof
-		       (jsl_dynamic_links:titles
-			  (State#state.dynamic_links)),
-		     eqc_gen:oneof
-		       (jsl_dynamic_links:links
-			  (Title,State#state.dynamic_links)))},
-		{1,
-		 eqc_gen:oneof(State#state.static_links)}]),
-	   gen_call(FinalLink))
-      end.
+         (FinalLink,
+          eqc_gen:
+            frequency
+              ([{7,
+                 ?LET
+                    (Title,
+                     eqc_gen:oneof
+                       (jsl_dynamic_links:titles
+                          (State#state.dynamic_links)),
+                     eqc_gen:oneof
+                       (jsl_dynamic_links:links
+                          (Title,State#state.dynamic_links)))},
+                {1,
+                 eqc_gen:oneof(State#state.static_links)}]),
+          gen_call(FinalLink))
+  end.
 
 link_pre(State,[Link,_]) ->
-  (State#state.initialized==true) 
+  (State#state.initialized==true)
     andalso ((jsg_links:link_type(Link)==static)
-	     orelse 
-	     jsl_dynamic_links:is_element(Link,State#state.dynamic_links))
+             orelse
+             jsl_dynamic_links:is_element(Link,State#state.dynamic_links))
     andalso link_permitted(State,Link).
 
 link_permitted(State,Link) ->
@@ -106,17 +106,14 @@ gen_call(Link) -> % generator :: [Link, {BinaryUri,Requesttype,Body,Parms}]
        [Link,Parms]).
 
 link_post(_State,Args,{'EXIT',Error}) ->
-  io:format
-    ("~n*** Error: when calling generating/issuing the http call~n~s~n"++
-       "Erlang raised the exception~n~p~n",
-     [format_http_call(Args),Error]),
+  error_messages:erlang_exception(Args, Error),
   error(bad_link);
 link_post(State,Args,Result) ->
   try make_call(postcondition,fun postcondition_int/3,[State,Args,Result])
   catch Class:Reason ->
       io:format
-	("Warning: postcondition/3 raises exception ~p~n",
-	 [Reason]),
+        ("Warning: postcondition/3 raises exception ~p~n",
+         [Reason]),
       StackTrace = erlang:get_stacktrace(),
       erlang:raise(Class,Reason,StackTrace)
   end.
@@ -127,7 +124,7 @@ postcondition_int(_State,Args,Result) ->
       Link = jsg_links:link_def(args_link(Args)),
       Schema = jsg_links:link_schema(args_link(Args)),
       validate_call_result_body(Args, Result, Link, Schema) and
-          validate_response_code(Args, Result, Link, Schema);
+        validate_response_code(Args, Result, Link, Schema);
     _ ->
       io:format("validation failed~n"),
       false
@@ -138,9 +135,7 @@ validate_call_not_error_result(Args,Result) ->
     ok ->
       true;
     {error,_Error} ->
-      io:format
-	("~n*** Error: postcondition error: for http call~n~s~nhttp responded with error ~p~n",
-	 [format_http_call(Args),http_error(Result)]),
+      error_messages:wrong_http_call(Args, Result),
       false
   end.
 
@@ -151,30 +146,19 @@ validate_call_result_body(Args,Result,Link,Schema) ->
     TargetSchema ->
       RealTargetSchema = jsg_links:get_schema(TargetSchema,Schema),
       case response_has_json_body(Result) of
-	false ->
-	  false;
-	true ->
-	  Body = http_body(Result),
-	  Validator = get_option(validator),
-	  try Validator:validate(RealTargetSchema,Body)
-	  catch _Class:Reason ->
-	      io:format
-		("~n***************************************************~n " ++ 
-		     "ERROR [postcondition error] [WRONG BODY]~n " ++
-		     "for http call~n~s~n"++
-		     "the JSON value~n~s~n"++
-		     "did not validate against the schema~n~s~n"++
-		     "due to error~n~p~n"++
-		     "~n***************************************************~n",
-		 [format_http_call(Args),
-		  Body,
-		  mochijson2:encode(RealTargetSchema),
-		  Reason]),
-	      io:format
-		("Stacktrace:~n~p~n",
-		 [erlang:get_stacktrace()]),
-	      false
-	  end
+        false ->
+          false;
+        true ->
+          Body = http_body(Result),
+          Validator = get_option(validator),
+          try Validator:validate(RealTargetSchema,Body)
+          catch _Class:Reason ->
+              error_messages:wrong_body_message(Args, Body, RealTargetSchema, Reason),
+              io:format
+                ("Stacktrace:~n~p~n",
+                 [erlang:get_stacktrace()]),
+              false
+          end
       end
   end.
 
@@ -184,51 +168,79 @@ validate_response_code(Args, Result, Link, Schema) ->
     TargetSchema ->
       RealTargetSchema = jsg_links:get_schema(TargetSchema, Schema),
       SchemaStatusCode = get_status_code(RealTargetSchema),
-        case
-          case SchemaStatusCode of
-            undefined ->
-              http_result_code(Result) == 200;
-            SchemaStatusCode when is_list(SchemaStatusCode) ->
-              lists:member(http_result_code(Result), SchemaStatusCode);
-            SchemaStatusCode ->
-              SchemaStatusCode == http_result_code(Result)
-            end
-          of
-            false ->
-              io:format
-                ("~n***************************************************~n" ++
-		     "ERROR [postcondition error] [WRONG HTTP STATUS CODE]~n"++
-		     "for http call~n~s~n"++
-		     "the HTTP response code was: ~p~n"++
-		     "but expected: ~p~n" ++
-		     "~n***************************************************~n"
-		,
-                 [format_http_call(Args), http_result_code(Result),SchemaStatusCode]),
-              false;
-           true -> true
+      case
+        case SchemaStatusCode of
+          undefined ->
+            http_result_code(Result) == 200;
+          {SpecialType, ListOfSchemasAndTypes} ->
+            validate_list_of_schemas(SpecialType, ListOfSchemasAndTypes,
+                                     http_result_code(Result), http_body(Result));
+          SchemaStatusCode ->
+            SchemaStatusCode == http_result_code(Result)
         end
+      of
+        false ->
+          error_messages:wrong_status_code(Args, Result, SchemaStatusCode),
+          false;
+        true -> true;
+        Errors ->
+          lists:map(fun({StatusCode, Header, Body}) ->
+                        error_messages:wrong_body_message(StatusCode, Header, Body)
+                    end, Errors),
+          false
+      end
   end.
 
 get_status_code(Schema={struct, ListOfValues}) ->
-    case ListOfValues of
-	[{<<"oneOf">>, JsonSchemaList}] ->
-	    lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
-	[{<<"anyOf">>, JsonSchemaList}] ->
-	    lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
-	%% [{<<"allOf">>, JsonSchemaList}] ->
-	%%     lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
-	%% [{<<"none">>, JsonSchemaList}] ->
-	%%     lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
-	_ ->
-	    jsg_jsonschema:propertyValue(Schema, "status")
-    end.
+  case ListOfValues of
+    [{<<"oneOf">>, JsonSchemaList}] ->
+      {one_of, lists:map(fun(X) -> {get_status_code(X), X} end, JsonSchemaList)};
+    [{<<"anyOf">>, JsonSchemaList}] ->
+      {any_of, lists:map(fun(X) -> {get_status_code(X), X} end, JsonSchemaList)};
+    %% [{<<"allOf">>, JsonSchemaList}] ->
+    %%     lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
+    %% [{<<"none">>, JsonSchemaList}] ->
+    %%     lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
+    _ ->
+      jsg_jsonschema:propertyValue(Schema, "status")
+  end.
+
+validate_list_of_schemas(one_of, List, StatusCode, Body) ->
+  ValidationResult = lists:map(fun(X) -> validate_header_and_schema(X, StatusCode, Body) end, List),
+  case length(lists:filter(fun(X) -> X == {true, true} end, ValidationResult)) of
+    1 -> true;
+    _ -> get_wrong_status_list(StatusCode, Body, List)
+  end;
+validate_list_of_schemas(any_of, List, StatusCode, Body) ->
+  ValidationResult = lists:map(fun(X) -> validate_header_and_schema(X, StatusCode, Body) end, List),
+  lists:map(fun(X) -> validate_header_and_schema(X, StatusCode, Body) end, List),
+  case length(lists:filter(fun(X) -> X == {true, true} end, ValidationResult)) of
+    0 -> get_wrong_status_list(StatusCode, Body, lists:zip(ValidationResult, List));
+    _ -> true
+  end.
+
+validate_header_and_schema({Header, Schema}, StatusCode, Body) ->
+  Validator = get_option(validator),
+  {
+    Header == StatusCode,
+    try Validator:validate(Schema, Body, no_report)
+    catch _:_ -> false end
+  }.
+
+get_wrong_status_list(StatusCode, Body, List) ->
+  lists:foldl(fun({X, {Header, _}}, Acc) ->
+                  case X of
+                    {false, true} -> [{StatusCode, Header, Body}|Acc];
+                    _ -> Acc
+                  end
+              end, [], List).
 
 link_next(State,Result,Args) ->
   try make_call(next_state,fun next_state_int/3,[State,Result,Args])
   catch Class:Reason ->
       io:format
-	("Warning: next_state/3 raises exception ~p~n",
-	 [Reason]),
+        ("Warning: next_state/3 raises exception ~p~n",
+         [Reason]),
       StackTrace = erlang:get_stacktrace(),
       erlang:raise(Class,Reason,StackTrace)
   end.
@@ -237,28 +249,28 @@ next_state_int(State,Result,[Link,_]) ->
   case Result of
     {ok,{{_,_Code,_},_Headers,_Body}} ->
       LinksToAdd =
-	case response_has_body(Result) of
-	  true ->
-	    JSONbody = mochijson2:decode(http_body(Result)),
-	    jsg_links:extract_dynamic_links
-	      (Link,JSONbody,jsg_links:intern_object(JSONbody));
-	  _ ->
-	    []
-	end,
+        case response_has_body(Result) of
+          true ->
+            JSONbody = mochijson2:decode(http_body(Result)),
+            jsg_links:extract_dynamic_links
+              (Link,JSONbody,jsg_links:intern_object(JSONbody));
+          _ ->
+            []
+        end,
       State#state
-	{
-	dynamic_links=
-	  lists:foldl
-	    (fun (DLink,DLs) ->
-		 jsl_dynamic_links:add_link(DLink,DLs)
-	     end, State#state.dynamic_links, LinksToAdd)
+        {
+        dynamic_links=
+          lists:foldl
+            (fun (DLink,DLs) ->
+                 jsl_dynamic_links:add_link(DLink,DLs)
+             end, State#state.dynamic_links, LinksToAdd)
        };
     _Other ->
       State
   end.
 
 make_call(ExternalFunction,InternalFunction,Args) ->
-  [{private_module,Module}] = 
+  [{private_module,Module}] =
     ets:lookup(js_links_machine_data,private_module),
   {arity,Arity} = erlang:fun_info(InternalFunction,arity),
   case exists_private_function(ExternalFunction,Arity+1) of
@@ -266,20 +278,20 @@ make_call(ExternalFunction,InternalFunction,Args) ->
       apply(Module,ExternalFunction,[InternalFunction|Args]);
     false ->
       ?LOG
-	("function ~p:~p/~p missing~n",
-	 [Module,ExternalFunction,Arity+1]),
+         ("function ~p:~p/~p missing~n",
+          [Module,ExternalFunction,Arity+1]),
       apply(InternalFunction,Args)
   end.
 
 exists_private_function(Function,Arity) ->
-  [{private_module,Module}] = 
+  [{private_module,Module}] =
     ets:lookup(js_links_machine_data,private_module),
   try Module:module_info(exports) of
       Exports -> lists:member({Function,Arity},Exports)
   catch _:_ -> false end.
 
 private_module() ->
-  [{private_module,Module}] = 
+  [{private_module,Module}] =
     ets:lookup(js_links_machine_data,private_module),
   Module.
 
@@ -294,16 +306,16 @@ gen_http_request(Link) -> % generator :: [{BinaryUri,Requesttype,Body,Parms}]
   ?LET({Body,QueryParms},
        {generate_body(Link),generate_parameters(Link)},
        begin
-	 PreURI = jsg_links:link_calculated_href(Link),
-	 RequestType = jsg_links:link_request_type(Link),
-	 EncodedParms = encode_generated_parameters(QueryParms), % enco..ters :: [{key,value}]
-	 case re:split(PreURI,"\\?") of
-	   [_] ->
-	     {binary_to_list(PreURI),RequestType,Body,EncodedParms};
-	   [BinaryURI,BinaryParms] -> 
-	     {binary_to_list(BinaryURI),RequestType,Body,
-	      split_parms(BinaryParms)++EncodedParms} % split_parms :: [{key,value}]
-	 end
+         PreURI = jsg_links:link_calculated_href(Link),
+         RequestType = jsg_links:link_request_type(Link),
+         EncodedParms = encode_generated_parameters(QueryParms), % enco..ters :: [{key,value}]
+         case re:split(PreURI,"\\?") of
+           [_] ->
+             {binary_to_list(PreURI),RequestType,Body,EncodedParms};
+           [BinaryURI,BinaryParms] ->
+             {binary_to_list(BinaryURI),RequestType,Body,
+              split_parms(BinaryParms)++EncodedParms} % split_parms :: [{key,value}]
+         end
        end).
 
 generate_body(Link) ->
@@ -311,9 +323,9 @@ generate_body(Link) ->
   Schema = jsg_jsonschema:propertyValue(Sch,"schema"),
   RequestType = jsg_links:link_request_type(Link),
   case may_have_body(RequestType) of
-    true when Schema=/=undefined -> 
+    true when Schema=/=undefined ->
       {ok,jsongen:json(Schema)};
-    _ -> 
+    _ ->
       undefined
   end.
 
@@ -355,10 +367,10 @@ link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
       Key = list_to_atom(String),
       {ok,Stats} = jsg_store:get(stats),
       NewValue =
-	case lists:keyfind(Key,1,Stats) of
-	  false -> 1;
-	  {_,N} -> N+1
-	end,
+        case lists:keyfind(Key,1,Stats) of
+          false -> 1;
+          {_,N} -> N+1
+        end,
       jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
     _ -> ok
   end,
@@ -367,14 +379,14 @@ link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
     true ->
       ResponseBody = http_body(Result),
       case false of
-      %% case length(ResponseBody)>1024 of
-	true ->
-	  jsg_store:put(last_body,{body,ResponseBody}),
-	  {P1,{P2,P3,_}} = Result,
-	  {P1,{P2,P3,ets_body}};
-	false ->
-	  jsg_store:put(last_body,has_body),
-	  Result
+        %% case length(ResponseBody)>1024 of
+        true ->
+          jsg_store:put(last_body,{body,ResponseBody}),
+          {P1,{P2,P3,_}} = Result,
+          {P1,{P2,P3,ets_body}};
+        false ->
+          jsg_store:put(last_body,has_body),
+          Result
       end;
     false ->
       jsg_store:put(last_body,no_body),
@@ -388,11 +400,11 @@ format_http_call(PreURI,RequestType,Body,Params) ->
   BodyString =
     case Body of
       {ok,JSON} ->
-	io_lib:format(" body=~s",[mochijson2:encode(JSON)]);
+        io_lib:format(" body=~s",[mochijson2:encode(JSON)]);
       _ ->
-	""
+        ""
     end,
-  URI = 
+  URI =
     case Params of
       [] -> PreURI;
       _ -> PreURI++"?"++encode_parameters(Params)
@@ -412,9 +424,9 @@ encode_generated_parameters(Parms) ->
   case Parms of
     {ok,{struct,L}} ->
       lists:map
-	(fun ({Key,Value}) ->
-	     {to_list(Key), to_list(Value)}
-	 end, L);
+        (fun ({Key,Value}) ->
+             {to_list(Key), to_list(Value)}
+         end, L);
     _ -> []
   end.
 
@@ -424,8 +436,8 @@ to_list(I) when is_integer(I) ->
   integer_to_list(I).
 
 encode_parameters([]) -> "";
-encode_parameters([{Key,Value}|Rest]) -> 
-  Continuation = 
+encode_parameters([{Key,Value}|Rest]) ->
+  Continuation =
     if
       Rest==[] -> "";
       true -> "&"++encode_parameters(Rest)
@@ -444,11 +456,11 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
   URIwithBody =
     case Body of
       {ok,RawBody} ->
-	{URI,[],
-	 "application/json",
-	 iolist_to_binary(mochijson2:encode(RawBody))};
+        {URI,[],
+         "application/json",
+         iolist_to_binary(mochijson2:encode(RawBody))};
       _ ->
-	{URI,[]}
+        {URI,[]}
     end,
   Timeout = get_option(timeout),
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
@@ -459,23 +471,23 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
   {ElapsedTime,Result} =
     case get_option(simulation_mode) of
       false ->
-	timer:tc(httpc,request,Request);
-    true -> 
-	TargetSchema =
-	  jsg_links:get_schema(jsg_links:link_targetSchema(Link)),
-	ResponseBody =
-	  case TargetSchema of
-	    undefined ->
-	      eqc_gen:pick(jsongen:anyType());
-	    _ ->
-	      eqc_gen:pick(jsongen:json(TargetSchema))
-	  end,
-	EncodedBody = mochijson2:encode(ResponseBody),
-	Headers = {"HTTP/1.1",200,"OK"},
-	StatusLine = [{"content-length",integer_to_list(length(EncodedBody))},
-		      {"content-type","application/json;charset=UTF-8"}],
-	{1000,{ok,{Headers,StatusLine,EncodedBody}}}
-  end,
+        timer:tc(httpc,request,Request);
+      true ->
+        TargetSchema =
+          jsg_links:get_schema(jsg_links:link_targetSchema(Link)),
+        ResponseBody =
+          case TargetSchema of
+            undefined ->
+              eqc_gen:pick(jsongen:anyType());
+            _ ->
+              eqc_gen:pick(jsongen:json(TargetSchema))
+          end,
+        EncodedBody = mochijson2:encode(ResponseBody),
+        Headers = {"HTTP/1.1",200,"OK"},
+        StatusLine = [{"content-length",integer_to_list(length(EncodedBody))},
+                      {"content-type","application/json;charset=UTF-8"}],
+        {1000,{ok,{Headers,StatusLine,EncodedBody}}}
+    end,
   case get_option(show_http_timing) of
     true -> io:format("http request took ~p milliseconds~n",[ElapsedTime/1000]);
     false -> ok
@@ -554,14 +566,14 @@ http_content_type(Result) ->
 %% Probably non-ok responses can have a body too...
 response_has_body(Result) ->
   case http_result_type(Result) of
-    ok -> 
+    ok ->
       ContentLength = http_content_length(Result),
       if
-	ContentLength=/=undefined ->
-	  ContLen = list_to_integer(ContentLength),
-	  ContLen>0;
-	true -> 
-	  false
+        ContentLength=/=undefined ->
+          ContLen = list_to_integer(ContentLength),
+          ContLen>0;
+        true ->
+          false
       end;
     _ -> false
   end.
@@ -585,9 +597,9 @@ init_table(PrivateModule,Links) ->
   end,
   spawn
     (fun () ->
-	 ets:new(js_links_machine_data,[named_table,public]),
-	 ets:insert(js_links_machine_data,{pid,self()}),
-	 wait_forever()
+         ets:new(js_links_machine_data,[named_table,public]),
+         ets:insert(js_links_machine_data,{pid,self()}),
+         wait_forever()
      end),
   wait_until_stable(),
   ets:insert(js_links_machine_data,{private_module,PrivateModule}),
@@ -604,47 +616,47 @@ wait_until_stable() ->
 wait_forever() ->
   receive _ -> wait_forever() end.
 
-  
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 prop_ok() ->
   ?FORALL
      (Cmds, eqc_dynamic_cluster:dynamic_commands(?MODULE),
       ?CHECK_COMMANDS
-	 ({H, DS, Res},
-	  ?MODULE,
-	  Cmds,
-	  begin
-	    %%io:format("Res size is ~p~n",[erts_debug:size(Res)]),
-	    %%io:format("DS size is ~p~n",[erts_debug:size(DS)]),
-	    %%io:format("length(H)=~p~n",[length(H)]),
-	    %%[{P1,P2,P3}|_] = lists:reverse(H),
-	    %%io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
-	    %%io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
-	    %%io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
-	    %%io:format("P1=~p~n",[P1]),
-	    %%io:format("P2=~p~n",[P2]),
-	    %%io:format("P3=~p~n",[P3]),
-	    %%io:format("H size is ~p~n",[erts_debug:size(H)]),
-	    %%io:format("H=~p~nDS=~p~n",[H,DS]),
-	    if
-	      Res == ok ->
-		true;
-	      true ->
-		print_counterexample(Cmds,H,DS,Res),
-		false
-	    end
-	  end)).
+         ({H, DS, Res},
+          ?MODULE,
+          Cmds,
+          begin
+            %%io:format("Res size is ~p~n",[erts_debug:size(Res)]),
+            %%io:format("DS size is ~p~n",[erts_debug:size(DS)]),
+            %%io:format("length(H)=~p~n",[length(H)]),
+            %%[{P1,P2,P3}|_] = lists:reverse(H),
+            %%io:format("P1(1).size=~p~n",[erts_debug:size(P1)]),
+            %%io:format("P2(1).size=~p~n",[erts_debug:size(P2)]),
+            %%io:format("P3(1).size=~p~n",[erts_debug:size(P3)]),
+            %%io:format("P1=~p~n",[P1]),
+            %%io:format("P2=~p~n",[P2]),
+            %%io:format("P3=~p~n",[P3]),
+            %%io:format("H size is ~p~n",[erts_debug:size(H)]),
+            %%io:format("H=~p~nDS=~p~n",[H,DS]),
+            if
+              Res == ok ->
+                true;
+              true ->
+                print_counterexample(Cmds,H,DS,Res),
+                false
+            end
+          end)).
 
 print_counterexample(Cmds,H,_DS,Reason) ->
   io:format("~nTest failed with reason ~p~n",[Reason]),
   {FailingCommandSequence,_} = lists:split(length(H)+1,Cmds),
-  ReturnValues = 
+  ReturnValues =
     case Reason of
       {exception,_} ->
-	(lists:map(fun (Item) -> Item#eqc_statem_history.result end, H))++[Reason];
+        (lists:map(fun (Item) -> Item#eqc_statem_history.result end, H))++[Reason];
       _ ->
-	(lists:map(fun (Item) -> Item#eqc_statem_history.result end, H))
+        (lists:map(fun (Item) -> Item#eqc_statem_history.result end, H))
     end,
   io:format("~nCommand sequence:~n"),
   io:format("---------------~n~n"),
@@ -657,34 +669,34 @@ print_commands([{_Call={call,_,start,_,_},_Result}|Rest]) ->
   print_commands(Rest);
 print_commands([{Call={call,_,link,Args,_},Result}|Rest]) ->
   Title = call_link_title(Call),
-  TitleString = 
-    if 
+  TitleString =
+    if
       Title==undefined ->
-	"Link ";
+        "Link ";
       true ->
-	io_lib:format("Link ~p ",[Title])
+        io_lib:format("Link ~p ",[Title])
     end,
   ResultString =
     case http_result_type(Result) of
-      {error,Error} -> 
-	io_lib:format(" ->~n    error ~p~n",[Error]);
+      {error,Error} ->
+        io_lib:format(" ->~n    error ~p~n",[Error]);
       ok ->
-	ResponseCode = http_result_code(Result),
-	case response_has_body(Result) of
-	  true -> 
-	    Body =
-	      case has_ets_body(Result) of
-		true -> "<<abstracted_body>>";
-		false -> http_body(Result)
-	      end,
-	    io_lib:format
-	      (" ->~n    ~p with body ~s",
-	       [ResponseCode,Body]);
-	  false ->
-	    io_lib:format
-	      (" ->~n     ~p",
-	       [ResponseCode])
-	end
+        ResponseCode = http_result_code(Result),
+        case response_has_body(Result) of
+          true ->
+            Body =
+              case has_ets_body(Result) of
+                true -> "<<abstracted_body>>";
+                false -> http_body(Result)
+              end,
+            io_lib:format
+              (" ->~n    ~p with body ~s",
+               [ResponseCode,Body]);
+          false ->
+            io_lib:format
+              (" ->~n     ~p",
+               [ResponseCode])
+        end
     end,
   io:format
     ("~saccess ~s~s~n~n",
@@ -693,7 +705,7 @@ print_commands([{Call={call,_,link,Args,_},Result}|Rest]) ->
 print_commands([{Call,_Result}|_Rest]) ->
   io:format("seeing Call ~p~n",[Call]),
   throw(bad).
-  
+
 test() ->
   Validator = get_option(validator),
   Validator:start_validator(),
@@ -716,22 +728,22 @@ run_statem(PrivateModule,Files,Options) ->
   if
     is_list(Files) ->
       lists:foreach
-	(fun (File) ->
-	     if
-	       is_list(File) -> ok;
-	       true ->
-		 io:format
-		   ("~n*** Error: the argument ~p (files) to run_statem "++
-		      " is not contain a list of files.~n",
-		    [Files]),
-		 throw(badarg)
-	     end
-	 end, Files);
-    true -> 
+        (fun (File) ->
+             if
+               is_list(File) -> ok;
+               true ->
+                 io:format
+                   ("~n*** Error: the argument ~p (files) to run_statem "++
+                      " is not contain a list of files.~n",
+                    [Files]),
+                 throw(badarg)
+             end
+         end, Files);
+    true ->
       io:format
-	("~n*** Error: the argument ~p (files) to run_statem "++
-	   " is not contain a list of files.~n",
-	 [Files]),
+        ("~n*** Error: the argument ~p (files) to run_statem "++
+           " is not contain a list of files.~n",
+         [Files]),
       throw(badarg)
   end,
   inets:start(),
@@ -744,8 +756,8 @@ run_statem(PrivateModule,Files,Options) ->
   case collect_links(Files) of
     [] ->
       io:format
-	("*** Error: no independent links could be found among the files ~p~n",
-	 [Files]),
+        ("*** Error: no independent links could be found among the files ~p~n",
+         [Files]),
       throw(bad);
     Links ->
       js_links_machine:init_table(PrivateModule,Links)
@@ -762,8 +774,8 @@ print_stats() ->
   io:format("~nLink statistics:~n-------------------~n"),
   lists:foreach
     (fun ({Name,NumCalls}) ->
-	 Percentage = (NumCalls/TotalCalls)*100,
-	 io:format("~p: ~p calls (~p%)~n",[Name,NumCalls,Percentage])
+         Percentage = (NumCalls/TotalCalls)*100,
+         io:format("~p: ~p calls (~p%)~n",[Name,NumCalls,Percentage])
      end, SortedStats).
 
 %% To make eqc not print the horrible counterexample
@@ -777,33 +789,33 @@ check_and_set_options(Options) ->
   ParsedOptions =
     lists:map
       (fun (Option) ->
-	   {Prop,Value} = ParsedOption =
-	     case Option of
-	       {Atom,Val} when is_atom(Atom) -> {Atom,Val};
-	       Atom when is_atom(Atom) -> {Atom,true}
-	     end,
-	 case Prop of
-	   cookies when is_boolean(Value) -> 
-	     if
-	       Value -> 
-		 ok = httpc:set_options([{cookies,enabled}]);
-	       true ->
-		 ok
-	     end,
-	     ParsedOption;
-	   timeout when is_integer(Value),Value>0 -> ParsedOption;
-	   simulation_mode when is_boolean(Value) -> ParsedOption;
-	   show_http_timing when is_boolean(Value) -> ParsedOption;
-	   show_http_result when is_boolean(Value) -> ParsedOption;
-	   show_uri when is_boolean(Value) -> ParsedOption;
-	   validator when is_atom(Value) -> ParsedOption;
-	   Other ->
-	     io:format
-	       ("*** Error: option ~p not recognized~n",
-		[Other]),
-	     throw(bad)
-	 end
-     end, Options),
+           {Prop,Value} = ParsedOption =
+             case Option of
+               {Atom,Val} when is_atom(Atom) -> {Atom,Val};
+               Atom when is_atom(Atom) -> {Atom,true}
+             end,
+           case Prop of
+             cookies when is_boolean(Value) ->
+               if
+                 Value ->
+                   ok = httpc:set_options([{cookies,enabled}]);
+                 true ->
+                   ok
+               end,
+               ParsedOption;
+             timeout when is_integer(Value),Value>0 -> ParsedOption;
+             simulation_mode when is_boolean(Value) -> ParsedOption;
+             show_http_timing when is_boolean(Value) -> ParsedOption;
+             show_http_result when is_boolean(Value) -> ParsedOption;
+             show_uri when is_boolean(Value) -> ParsedOption;
+             validator when is_atom(Value) -> ParsedOption;
+             Other ->
+               io:format
+                 ("*** Error: option ~p not recognized~n",
+                  [Other]),
+               throw(bad)
+           end
+       end, Options),
   NewParsedOptions1 =
     case proplists:get_value(validator,ParsedOptions) of
       undefined -> [{validator,java_validator}|ParsedOptions];
@@ -853,8 +865,8 @@ collect_links_from_file(File) ->
   FileSchema = {struct,[{<<"$ref">>,list_to_binary(File)}]},
   lists:map
     (fun (Link={link,Props}) ->
-	 {link,[{type,static},
-		{calculated_href,jsg_links:link_href(Link)}|Props]}
+         {link,[{type,static},
+                {calculated_href,jsg_links:link_href(Link)}|Props]}
      end, collect_schema_links(FileSchema,false)).
 
 collect_schema_links(RawSchema, DependsOnObject) ->
@@ -865,15 +877,15 @@ collect_schema_links(RawSchema, DependsOnObject) ->
       [];
     Links when is_list(Links) ->
       lists:foldl
-	(fun ({N,Link},Ls) ->
-	     Dependency = depends_on_object_properties(Link),
-	     if
-	       Dependency==DependsOnObject ->
-		 [{link,[{link,N},{schema,RawSchema}]}|Ls];
-	       true ->
-		 Ls
-	     end
-	 end, [], lists:zip(lists:seq(1,length(Links)),Links))
+        (fun ({N,Link},Ls) ->
+             Dependency = depends_on_object_properties(Link),
+             if
+               Dependency==DependsOnObject ->
+                 [{link,[{link,N},{schema,RawSchema}]}|Ls];
+               true ->
+                 Ls
+             end
+         end, [], lists:zip(lists:seq(1,length(Links)),Links))
   end.
 
 depends_on_object_properties(Link) ->
@@ -882,11 +894,7 @@ depends_on_object_properties(Link) ->
       Href = binary_to_list(Value),
       Template = uri_template:parse(Href),
       (jsg_jsonschema:propertyValue(Link,"isRelative")==true) orelse
-	(lists:any(fun ({var, _, _}) -> true;
-		       (_) -> false
-		   end, Template))
+                                                                (lists:any(fun ({var, _, _}) -> true;
+                                                                               (_) -> false
+                                                                           end, Template))
   end.
-
-
-  
-
