@@ -362,35 +362,53 @@ split_parms(BinaryParms) ->
   end.
 
 link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
-  case jsg_links:link_title(Link) of
-    String when is_list(String) ->
-      Key = list_to_atom(String),
-      {ok,Stats} = jsg_store:get(stats),
-      NewValue =
-        case lists:keyfind(Key,1,Stats) of
-          false -> 1;
-          {_,N} -> N+1
-        end,
-      jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
-    _ -> ok
-  end,
-  Result = http_request(URI,RequestType,Body,QueryParms,Link),
-  case response_has_body(Result) of
-    true ->
-      ResponseBody = http_body(Result),
-      case false of
-        %% case length(ResponseBody)>1024 of
-        true ->
-          jsg_store:put(last_body,{body,ResponseBody}),
-          {P1,{P2,P3,_}} = Result,
-          {P1,{P2,P3,ets_body}};
-        false ->
-          jsg_store:put(last_body,has_body),
-          Result
-      end;
-    false ->
-      jsg_store:put(last_body,no_body),
-      Result
+  try 
+    case jsg_links:link_title(Link) of
+      String when is_list(String) ->
+	Key = list_to_atom(String),
+	{ok,Stats} = jsg_store:get(stats),
+	NewValue =
+	  case lists:keyfind(Key,1,Stats) of
+	    false -> 1;
+	    {_,N} -> N+1
+	  end,
+	jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
+      _ -> ok
+    end,
+    Result = http_request(URI,RequestType,Body,QueryParms,Link),
+    case Result of
+      {error,Error} ->
+	io:format
+	  ("Warning: link/3 returned an error ~p, raising exception~n",
+	   [Error]),
+	throw({error,Error});
+      _ -> ok
+    end,
+    case response_has_body(Result) of
+      true ->
+	ResponseBody = http_body(Result),
+	case false of
+	  %% case length(ResponseBody)>1024 of
+	  true ->
+	    jsg_store:put(last_body,{body,ResponseBody}),
+	    {P1,{P2,P3,_}} = Result,
+	    {P1,{P2,P3,ets_body}};
+	  false ->
+	    jsg_store:put(last_body,has_body),
+	    Result
+	end;
+      false ->
+	jsg_store:put(last_body,no_body),
+	Result
+    end
+  catch Class:Reason ->
+      case {Class,Reason} of
+	{throw,{error,_}} -> 
+	  {'EXIT',Reason};
+	_ -> 
+	  io:format("Warning: link/3 raised exception ~p~n",[Reason]),
+	  {'EXIT',Reason}
+      end
   end.
 
 format_http_call([_,{URI,RequestType,Body,Params}]) ->
