@@ -123,8 +123,13 @@ postcondition_int(_State,Args,Result) ->
     true ->
       Link = jsg_links:link_def(args_link(Args)),
       Schema = jsg_links:link_schema(args_link(Args)),
-      validate_call_result_body(Args, Result, Link, Schema) and
-        validate_response_code(Args, Result, Link, Schema);
+      case response_has_body(Result) of
+        true ->
+          validate_call_result_body(Args, Result, Link, Schema) and
+            validate_response_code(Args, Result, Link, Schema);
+        false ->
+          validate_no_body_response(Args, Result, Link)
+      end;
     _ ->
       io:format("validation failed~n"),
       false
@@ -162,6 +167,27 @@ validate_call_result_body(Args,Result,Link,Schema) ->
       end
   end.
 
+validate_no_body_response(Args, Result, Link) ->
+  case jsg_jsonschema:propertyValue(Link, "targetSchema") of
+    undefined -> true;
+    TargetSchema ->
+      Errors = jsg_jsonschema:propertyValue(TargetSchema, "error"),
+      case
+        case Errors of
+          undefined ->
+            true;                                       % TODO check default error codes
+          _ ->
+            lists:member(http_result_code(Result), Errors)
+        end
+      of
+        false ->
+	  error_messages:wrong_status_code(Args, Result, Errors),
+	  false;
+        true ->
+          true
+      end
+  end.
+
 validate_response_code(Args, Result, Link, Schema) ->
   case jsg_jsonschema:propertyValue(Link, "targetSchema") of
     undefined -> true;
@@ -172,8 +198,8 @@ validate_response_code(Args, Result, Link, Schema) ->
         case SchemaStatusCode of
           undefined ->
             http_result_code(Result) == 200;
-          {SpecialType, ListOfSchemasAndTypes} ->
-            validate_list_of_schemas(SpecialType, ListOfSchemasAndTypes,
+          {SpecialType, ListOfSchemasAndStatus} ->
+            validate_list_of_schemas(SpecialType, ListOfSchemasAndStatus,
                                      http_result_code(Result), http_body(Result));
           SchemaStatusCode ->
             SchemaStatusCode == http_result_code(Result)
@@ -362,52 +388,52 @@ split_parms(BinaryParms) ->
   end.
 
 link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
-  try 
+  try
     case jsg_links:link_title(Link) of
       String when is_list(String) ->
-	Key = list_to_atom(String),
-	{ok,Stats} = jsg_store:get(stats),
-	NewValue =
-	  case lists:keyfind(Key,1,Stats) of
-	    false -> 1;
-	    {_,N} -> N+1
-	  end,
-	jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
+        Key = list_to_atom(String),
+        {ok,Stats} = jsg_store:get(stats),
+        NewValue =
+          case lists:keyfind(Key,1,Stats) of
+            false -> 1;
+            {_,N} -> N+1
+          end,
+        jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
       _ -> ok
     end,
     Result = http_request(URI,RequestType,Body,QueryParms,Link),
     case Result of
       {error,Error} ->
-	io:format
-	  ("Warning: link/3 returned an error ~p, raising exception~n",
-	   [Error]),
-	throw({error,Error});
+        io:format
+          ("Warning: link/3 returned an error ~p, raising exception~n",
+           [Error]),
+        throw({error,Error});
       _ -> ok
     end,
     case response_has_body(Result) of
       true ->
-	ResponseBody = http_body(Result),
-	case false of
-	  %% case length(ResponseBody)>1024 of
-	  true ->
-	    jsg_store:put(last_body,{body,ResponseBody}),
-	    {P1,{P2,P3,_}} = Result,
-	    {P1,{P2,P3,ets_body}};
-	  false ->
-	    jsg_store:put(last_body,has_body),
-	    Result
-	end;
+        ResponseBody = http_body(Result),
+        case false of
+          %% case length(ResponseBody)>1024 of
+          true ->
+            jsg_store:put(last_body,{body,ResponseBody}),
+            {P1,{P2,P3,_}} = Result,
+            {P1,{P2,P3,ets_body}};
+          false ->
+            jsg_store:put(last_body,has_body),
+            Result
+        end;
       false ->
-	jsg_store:put(last_body,no_body),
-	Result
+        jsg_store:put(last_body,no_body),
+        Result
     end
   catch Class:Reason ->
       case {Class,Reason} of
-	{throw,{error,_}} -> 
-	  {'EXIT',Reason};
-	_ -> 
-	  io:format("Warning: link/3 raised exception ~p~n",[Reason]),
-	  {'EXIT',Reason}
+        {throw,{error,_}} ->
+          {'EXIT',Reason};
+        _ ->
+          io:format("Warning: link/3 raised exception ~p~n",[Reason]),
+          {'EXIT',Reason}
       end
   end.
 
