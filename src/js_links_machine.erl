@@ -175,14 +175,15 @@ validate_no_body_response(Args, Result, Link) ->
       case
         case Errors of
           undefined ->
-            true;                                       % TODO check default error codes
+	    error_messages:unknown_status(Args, http_result_code(Result)),
+            true;
           _ ->
             lists:member(http_result_code(Result), Errors)
         end
       of
         false ->
-	  error_messages:wrong_status_code(Args, Result, Errors),
-	  false;
+          error_messages:wrong_status_code(Args, Result, Errors),
+          false;
         true ->
           true
       end
@@ -239,7 +240,6 @@ validate_list_of_schemas(one_of, List, StatusCode, Body) ->
   end;
 validate_list_of_schemas(any_of, List, StatusCode, Body) ->
   ValidationResult = lists:map(fun(X) -> validate_header_and_schema(X, StatusCode, Body) end, List),
-  lists:map(fun(X) -> validate_header_and_schema(X, StatusCode, Body) end, List),
   case length(lists:filter(fun(X) -> X == {true, true} end, ValidationResult)) of
     0 -> get_wrong_status_list(StatusCode, Body, lists:zip(ValidationResult, List));
     _ -> true
@@ -248,7 +248,10 @@ validate_list_of_schemas(any_of, List, StatusCode, Body) ->
 validate_header_and_schema({Header, Schema}, StatusCode, Body) ->
   Validator = get_option(validator),
   {
-    Header == StatusCode,
+    case Header of
+      undefined -> StatusCode == 200;
+      _ -> Header == StatusCode
+    end,
     try Validator:validate(Schema, Body, no_report)
     catch _:_ -> false end
   }.
