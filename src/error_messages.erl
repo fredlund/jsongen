@@ -65,7 +65,9 @@ wrong_body_message(StatusCode, Header, JSONText) ->
        "expected: ~p~n"++
        "for the JSON value:~n~s~n"++
        "***************************************************~n",
-     [StatusCode, Header, jsg_json:pretty_json(JSONText)]).
+     [StatusCode, 
+      case Header of undefined -> 200; _ -> Header end, 
+      jsg_json:pretty_json(JSONText)]).
 
 unknown_status(Args, StatusCode) ->
   io:format

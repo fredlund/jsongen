@@ -211,7 +211,7 @@ validate_response_code(Args, Result, Link, Schema) ->
           false;
         true -> true;
         Errors ->
-          lists:map(fun({StatusCode, Header, Body}) ->
+	  lists:map(fun({StatusCode, Header, Body}) ->
                         error_messages:wrong_body_message(StatusCode, Header, Body)
                     end, Errors),
           false
@@ -224,6 +224,8 @@ get_status_code(Schema={struct, ListOfValues}) ->
       {one_of, lists:map(fun(X) -> {get_status_code(X), X} end, JsonSchemaList)};
     [{<<"anyOf">>, JsonSchemaList}] ->
       {any_of, lists:map(fun(X) -> {get_status_code(X), X} end, JsonSchemaList)};
+    [{<<"$ref">>, _}] ->
+      get_status_code(jsg_links:get_schema(Schema));
     %% [{<<"allOf">>, JsonSchemaList}] ->
     %%     lists:map(fun(X) -> get_status_code(X) end, JsonSchemaList);
     %% [{<<"none">>, JsonSchemaList}] ->
@@ -236,7 +238,7 @@ validate_list_of_schemas(one_of, List, StatusCode, Body) ->
   ValidationResult = lists:map(fun(X) -> validate_header_and_schema(X, StatusCode, Body) end, List),
   case length(lists:filter(fun(X) -> X == {true, true} end, ValidationResult)) of
     1 -> true;
-    _ -> get_wrong_status_list(StatusCode, Body, List)
+    _ -> get_wrong_status_list(StatusCode, Body, lists:zip(ValidationResult, List))
   end;
 validate_list_of_schemas(any_of, List, StatusCode, Body) ->
   ValidationResult = lists:map(fun(X) -> validate_header_and_schema(X, StatusCode, Body) end, List),
