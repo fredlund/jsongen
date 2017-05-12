@@ -77,3 +77,10 @@ unknown_status(Args, StatusCode) ->
        "for http call~n~s~n" ++
        "***************************************************~n",
      [StatusCode, js_links_machine:format_http_call(Args)]).
+
+no_content_type() ->
+  io:format
+    ("~n***************************************************~n" ++
+       "WARNING [NO CONTENT TYPE HEADER]~n" ++
+       "***************************************************~n").
+     

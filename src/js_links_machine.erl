@@ -175,7 +175,7 @@ validate_no_body_response(Args, Result, Link) ->
       case
         case Errors of
           undefined ->
-	    error_messages:unknown_status(Args, http_result_code(Result)),
+            error_messages:unknown_status(Args, http_result_code(Result)),
             true;
           _ ->
             lists:member(http_result_code(Result), Errors)
@@ -211,7 +211,7 @@ validate_response_code(Args, Result, Link, Schema) ->
           false;
         true -> true;
         Errors ->
-	  lists:map(fun({StatusCode, Header, Body}) ->
+          lists:map(fun({StatusCode, Header, Body}) ->
                         error_messages:wrong_body_message(StatusCode, Header, Body)
                     end, Errors),
           false
@@ -502,14 +502,27 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
       [] -> PreURI;
       _ -> PreURI++"?"++encode_parameters(QueryParms)
     end,
+  User = get_option(user),
+  Password = get_option (password),
   URIwithBody =
     case Body of
-      {ok,RawBody} ->
+      {ok,RawBody} when (User == false) or (Password == false) ->
         {URI,[],
          "application/json",
          iolist_to_binary(mochijson2:encode(RawBody))};
-      _ ->
-        {URI,[]}
+      {ok,RawBody} ->
+        {URI,[
+              {"Authorization", "Basic " ++ base64:encode_to_string(User ++ ":" ++ Password)}
+             ],
+         "application/json",
+         iolist_to_binary(mochijson2:encode(RawBody))};
+      _ when (User == false) or (Password == false) ->
+        {URI,[
+             ]};
+      _  ->
+        {URI,[
+	      {"Authorization", "Basic " ++ base64:encode_to_string(User ++ ":" ++ Password)}
+             ]}
     end,
   Timeout = get_option(timeout),
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
@@ -629,8 +642,11 @@ response_has_body(Result) ->
 
 response_has_json_body(Result) ->
   case response_has_body(Result) of
-    true -> string:str(http_content_type(Result), "application/json") >= 0;
-    false -> false
+    true when is_list(Result) -> string:str(http_content_type(Result), "application/json") >= 0;
+    false -> false;
+    _ ->
+      %% error_messages:no_content_type(),
+      true
   end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -739,8 +755,8 @@ print_commands([{Call={call,_,link,Args,_},Result}|Rest]) ->
                 false -> http_body(Result)
               end,
             io_lib:format
-              (" ->~n    ~p with body ~s",
-               [ResponseCode,Body]);
+              (" ->~n    ~p with body:~n~s",
+               [ResponseCode,jsg_json:pretty_json(Body)]);
           false ->
             io_lib:format
               (" ->~n     ~p",
@@ -852,6 +868,8 @@ check_and_set_options(Options) ->
                    ok
                end,
                ParsedOption;
+             user when is_list(Value) -> ParsedOption;
+             password when is_list(Value) -> ParsedOption;
              timeout when is_integer(Value),Value>0 -> ParsedOption;
              simulation_mode when is_boolean(Value) -> ParsedOption;
              show_http_timing when is_boolean(Value) -> ParsedOption;
