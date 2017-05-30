@@ -188,6 +188,11 @@ json(Schema,Options) ->
 	  [Module,Fun] = re:split(Name,":"),
 	  (binary_to_atom(Module)):
 	    (binary_to_atom(Fun))(QcValue,jsg_store:get(eqc_gen_context));
+	  %% Name = binary_to_list(jsg_jsonschema:propertyValue(QcValue,"name")),
+	  %% [Module,Fun] = re:split(Name,":"),
+	  %% {struct, QcArgs} = QcValue,
+	  %%     (binary_to_atom(Module)):(binary_to_atom(Fun))(QcValue);
+	  %% (binary_to_atom(Module)):(binary_to_atom(Fun))(QcArgs);
 	false ->
 	  Name = binary_to_list(QcValue),
 	  [Module,Fun] = re:split(Name,":"),

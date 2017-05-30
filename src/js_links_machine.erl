@@ -905,7 +905,9 @@ call_link_title(Call) ->
   jsg_links:link_title(call_link(Call)).
 
 call_link({call,_,_,[Link,_],_}) ->
-  Link.
+  Link;
+call_link(CallPropList) ->
+  {link, proplists:get_value(link, CallPropList)}.
 
 args_link_title(Call) ->
   jsg_links:link_title(args_link(Call)).
