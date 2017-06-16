@@ -10,7 +10,7 @@
 
 -ifdef(debug).
 -define(LOG(X,Y),
-	io:format("{~p,~p}: ~s~n", [?MODULE,?LINE,io_lib:format(X,Y)])).
+        io:format("{~p,~p}: ~s~n", [?MODULE,?LINE,io_lib:format(X,Y)])).
 -else.
 -define(LOG(X,Y),true).
 -endif.
@@ -23,15 +23,15 @@ extract_dynamic_links(Link,Term,Object) ->
   DynamicLinks =
     case jsg_jsonschema:propertyValue(LD,"targetSchema") of
       undefined ->
-	[];
+        [];
       SchemaDesc ->
-	extract_links(Link,SchemaDesc,Term,[],Object,NewHistory)
+        extract_links(Link,SchemaDesc,Term,[],Object,NewHistory)
     end,
   lists:map
-    (fun ({link,Props}) -> 
-	 {link,
-	  [{type,dynamic},{object,Object},{history,NewHistory}|
-	   proplists:delete(history,Props)]}
+    (fun ({link,Props}) ->
+         {link,
+          [{type,dynamic},{object,Object},{history,NewHistory}|
+           proplists:delete(history,Props)]}
      end, DynamicLinks).
 
 extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
@@ -44,47 +44,47 @@ extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
     <<"object">> ->
       Links = js_links_machine:collect_schema_links(Sch,true),
       ShallowLinks =
-	lists:flatmap
-	  (fun (Link={link,Props}) ->
-	       Href = link_href(Link),
-	       Template = uri_template:parse(binary_to_list(Href)),
+        lists:flatmap
+          (fun (Link={link,Props}) ->
+               Href = link_href(Link),
+               Template = uri_template:parse(binary_to_list(Href)),
 	       %% We should handle relative URIs here...
-	       try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
-		   CHREF ->
-		   ComposedCHREF = composed_uri(CHREF,Link,FollowedLink,Object),
-		   [{link,[{calculated_href,list_to_binary(ComposedCHREF)}|Props]}]
-	       catch _:_ ->
-		   io:format
-		     ("*** Warning: skipping link ~p due to problems "++
-			"resolving href~n",
-		      [link_title(Link)]),
-		   []
-	       end
-	   end,
-	   Links),
+               try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
+                   CHREF ->
+                   ComposedCHREF = composed_uri(CHREF,Link,FollowedLink,Object),
+                   [{link,[{calculated_href,list_to_binary(ComposedCHREF)}|Props]}]
+               catch _:_ ->
+                   io:format
+                     ("*** Warning: skipping link ~p due to problems "++
+                        "resolving href~n",
+                      [link_title(Link)]),
+                   []
+               end
+           end,
+           Links),
       DeepLinks =
-	extract_links_from_subterms
-	  (FollowedLink,Schema,Term,Pointer,Object,History),
+        extract_links_from_subterms
+          (FollowedLink,Schema,Term,Pointer,Object,History),
       ShallowLinks++DeepLinks;
 
     <<"array">> ->
       case proplists:get_value(<<"items">>,Proplist) of
-	ItemSchemaDesc={struct,_} ->
-	  {_,Result} =
-	    lists:foldl
-	      (fun (SubItem,{Index,Acc}) ->
-		   SubItemLinks =
-		     extract_links
-		       (FollowedLink,ItemSchemaDesc,SubItem,[Index|Pointer],
-			Object,History),
-		   {Index+1,SubItemLinks++Acc}
-	       end,
-	       {0,[]},
-	       Term),
-	  Result;
-	_ -> []
+        ItemSchemaDesc={struct,_} ->
+          {_,Result} =
+            lists:foldl
+              (fun (SubItem,{Index,Acc}) ->
+                   SubItemLinks =
+                     extract_links
+                       (FollowedLink,ItemSchemaDesc,SubItem,[Index|Pointer],
+                        Object,History),
+                   {Index+1,SubItemLinks++Acc}
+               end,
+               {0,[]},
+               Term),
+          Result;
+        _ -> []
       end;
-    
+
     _Other -> []
   end.
 
@@ -93,31 +93,31 @@ extract_links_from_subterms(FollowedLink,{struct,Proplist},Term,Pointer,Object,H
     undefined -> [];
     {struct,Properties} ->
       lists:flatmap
-	(fun ({Property,Def}) ->
-	     {struct,Props} = Term,
-	     case proplists:get_value(Property,Props) of
-	       undefined ->
-		 [];
-	       SubProp ->
-		 extract_links
-		   (FollowedLink,Def,SubProp,[binary_to_list(Property)|Pointer],Object,History)
-	     end
-	 end, Properties)
+        (fun ({Property,Def}) ->
+             {struct,Props} = Term,
+             case proplists:get_value(Property,Props) of
+               undefined ->
+                 [];
+               SubProp ->
+                 extract_links
+                   (FollowedLink,Def,SubProp,[binary_to_list(Property)|Pointer],Object,History)
+             end
+         end, Properties)
   end.
 
 intern_object(Term) ->
   %% This is far from process safe...
   case jsg_store:get({term,Term}) of
     {ok,N} -> N;
-    _ -> 
+    _ ->
       Counter =
-	case jsg_store:get(object_counter) of
-	  {ok,Cnt} ->
-	    Cnt;
-	  _ ->
-	    jsg_store:put(object_counter,0),
-	    0
-	end,
+        case jsg_store:get(object_counter) of
+          {ok,Cnt} ->
+            Cnt;
+          _ ->
+            jsg_store:put(object_counter,0),
+            0
+        end,
       jsg_store:put({term,Term},Counter),
       jsg_store:put({object,Counter},Term),
       jsg_store:put(object_counter,Counter+1),
@@ -135,11 +135,11 @@ composed_uri(Ref,_Link,FollowedLink,_Object) ->
       Ref;
     false ->
       Result =
-	java:string_to_list
-	  (java:call
-	     (java:call(PreviousURI,resolve,[RefURI]),
-	      toString,
-	      [])),
+        java:string_to_list
+          (java:call
+             (java:call(PreviousURI,resolve,[RefURI]),
+              toString,
+              [])),
       Result
   end.
 
@@ -171,11 +171,11 @@ is_parent_relative({struct,Proplist}) ->
       false;
     Ref ->
       case binary_to_list(Ref) of
-	[$#|_] -> true;
-	_ -> false
+        [$#|_] -> true;
+        _ -> false
       end
   end.
-  
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 link_def(Link) ->
@@ -198,12 +198,12 @@ link_title(Link) ->
 
 print_link(Link={link,LD}) ->
   {struct,LinkDef} = link_def(Link),
-  LinkTitle = 
+  LinkTitle =
     case proplists:get_value(<<"title">>,LinkDef) of
       L when is_binary(L) ->
-	binary_to_list(L);
+        binary_to_list(L);
       Other ->
-	Other
+        Other
     end,
   Href =
     proplists:get_value(<<"href">>,LinkDef),
@@ -240,45 +240,45 @@ link_history(Link) ->
   {link,LD} = Link,
   proplists:get_value(history,LD,[]).
 
-link_calculated_href(Link) ->	     
+link_calculated_href(Link) ->
   {link,LD} = Link,
   substitute(proplists:get_value(calculated_href,LD,[])).
 
-link_type(Link) ->	     
+link_type(Link) ->
   {link,LD} = Link,
   proplists:get_value(type,LD,[]).
 
 substitute(Href) -> % Regex para la sustitución '{:[^}]*}'
-    {ok, MP} = re:compile("#([^#]*)#"),
-    case re:run(Href, MP, [global, {capture, all, list}]) of %% {match,N} = re:run(S,"{:([^}]*)}", [global,{capture, all, list}]).
-	nomatch -> Href;
-	{match,N} ->  %% 1- Llamar a jsongen con los generadores correspondientes.
-	    Values =
-		lists:map(fun([_P,S]) ->
-				  FS = {struct,[{<<"$ref">>,list_to_binary(S)}]},
-				  Schema = jsg_links:get_schema(FS),
-				  Gen = ?LET(V, %% Todos los valores tienen que ser string para ser concatenados
-					     ?SUCHTHAT(X, % Valores no vacios
-						       jsongen:json(Schema),
-						       lists:flatten(io_lib:format("~p",[X])) > 0 andalso 
-						       lists:flatten(io_lib:format("~p",[X])) =/= "<<>>"
-						      ),
-					     begin
-						 Str = lists:flatten(io_lib:format("~p",[V])),
-						 {ok, Picos } = re:compile("<<\"|\">>"),
-						 re:replace(Str, Picos, "", [global, {return, list}])
-					     end
-					    ),
-				  eqc_gen:pick(Gen)
-			  end, N),
-	    %% 2- Hacer un replace de cada valor generado
-	    {ok, RE} = re:compile("#[^#]*#"),
-	    [First | Tail] = re:split(Href, RE, [{return,list}]),
-	    Build = lists:zipwith(fun(A,B) -> B ++ A end, Tail, Values),
-	    %% 3- Devolver el Link resultante
-	    H = lists:flatten([First | Build]),
-	    list_to_binary(H)
-    end.
+  {ok, MP} = re:compile("#([^#]*)#"),
+  case re:run(Href, MP, [global, {capture, all, list}]) of %% {match,N} = re:run(S,"{:([^}]*)}", [global,{capture, all, list}]).
+    nomatch -> Href;
+    {match,N} ->  %% 1- Llamar a jsongen con los generadores correspondientes.
+      Values =
+        lists:map(fun([_P,S]) ->
+                      FS = {struct,[{<<"$ref">>,list_to_binary(S)}]},
+                      Schema = jsg_links:get_schema(FS),
+                      Gen = ?LET(V, %% Todos los valores tienen que ser string para ser concatenados
+                                 ?SUCHTHAT(X, % Valores no vacios
+                                           jsongen:json(Schema),
+                                           lists:flatten(io_lib:format("~p",[X])) > 0 andalso
+                                           lists:flatten(io_lib:format("~p",[X])) =/= "<<>>"
+                                          ),
+                                 begin
+                                   Str = lists:flatten(io_lib:format("~p",[V])),
+                                   {ok, Picos } = re:compile("<<\"|\">>"),
+                                   re:replace(Str, Picos, "", [global, {return, list}])
+                                 end
+                                ),
+                      eqc_gen:pick(Gen)
+                  end, N),
+      %% 2- Hacer un replace de cada valor generado
+      {ok, RE} = re:compile("#[^#]*#"),
+      [First | Tail] = re:split(Href, RE, [{return,list}]),
+      Build = lists:zipwith(fun(A,B) -> B ++ A end, Tail, Values),
+      %% 3- Devolver el Link resultante
+      H = lists:flatten([First | Build]),
+      list_to_binary(H)
+  end.
 
-      
-  
+collect_headers({struct, PropList}) ->
+  proplists:get_value(<<"headers">>, PropList, undefined).

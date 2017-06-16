@@ -334,20 +334,28 @@ initial_links() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 gen_http_request(Link) -> % generator :: [{BinaryUri,Requesttype,Body,Parms}]
-  ?LET({Body,QueryParms},
-       {generate_body(Link),generate_parameters(Link)},
+  ?LET({Body,QueryParms,Headers},
+       {generate_body(Link),generate_parameters(Link),generate_headers(Link)},
        begin
          PreURI = jsg_links:link_calculated_href(Link),
          RequestType = jsg_links:link_request_type(Link),
          EncodedParms = encode_generated_parameters(QueryParms), % enco..ters :: [{key,value}]
          case re:split(PreURI,"\\?") of
            [_] ->
-             {binary_to_list(PreURI),RequestType,Body,EncodedParms};
+             {binary_to_list(PreURI),RequestType,Body,EncodedParms,Headers};
            [BinaryURI,BinaryParms] ->
              {binary_to_list(BinaryURI),RequestType,Body,
-              split_parms(BinaryParms)++EncodedParms} % split_parms :: [{key,value}]
+              split_parms(BinaryParms)++EncodedParms,Headers} % split_parms :: [{key,value}]
          end
        end).
+
+generate_headers(Link) ->
+  Sch = jsg_links:link_def(Link),
+  Headers = jsg_jsonschema:propertyValue(Sch, "headers"),
+  case Headers of
+    undefined -> [];
+    _ -> Headers
+  end.
 
 generate_body(Link) ->
   Sch = jsg_links:link_def(Link),
@@ -392,7 +400,7 @@ split_parms(BinaryParms) ->
       lists:flatmap(fun split_parms/1, Assignments)
   end.
 
-link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
+link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms,Headers}) ->
   try
     case jsg_links:link_title(Link) of
       String when is_list(String) ->
@@ -406,7 +414,7 @@ link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
         jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
       _ -> ok
     end,
-    Result = http_request(URI,RequestType,Body,QueryParms,Link),
+    Result = http_request(URI,RequestType,Body,QueryParms,Link,Headers),
     case Result of
       {error,Error} ->
         io:format
@@ -417,17 +425,17 @@ link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
     end,
     case response_has_body(Result) of
       true ->
-        ResponseBody = http_body(Result),
-        case false of
-          %% case length(ResponseBody)>1024 of
-          true ->
-            jsg_store:put(last_body,{body,ResponseBody}),
-            {P1,{P2,P3,_}} = Result,
-            {P1,{P2,P3,ets_body}};
-          false ->
-            jsg_store:put(last_body,has_body),
-            Result
-        end;
+        %% ResponseBody = http_body(Result),
+        %% case false of
+        %%   %% case length(ResponseBody)>1024 of
+        %%   true ->
+        %%     jsg_store:put(last_body,{body,ResponseBody}),
+        %%     {P1,{P2,P3,_}} = Result,
+        %%     {P1,{P2,P3,ets_body}};
+        %%   false ->
+        jsg_store:put(last_body,has_body),
+        Result;
+      %% end;
       false ->
         jsg_store:put(last_body,no_body),
         Result
@@ -442,7 +450,7 @@ link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms}) ->
       end
   end.
 
-format_http_call([_,{URI,RequestType,Body,Params}]) ->
+format_http_call([_,{URI,RequestType,Body,Params,_Headers}]) ->
   format_http_call(URI,RequestType,Body,Params).
 
 format_http_call(PreURI,RequestType,Body,Params) ->
@@ -496,33 +504,18 @@ encode_parameters([{Key,Value}|Rest]) ->
 encode(String) when is_list(String) ->
   http_uri:encode(String).
 
-http_request(PreURI,Type,Body,QueryParms,Link) ->
+http_request(PreURI,Type,Body,QueryParms,Link,Headers) ->
   URI =
     case QueryParms of
       [] -> PreURI;
       _ -> PreURI++"?"++encode_parameters(QueryParms)
     end,
-  User = get_option(user),
-  Password = get_option (password),
   URIwithBody =
     case Body of
-      {ok,RawBody} when (User == false) or (Password == false) ->
-        {URI,[],
-         "application/json",
-         iolist_to_binary(mochijson2:encode(RawBody))};
-      {ok,RawBody} ->
-        {URI,[
-              {"Authorization", "Basic " ++ base64:encode_to_string(User ++ ":" ++ Password)}
-             ],
-         "application/json",
-         iolist_to_binary(mochijson2:encode(RawBody))};
-      _ when (User == false) or (Password == false) ->
-        {URI,[
-             ]};
-      _  ->
-        {URI,[
-	      {"Authorization", "Basic " ++ base64:encode_to_string(User ++ ":" ++ Password)}
-             ]}
+      {ok, RawBody} -> 
+ 	{URI, gen_headers(Headers), "application/json", iolist_to_binary(mochijson2:encode(RawBody))};
+      _ -> 
+	{URI, gen_headers(Headers)}
     end,
   Timeout = get_option(timeout),
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
@@ -559,6 +552,35 @@ http_request(PreURI,Type,Body,QueryParms,Link) ->
     false -> ok
   end,
   Result.
+
+gen_headers([]) ->
+  case {get_option(user), get_option(password)} of
+    {false, _} -> [];
+    {_, false} -> [];
+    {User, Password} ->
+      [{"Authorization", "Basic " ++ base64:encode_to_string(User ++ ":" ++ Password)}]
+  end;
+gen_headers([{struct, PropList}]) ->
+  gen_headers(proplists:get_value(<<"name">>, PropList, undefined), PropList).
+
+gen_headers(<<"login">>, PropList) ->
+  {User, Password} =
+    case
+      case {proplists:get_value(<<"user">>, PropList, undefined),
+            proplists:get_value(<<"password">>, PropList, undefined)} of
+        {undefined, _} -> 
+	  {get_option(user), get_option(password)};
+        {_, undefined} -> 
+	  
+	  {get_option(user), get_option(password)};
+        X -> X
+      end
+    of
+      {undefined, _} -> {"", ""};
+      {Y, undefined} -> {Y, ""};
+      Y -> Y
+    end,
+  [{"Authorization", "Basic " ++ base64:encode_to_string(<<User/binary, ":", Password/binary>>)}].
 
 http_result_type({ok,_}) ->
   ok;
@@ -948,9 +970,10 @@ collect_schema_links(RawSchema, DependsOnObject) ->
       lists:foldl
         (fun ({N,Link},Ls) ->
              Dependency = depends_on_object_properties(Link),
-             if
-               Dependency==DependsOnObject ->
-                 [{link,[{link,N},{schema,RawSchema}]}|Ls];
+	     Headers = jsg_links:collect_headers(Link),
+             if 
+	       Dependency==DependsOnObject ->
+		 [{link,[{link,N},{schema,RawSchema},{headers,Headers}]}|Ls];
                true ->
                  Ls
              end
@@ -967,3 +990,4 @@ depends_on_object_properties(Link) ->
                                                                                (_) -> false
                                                                            end, Template))
   end.
+
