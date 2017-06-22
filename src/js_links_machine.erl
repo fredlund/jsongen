@@ -1,5 +1,5 @@
 %% @doc This is a module.
-%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund
 %% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
 %% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
 %% @end
@@ -8,37 +8,33 @@
 
 -module(js_links_machine).
 
--export([run_statem/1,run_statem/2,run_statem/3
-	, format_http_call/1, http_result_code/1, http_error/1
-	, collect_links/1, collect_schema_links/2]).
+-export([run_statem/1,run_statem/2,run_statem/3 , format_http_call/1,
+         http_result_code/1, http_error/1 , collect_links/1,
+         collect_schema_links/2, init_table/2, test/0, initial_state/0,
+         api_spec/0, link/2]).
 
 -compile([{nowarn_unused_function, [ prop_ok/0
-				   , test/0
-				   , initial_state/0
-				   , start/0
-				   , link/2
-				   , print_counterexample/4
-				   , print_commands/1
-				   , print_stats/0
-				   , call_link/1
-				   , init_table/2
-				   , private_module/0
-				   , http_request/6
-				   , gen_headers/1, gen_headers/2
-				   , has_ets_body/1
-				   , http_version/1
-				   , wait_until_stable/0
-				   , wait_forever/0
-				   , eqc_printer/2
-				   , call_link_title/1
-				   , args_link_title/1
-				   , get_json_body/1
-				   , api_spec/0
-				   , initial_links/0
-				   , http_reason_phrase/1
-				   , http_response_is_ok/1
-				   , json_call_body/1
-				   ]}]).
+                                   , start/0
+                                   , print_counterexample/4
+                                   , print_commands/1
+                                   , print_stats/0
+                                   , call_link/1
+                                   , private_module/0
+                                   , http_request/6
+                                   , gen_headers/2, gen_header/2
+                                   , has_ets_body/1
+                                   , http_version/1
+                                   , wait_until_stable/0
+                                   , wait_forever/0
+                                   , eqc_printer/2
+                                   , call_link_title/1
+                                   , args_link_title/1
+                                   , get_json_body/1
+                                   , initial_links/0
+                                   , http_reason_phrase/1
+                                   , http_response_is_ok/1
+                                   , json_call_body/1
+                                   ]}]).
 
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_component.hrl").
@@ -59,7 +55,7 @@
 
 -type filename() :: string().
 
-% Not used
+                                                % Not used
 api_spec() ->
   #api_spec{}.
 
@@ -389,13 +385,7 @@ gen_http_request(Link) -> % generator :: [{BinaryUri,Requesttype,Body,Parms}]
          end
        end).
 
-generate_headers(Link) ->
-  Sch = jsg_links:link_def(Link),
-  Headers = jsg_jsonschema:propertyValue(Sch, "headers"),
-  case Headers of
-    undefined -> [];
-    _ -> Headers
-  end.
+generate_headers({link, Props}) -> proplists:get_value(headers, Props).
 
 generate_body(Link) ->
   Sch = jsg_links:link_def(Link),
@@ -552,10 +542,10 @@ http_request(PreURI,Type,Body,QueryParms,Link,Headers) ->
     end,
   URIwithBody =
     case Body of
-      {ok, RawBody} -> 
- 	{URI, gen_headers(Headers), "application/json", iolist_to_binary(mochijson2:encode(RawBody))};
-      _ -> 
-	{URI, gen_headers(Headers)}
+      {ok, RawBody} ->
+        {URI, gen_headers(Headers, Body), "application/json", iolist_to_binary(mochijson2:encode(RawBody))};
+      _ ->
+        {URI, gen_headers(Headers, Body)}
     end,
   Timeout = get_option(timeout),
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
@@ -593,26 +583,24 @@ http_request(PreURI,Type,Body,QueryParms,Link,Headers) ->
   end,
   Result.
 
-gen_headers([]) ->
+gen_headers([], _) ->
   case {get_option(user), get_option(password)} of
     {false, _} -> [];
     {_, false} -> [];
     {User, Password} ->
       [{"Authorization", "Basic " ++ base64:encode_to_string(User ++ ":" ++ Password)}]
   end;
-gen_headers([{struct, PropList}]) ->
-  gen_headers(proplists:get_value(<<"name">>, PropList, undefined), PropList).
+gen_headers(Headers, Body) -> lists:map(fun(Header) -> gen_header(Header, Body) end, Headers).
 
-gen_headers(<<"login">>, PropList) ->
+gen_header({struct, PropList}, _) ->
   {User, Password} =
     case
       case {proplists:get_value(<<"user">>, PropList, undefined),
             proplists:get_value(<<"password">>, PropList, undefined)} of
-        {undefined, _} -> 
-	  {get_option(user), get_option(password)};
-        {_, undefined} -> 
-	  
-	  {get_option(user), get_option(password)};
+        {undefined, _} ->
+          {get_option(user), get_option(password)};
+        {_, undefined} ->
+          {get_option(user), get_option(password)};
         X -> X
       end
     of
@@ -620,7 +608,8 @@ gen_headers(<<"login">>, PropList) ->
       {Y, undefined} -> {Y, ""};
       Y -> Y
     end,
-  [{"Authorization", "Basic " ++ base64:encode_to_string(<<User/binary, ":", Password/binary>>)}].
+  {"Authorization", "Basic " ++ base64:encode_to_string(<<User/binary, ":", Password/binary>>)};
+gen_header({quickcheck, QcGen}, Body) -> eqc_gen:pick(QcGen(Body)).
 
 http_result_type({ok,_}) ->
   ok;
@@ -846,7 +835,7 @@ test() ->
   print_stats().
 
 %% @doc Punto de entrada a la librería para ejecutar los tests con la
-%% ejecución del test de jsongen.  
+%% ejecución del test de jsongen.
 %%
 %% @param Files Lista de ficheros que
 %% formarán el conjunto de links iniciales (links estáticos).  Los
@@ -862,7 +851,7 @@ run_statem(Files) ->
 %% Si hay alguna función en el `PrivateModule' especificado que sobreescriba la
 %% función de Quickcheck para la máquina de estados, se ejecutará
 %% dicha función en lugar de la implementada por defecto en JSONgen
-%% 
+%%
 %% @param PrivateModule módulo erlang (sin terminación .erl)
 %% implementado por el usuario que contiene una o más funciones que
 %% sustituirán a las que usa Quickcheck para la máquina de estados.
@@ -1053,10 +1042,10 @@ collect_schema_links(RawSchema, DependsOnObject) ->
       lists:foldl
         (fun ({N,Link},Ls) ->
              Dependency = depends_on_object_properties(Link),
-	     Headers = jsg_links:collect_headers(Link),
-             if 
-	       Dependency==DependsOnObject ->
-		 [{link,[{link,N},{schema,RawSchema},{headers,Headers}]}|Ls];
+             Headers = jsg_links:collect_headers(Link),
+             if
+               Dependency==DependsOnObject ->
+                 [{link,[{link,N},{schema,RawSchema},{headers,Headers}]}|Ls];
                true ->
                  Ls
              end
@@ -1073,4 +1062,3 @@ depends_on_object_properties(Link) ->
                                                                                (_) -> false
                                                                            end, Template))
   end.
-

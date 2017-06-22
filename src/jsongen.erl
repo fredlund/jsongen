@@ -35,6 +35,7 @@
 
 -export([ json/1
 	, version/0
+	, binary_to_atom/1
 	]).
 
 -compile([{nowarn_unused_function, [ insertType/2

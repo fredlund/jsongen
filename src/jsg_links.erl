@@ -1,52 +1,54 @@
-%% @doc 
+%% @doc
 %% Módulo con funciones básicas para operar sobre los Links y Schemas de jsongen.
-%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund
 %% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
 %% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
 %% @end
 %%
 
 -module(jsg_links).
- 
+
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
 
 -export([ link_calculated_href/1
-	, link_request_type/1
-	, link_href/1
-	, link_title/1
-	, link_type/1
-	, link_def/1
-	, link_schema/1
-	, collect_headers/1
-	, get_schema/1
-	, extract_dynamic_links/3
-	, link_targetSchema/1
-	, link_history/1 
-	, intern_object/1
-	, print_link/1
-	, make_schema/2
-	, is_parent_relative/1
-	]).
+        , link_request_type/1
+        , link_href/1
+        , link_title/1
+        , link_type/1
+        , link_def/1
+        , link_schema/1
+        , get_schema/1
+        , get_schema/2
+        , get_header/1
+        , extract_dynamic_links/3
+        , link_targetSchema/1
+        , link_history/1
+        , intern_object/1
+        , print_link/1
+        , make_schema/2
+        , is_parent_relative/1
+        , collect_headers/1
+        ]).
 
 -type link_type() :: static | dynamic.
 
-% Un record especificaría mejor el tipo de un link.
+                                                % Un record especificaría mejor el tipo de un link.
 -type link() ::
-	{link, [ { type, link_type() }
-	       | { calculated_href, iodata() }
-	       | { link, non_neg_integer() }
-	       | { schema, { struct, [iodata()] }}
-	       ]
-	}.
+        {link, [ { type, link_type() }
+                 | { calculated_href, iodata() }
+                 | { link, non_neg_integer() }
+                 | { schema, { struct, [iodata()] }}
+               ]
+        }.
 
--type header() :: {struct, {Prop :: binary(), Value :: binary()} }. 
+-type header() :: {struct, {Prop :: binary(), Value :: binary()} }.
 
 -type link_def() :: {struct, [ {iodata(), iodata() } | % <<"ref">> | <<"method">> | <<"title">> ...
-			       {iodata(), header() } | % <<"headers"
-			       {iodata(), {struct, [{iodata(),iodata()}]}} 
-			     ]
-		    }.
+                               {iodata(), header() } | % <<"headers"
+                               {iodata(), {struct, [{iodata(),iodata()}]}}
+                             ]
+                    }.
 
 %%-define(debug,true).
 
@@ -90,7 +92,7 @@ extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
           (fun (Link={link,Props}) ->
                Href = link_href(Link),
                Template = uri_template:parse(binary_to_list(Href)),
-	       %% We should handle relative URIs here...
+               %% We should handle relative URIs here...
                try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
                    CHREF ->
                    ComposedCHREF = composed_uri(CHREF,Link,FollowedLink,Object),
@@ -225,7 +227,7 @@ is_parent_relative({struct,Proplist}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc
 %% Dado un link, devuelve el json (mochijson) que lo define.
-%% 
+%%
 %% Quizá esto no especifica de la mejor forma cómo es un link. Pese a
 %% que en link_def() los atributos aparecen como opcionales o "alternatividad", es
 %% necesario para el correcto funcionamiento que el link posea estas 4
@@ -329,7 +331,8 @@ link_history(Link) ->
 %% aplicará la transformación necesaria para generarlo.
 %% @spec link_calculated_href(Link) -> binary()
 %% @end
-link_calculated_href(Link) ->	     
+
+link_calculated_href(Link) ->
   {link,LD} = Link,
   substitute(proplists:get_value(calculated_href,LD,[])).
 
@@ -337,7 +340,7 @@ link_calculated_href(Link) ->
 %% Conocer el tipo del link.
 %% @spec link_type(Link) -> static | dynamic
 %% @end
-link_type(Link) ->	     
+link_type(Link) ->
   {link,LD} = Link,
   proplists:get_value(type,LD,[]).
 
@@ -374,4 +377,10 @@ substitute(Href) -> % Regex para la sustitución '{:[^}]*}'
   end.
 
 collect_headers({struct, PropList}) ->
-  proplists:get_value(<<"headers">>, PropList, undefined).
+  lists:map(fun(X) -> get_header(X) end, proplists:get_value(<<"headers">>, PropList, [])).
+
+get_header(FileSchema = {struct,[{<<"$ref">>, _}]}) -> jsg_links:get_schema(FileSchema);
+get_header({struct,[{<<"quickcheck">>, QcValue}]}) ->
+  [Module, QcFun] = re:split(binary_to_list(QcValue), ":"),
+  {quickcheck, fun(X) -> (jsongen:binary_to_atom(Module)):(jsongen:binary_to_atom(QcFun))(X) end};
+get_header(Header) -> Header.
