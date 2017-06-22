@@ -33,9 +33,21 @@
 
 -module(jsongen).
 
--export([json/1]).
+-export([ json/1
+	, version/0
+	]).
 
--compile(export_all).
+-compile([{nowarn_unused_function, [ insertType/2
+				   , number_positive/0
+				   , number_mul/1
+				   , selectSimpleType/0
+				   , randFlt/2
+				   , choose_from_list/3
+				   , pattern_gen/1
+				   , create_patterns/1
+				   ]}]).
+
+-compile({no_auto_import, [floor/1]}).
 
 %%LOGS
 %%-define(debug,true).

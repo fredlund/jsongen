@@ -1,4 +1,7 @@
-%% @doc This module validates JSON data against JSON Schemas.
+%% @doc
+%% NOT IN USE.
+%%
+%% This module validates JSON data against JSON Schemas.
 %% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
 %% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
 %% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil

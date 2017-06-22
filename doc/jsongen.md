@@ -19,7 +19,7 @@ __Authors:__ [`Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund  (lfredlun
 
 
 <table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#json-1">json/1</a></td><td>
-Translates a JSON schema into an Erlang QuickCheck generator.</td></tr></table>
+Translates a JSON schema into an Erlang QuickCheck generator.</td></tr><tr><td valign="top"><a href="#version-0">version/0</a></td><td></td></tr></table>
 
 
 <a name="functions"></a>
@@ -36,4 +36,10 @@ json(Schema::<a href="jsg_json.md#type-json_term">jsg_json:json_term()</a>) -&gt
 <br />
 
 Translates a JSON schema into an Erlang QuickCheck generator.
+
+<a name="version-0"></a>
+
+### version/0 ###
+
+`version() -> any()`
 

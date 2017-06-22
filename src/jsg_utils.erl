@@ -1,6 +1,8 @@
 -module(jsg_utils).
 
--compile(export_all).
+-export([ clear_schema_cache/0
+	, lookup_schema/1
+	, store_schema/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

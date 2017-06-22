@@ -2,14 +2,10 @@
 
 # Welcome to the jsongen library. #
 
-__Authors:__ [`Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)`].
+__Authors:__ [`Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)`](mailto:Lars-Ake Fredlund  (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com), Angel Herranz (aherranz@fi.upm.es)).
 
-Jsongen is a library that permits to:
-* automatically derive QuickCheck (quviq.com) generators from descriptions
-of JSON data using [JSON schemas](http://json-schema.org/documentation.html)
-* automatically
-explore the web links that may be present in JSON schemas, validating
-that returned JSON data conforms to the schema specifications.
+Jsongen is a library for generating QuickCheck (quviq.com) generators from descriptions of JSON data using JSON schemas.
+
 
 ## Build, Test, and Generate Markdown Docs ##
 
@@ -23,6 +19,7 @@ To compile, execute the following command:<br />
 $ rebar3 compile
 ```
 
+
 After compilation Erlang beam files will be left in the
 directory _build/default/lib/jsongen/ebin/.
 
@@ -31,9 +28,6 @@ Erlang library structure, the following commands can be used:<br />
 ```
 $ make install
 ```
-Note that it may be required to run the above command
-as a "superuser" if the Erlang libraries are installed
-in a "non-user writeable" directory.
 </p>
 
 <p>
@@ -49,6 +43,7 @@ $ env ERL_LIBS=$PWD/_build/default/lib/edown rebar3 edoc
 
 
 <table width="100%" border="0" summary="list of modules">
+<tr><td><a href="https://github.com/fredlund/jsongen/blob/master/doc/error_messages.md" class="module">error_messages</a></td></tr>
 <tr><td><a href="https://github.com/fredlund/jsongen/blob/master/doc/java_validator.md" class="module">java_validator</a></td></tr>
 <tr><td><a href="https://github.com/fredlund/jsongen/blob/master/doc/jesse_validator.md" class="module">jesse_validator</a></td></tr>
 <tr><td><a href="https://github.com/fredlund/jsongen/blob/master/doc/js_links_machine.md" class="module">js_links_machine</a></td></tr>

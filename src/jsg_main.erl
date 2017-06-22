@@ -1,6 +1,8 @@
 -module(jsg_main).
 
--compile(export_all).
+-export([ write_instance_of/1
+	, write_X_instances_of/1
+	]).
 
 %% Run it using, for example,
 %% erl -pa ebin -noshell -run main write_X_instances_of 10 tests/string_simple.jsch

@@ -1,10 +1,52 @@
--module(jsg_links).
+%% @doc 
+%% Módulo con funciones básicas para operar sobre los Links y Schemas de jsongen.
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
+%% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
+%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
+%% @end
+%%
 
+-module(jsg_links).
+ 
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_dynamic_cluster.hrl").
 
--compile(export_all).
+-export([ link_calculated_href/1
+	, link_request_type/1
+	, link_href/1
+	, link_title/1
+	, link_type/1
+	, link_def/1
+	, link_schema/1
+	, collect_headers/1
+	, get_schema/1
+	, extract_dynamic_links/3
+	, link_targetSchema/1
+	, link_history/1 
+	, intern_object/1
+	, print_link/1
+	, make_schema/2
+	, is_parent_relative/1
+	]).
 
+-type link_type() :: static | dynamic.
+
+% Un record especificaría mejor el tipo de un link.
+-type link() ::
+	{link, [ { type, link_type() }
+	       | { calculated_href, iodata() }
+	       | { link, non_neg_integer() }
+	       | { schema, { struct, [iodata()] }}
+	       ]
+	}.
+
+-type header() :: {struct, {Prop :: binary(), Value :: binary()} }. 
+
+-type link_def() :: {struct, [ {iodata(), iodata() } | % <<"ref">> | <<"method">> | <<"title">> ...
+			       {iodata(), header() } | % <<"headers"
+			       {iodata(), {struct, [{iodata(),iodata()}]}} 
+			     ]
+		    }.
 
 %%-define(debug,true).
 
@@ -143,6 +185,10 @@ composed_uri(Ref,_Link,FollowedLink,_Object) ->
       Result
   end.
 
+%% @doc
+%% Obtiene el esquema dado un objeto json de mochijson.
+%% @end
+
 get_schema(Value={struct,_Proplist}) ->
   get_schema(Value,{struct,[]});
 get_schema([Child,Root]) ->
@@ -177,7 +223,16 @@ is_parent_relative({struct,Proplist}) ->
   end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc
+%% Dado un link, devuelve el json (mochijson) que lo define.
+%% 
+%% Quizá esto no especifica de la mejor forma cómo es un link. Pese a
+%% que en link_def() los atributos aparecen como opcionales o "alternatividad", es
+%% necesario para el correcto funcionamiento que el link posea estas 4
+%% características mínimas.
+%%
 
+-spec link_def(Link :: link()) -> link_def().
 link_def(Link) ->
   Schema = link_schema(Link),
   RootSchema = {struct,[]},
@@ -187,6 +242,11 @@ link_def(Link) ->
   %%io:format("Links are ~p~n",[Links]),
   lists:nth(N,Links).
 
+%% @doc
+%% Dado un link, devuelve el título de dicho link.
+%%
+%% spec link_title(Link :: link()) -> string() | undefined
+-spec link_title(Link :: link()) -> string() | undefined.
 link_title(Link) ->
   {struct,LinkDef} = link_def(Link),
   case proplists:get_value(<<"title">>,LinkDef) of
@@ -213,6 +273,9 @@ print_link(Link={link,LD}) ->
     proplists:get_value(object,LD),
   {link,[{title,LinkTitle},{href,Href},{schema,Schema},{object,Object}]}.
 
+%% @doc
+%% Obtiene el valor href del link.
+%% @spec link_request_type(Link :: link()) -> atom()
 link_request_type(Link) ->
   {struct,LinkDef} = link_def(Link),
   case proplists:get_value(<<"method">>,LinkDef) of
@@ -220,31 +283,61 @@ link_request_type(Link) ->
     Other -> list_to_atom(string:to_lower(binary_to_list(Other)))
   end.
 
+%% @doc
+%% Obtiene el valor href del link.
+%% @spec link_href(Link :: link()) -> iodata() | undefined
+-spec link_href(Link :: link()) -> iodata() | undefined.
 link_href(Link) ->
   {struct,LinkDef} = link_def(Link),
   proplists:get_value(<<"href">>,LinkDef).
 
+%% @doc
+%% Obtiene el valor targetSchema del link.
+%% @spec link_targetSchema(Link :: link()) -> iodata() | undefined
+-spec link_targetSchema(Link :: link()) -> iodata() | undefined.
 link_targetSchema(Link) ->
   {struct,LinkDef} = link_def(Link),
   proplists:get_value(<<"targetSchema">>,LinkDef).
 
+%% @doc
+%% Obtiene el valor schema del link.
+%% @spec link_schema(Link :: link()) -> iodata() | undefined
+-spec link_schema(Link :: link()) -> iodata() | undefined.
 link_schema(Link) ->
   {link,LD} = Link,
   proplists:get_value(schema,LD).
 
+%% @doc
+%% Obtiene el valor num del link.
+%% @spec link_num(Link :: link()) -> iodata() | undefined
+-spec link_num(Link :: link()) -> iodata() | undefined.
 link_num(Link) ->
   {link,LD} = Link,
   proplists:get_value(link,LD).
 
+%% @doc
+%% Obtiene el valor history del link.
+%% @spec link_history(Link :: link()) -> iodata() | undefined
+-spec link_history(Link :: link()) -> iodata() | undefined.
 link_history(Link) ->
   {link,LD} = Link,
   proplists:get_value(history,LD,[]).
 
-link_calculated_href(Link) ->
+%% @doc
+%% Dado un Link, devuelve el href (URI) del Schema.
+%% Además, si el href está especificado con un recurso en base a un generador,
+%% aplicará la transformación necesaria para generarlo.
+%% @spec link_calculated_href(Link) -> binary()
+%% @end
+link_calculated_href(Link) ->	     
   {link,LD} = Link,
   substitute(proplists:get_value(calculated_href,LD,[])).
 
-link_type(Link) ->
+%% @doc
+%% Conocer el tipo del link.
+%% @spec link_type(Link) -> static | dynamic
+%% @end
+link_type(Link) ->	     
   {link,LD} = Link,
   proplists:get_value(type,LD,[]).
 

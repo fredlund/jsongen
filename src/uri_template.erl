@@ -1,8 +1,17 @@
 -module(uri_template).
 
--compile(export_all).
+%% -compile(export_all).
 
--export([sub/2]).
+-export([ sub/2
+	, encode/1
+	, encode_var/1
+	, parse/1
+	, percent_encode/1
+	, percent_encode/2
+	, hexchr/1
+	]).
+
+
 
 -import(lists, [foldl/3, reverse/1, reverse/2]).
 

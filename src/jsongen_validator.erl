@@ -1,5 +1,7 @@
 -module(jsongen_validator).
--compile(export_all).
+-export([ start_validator/0
+	, validate/2
+	]).
 
 start_validator() ->
   ok.

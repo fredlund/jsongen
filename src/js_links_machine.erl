@@ -1,6 +1,44 @@
+%% @doc This is a module.
+%% @author Ángel Herranz (aherranz@fi.upm.es), Lars-Ake Fredlund 
+%% (lfredlund@fi.upm.es), Sergio Gil (sergio.gil.luque@gmail.com)
+%% @copyright 2013 Ángel Herranz, Lars-Ake Fredlund, Sergio Gil
+%% @end
+%%
+
+
 -module(js_links_machine).
 
--compile(export_all).
+-export([run_statem/1,run_statem/2,run_statem/3
+	, format_http_call/1, http_result_code/1, http_error/1
+	, collect_links/1, collect_schema_links/2]).
+
+-compile([{nowarn_unused_function, [ prop_ok/0
+				   , test/0
+				   , initial_state/0
+				   , start/0
+				   , link/2
+				   , print_counterexample/4
+				   , print_commands/1
+				   , print_stats/0
+				   , call_link/1
+				   , init_table/2
+				   , private_module/0
+				   , http_request/6
+				   , gen_headers/1, gen_headers/2
+				   , has_ets_body/1
+				   , http_version/1
+				   , wait_until_stable/0
+				   , wait_forever/0
+				   , eqc_printer/2
+				   , call_link_title/1
+				   , args_link_title/1
+				   , get_json_body/1
+				   , api_spec/0
+				   , initial_links/0
+				   , http_reason_phrase/1
+				   , http_response_is_ok/1
+				   , json_call_body/1
+				   ]}]).
 
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_component.hrl").
@@ -19,7 +57,9 @@
 -define(LOG(X,Y),true).
 -endif.
 
+-type filename() :: string().
 
+% Not used
 api_spec() ->
   #api_spec{}.
 
@@ -73,7 +113,7 @@ link_args(State) ->
          (FinalLink,
           eqc_gen:
             frequency
-              ([{7,
+              ([{2,
                  ?LET
                     (Title,
                      eqc_gen:oneof
@@ -470,12 +510,12 @@ format_http_call(PreURI,RequestType,Body,Params) ->
     ("~s using ~s~s",
      [URI,string:to_upper(atom_to_list(RequestType)),BodyString]).
 
-has_body(get) ->
-  false;
-has_body(delete) ->
-  false;
-has_body(_) ->
-  true.
+%% has_body(get) ->
+%%   false;
+%% has_body(delete) ->
+%%   false;
+%% has_body(_) ->
+%%   true.
 
 encode_generated_parameters(Parms) ->
   case Parms of
@@ -708,7 +748,7 @@ wait_forever() ->
 
 prop_ok() ->
   ?FORALL
-     (Cmds, eqc_dynamic_cluster:dynamic_commands(?MODULE),
+     (Cmds, noshrink(eqc_dynamic_cluster:dynamic_commands(?MODULE)),
       ?CHECK_COMMANDS
          ({H, DS, Res},
           ?MODULE,
@@ -805,12 +845,54 @@ test() ->
   end,
   print_stats().
 
+%% @doc Punto de entrada a la librería para ejecutar los tests con la
+%% ejecución del test de jsongen.  
+%%
+%% @param Files Lista de ficheros que
+%% formarán el conjunto de links iniciales (links estáticos).  Los
+%% ficheros deberán estar en el path para que puedan leerse.
+%% @end
+-spec run_statem(Files :: list(filename())) -> ok.
 run_statem(Files) ->
   run_statem(void,Files).
 
+%% @doc Ejecución del test de jsongen pero sobreescribiendo las
+%% funciones de Quickcheck con el módulo indicado.
+%%
+%% Si hay alguna función en el `PrivateModule' especificado que sobreescriba la
+%% función de Quickcheck para la máquina de estados, se ejecutará
+%% dicha función en lugar de la implementada por defecto en JSONgen
+%% 
+%% @param PrivateModule módulo erlang (sin terminación .erl)
+%% implementado por el usuario que contiene una o más funciones que
+%% sustituirán a las que usa Quickcheck para la máquina de estados.
+%% @end
+-spec run_statem(PrivateModule :: atom(), Files :: list(filename())) -> ok.
 run_statem(PrivateModule,Files) ->
   run_statem(PrivateModule,Files,[]).
 
+
+%% @doc Ejecución de los tests de jsongen con módulo y opciones.
+%% En cso de que no se quiera usar ningún módulo auxiliar pero sí las opciones, se deberá indicar
+%% que el módulo es `void'.
+%%
+%% @param Options lista de tuplas {Opción,Valor}.
+%% @end
+%% @spec run_statem(PrivateModule :: atom()
+%%                  , Files :: list(filename())
+%%                  , Options :: list(option())) -> ok
+%% where
+%%       option() =   {cookies, boolean()}
+%%                  | {user, string()}
+%%                  | {password, string()}
+%%                  | {timeout, integer()}
+%%                  | {simulation_mode, boolean()}
+%%                  | {show_http_timing, boolean()}
+%%                  | {show_http_result, boolean()}
+%%                  | {show_uri, boolean()}
+%%                  | {validator, atom()}
+%% @end
+-spec run_statem(PrivateModule :: atom(), Files :: list(filename()), Options :: list()) -> ok.
 run_statem(PrivateModule,Files,Options) ->
   if
     is_list(Files) ->
@@ -851,6 +933,7 @@ run_statem(PrivateModule,Files,Options) ->
   end,
   check_and_set_options(Options),
   js_links_machine:test().
+%% @end
 
 print_stats() ->
   {ok,Stats} = jsg_store:get(stats),

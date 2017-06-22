@@ -1,6 +1,14 @@
 -module(error_messages).
 
--compile(export_all).
+-export([ erlang_exception/2
+	, no_content_type/0
+	, unknown_status/2
+	, wrong_body_message/2, wrong_body_message/3, wrong_body_message/4
+	, wrong_http_call/2
+	, wrong_status_code/3
+	, java_validator/1, java_validator/2
+	]).
+
 
 wrong_body_message(JSONText, RawSchema) ->
   io:format
@@ -84,3 +92,10 @@ no_content_type() ->
        "WARNING [NO CONTENT TYPE HEADER]~n" ++
        "***************************************************~n").
      
+java_validator(non_existing) ->
+    io:format("*** Error: the Java Erlang library is not accessible.~n").
+java_validator(not_jar, Dir) ->
+    io:format
+      ("*** Error: could not access the java validator jar file.~n"++
+	   "It should be located in ~p~n",
+       [Dir]).

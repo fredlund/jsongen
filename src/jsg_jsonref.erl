@@ -1,6 +1,12 @@
 -module(jsg_jsonref).
 
--compile(export_all).
+-export([ deref/2
+	, deref_relative_pointer/4
+	, unref/2
+	, subst/3, substl/4
+	, list_is_integer/1
+	, gen/1
+	]).
 
 -export_type([jsonpointer/0]).
 

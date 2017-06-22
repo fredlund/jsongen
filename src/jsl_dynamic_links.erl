@@ -1,6 +1,14 @@
 -module(jsl_dynamic_links).
 
--compile(export_all).
+-export([ add_link/2
+	, initialize/1
+	, is_element/2
+	, is_empty/1
+	, get_link/1
+	, size/1
+	, titles/1
+	, links/1, links/2
+	]).
 
 -record(dlinks,{limit,links,size}).
 

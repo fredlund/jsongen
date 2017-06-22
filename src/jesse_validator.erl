@@ -1,5 +1,7 @@
 -module(jesse_validator).
--compile(export_all).
+
+-export([ start_validator/0
+	, validate/2]).
 
 start_validator() ->
   case code:which(jesse_schema_validator) of

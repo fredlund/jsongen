@@ -43,6 +43,7 @@ $ env ERL_LIBS=$PWD/_build/default/lib/edown rebar3 edoc
 
 
 <table width="100%" border="0" summary="list of modules">
+<tr><td><a href="error_messages.md" class="module">error_messages</a></td></tr>
 <tr><td><a href="java_validator.md" class="module">java_validator</a></td></tr>
 <tr><td><a href="jesse_validator.md" class="module">jesse_validator</a></td></tr>
 <tr><td><a href="js_links_machine.md" class="module">js_links_machine</a></td></tr>

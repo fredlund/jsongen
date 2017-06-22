@@ -1,5 +1,8 @@
 -module(java_validator).
--compile(export_all).
+
+-export([ start_validator/0
+	, validate/2, validate/3
+	]).
 
 start_validator() ->
   case jsg_store:get(java_validator) of
@@ -8,8 +11,7 @@ start_validator() ->
     _ ->
       case code:which(java) of
         non_existing ->
-          io:format
-            ("*** Error: the Java Erlang library is not accessible.~n"),
+	  error_messages:java_validator(non_existing),
           throw(bad);
         _ ->
           ok
@@ -30,11 +32,8 @@ start_validator() ->
             case file:list_dir(JarDir2) of
               {ok,L2} when L2=/=[] ->
                 lists:map(fun (Jar) -> JarDir2++"/"++Jar end, L2);
-              _ ->
-                io:format
-                  ("*** Error: could not access the java validator jar file.~n"++
-                     "It should be located in ~p~n",
-                   [JarDir2]),
+              _ -> 
+		error_messages:java_validator(not_jar,JarDir2),
                 throw(bad)
             end
         end,

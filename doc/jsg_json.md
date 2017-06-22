@@ -77,7 +77,7 @@ json_text() = iolist()
 representing the value.</td></tr><tr><td valign="top"><a href="#decode_url-1">decode_url/1</a></td><td>
 Reads a JSON schema in textual format, converting it into
 a mochijson2 Erlang term.</td></tr><tr><td valign="top"><a href="#encode-1">encode/1</a></td><td>Translates a mochijson2 Erlang term representing a JSON value
-into its textual representation.</td></tr></table>
+into its textual representation.</td></tr><tr><td valign="top"><a href="#pretty_json-1">pretty_json/1</a></td><td></td></tr></table>
 
 
 <a name="functions"></a>
@@ -121,4 +121,10 @@ encode(JsonErlang::<a href="#type-json_term">json_term()</a>) -&gt; <a href="#ty
 
 Translates a mochijson2 Erlang term representing a JSON value
 into its textual representation.
+
+<a name="pretty_json-1"></a>
+
+### pretty_json/1 ###
+
+`pretty_json(Json) -> any()`
 

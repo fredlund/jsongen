@@ -5,9 +5,28 @@
 
 -module(jsg_jsonschema).
 
--export([read_schema/1]).
-
--compile(export_all).
+-export([ additionalItems/1
+	, additionalProperties/1
+	, allOf/1
+	, anyOf/1
+	, enumerated/1
+	, hasType/1
+	, is_object/1
+	, items/1
+	, keyword/2, keyword/3
+	, links/1
+	, maxProperties/1, maxProperties/2
+	, minProperties/2
+	, notKeyword/1
+	, oneOf/1
+	, patternProperties/1
+	, properties/1
+	, propertyValue/2
+	, read_schema/1
+	, schemaType/1
+	, set_type/2
+	, type/1
+	]).
 
 %% @doc
 %% Reads a JSON schema in textual format, converting it into
