@@ -9,9 +9,11 @@
 -module(js_links_machine).
 
 -export([run_statem/1,run_statem/2,run_statem/3 , format_http_call/1,
-         http_result_code/1, http_error/1 , collect_links/1,
-         collect_schema_links/2, init_table/2, test/0, initial_state/0,
-         api_spec/0, link/2]).
+         http_result_code/1, http_error/1, collect_links/1,
+         collect_schema_links/2, init_table/2, test/0,
+         initial_state/0, api_spec/0, link/2, call_link_title/1,
+         validate_call_not_error_result/2, response_has_body/1,
+         get_json_body/1]).
 
 -compile([{nowarn_unused_function, [ prop_ok/0
                                    , start/0
@@ -27,9 +29,7 @@
                                    , wait_until_stable/0
                                    , wait_forever/0
                                    , eqc_printer/2
-                                   , call_link_title/1
                                    , args_link_title/1
-                                   , get_json_body/1
                                    , initial_links/0
                                    , http_reason_phrase/1
                                    , http_response_is_ok/1
