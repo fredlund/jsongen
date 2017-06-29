@@ -69,7 +69,7 @@ extract_dynamic_links(Link,Term,Object) ->
       undefined ->
         [];
       SchemaDesc ->
-        extract_links(Link,SchemaDesc,Term,[],Object,NewHistory)
+	extract_links(Link,SchemaDesc,Term,[],Object,NewHistory)
     end,
   lists:map
     (fun ({link,Props}) ->
@@ -96,7 +96,14 @@ extract_links(FollowedLink,Sch,Term,Pointer,Object,History) ->
                try uri_template:sub({FollowedLink,Object,lists:reverse(Pointer)},Template) of
                    CHREF ->
                    ComposedCHREF = composed_uri(CHREF,Link,FollowedLink,Object),
-                   [{link,[{calculated_href,list_to_binary(ComposedCHREF)}|Props]}]
+                   [{link,[{calculated_href,list_to_binary(ComposedCHREF)}| 
+			   case {proplists:get_value(headers, Props), jsg_store:get(last_headers)} of
+                             {[], {ok,[LastHeader]}} ->
+                               lists:keyreplace(headers, 1, Props, {headers, [LastHeader]});
+                             _  -> Props
+                           end
+			   %% Props
+			  ]}]
                catch _:_ ->
                    io:format
                      ("*** Warning: skipping link ~p due to problems "++

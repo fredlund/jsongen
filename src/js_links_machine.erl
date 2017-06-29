@@ -444,7 +444,9 @@ link(Link,_HTTPRequest={URI,RequestType,Body,QueryParms,Headers}) ->
         jsg_store:put(stats,lists:keystore(Key,1,Stats,{Key,NewValue}));
       _ -> ok
     end,
-    Result = http_request(URI,RequestType,Body,QueryParms,Link,Headers),
+    GeneratedHeaders=gen_headers(Headers,Body),
+    Result = http_request(URI,RequestType,Body,QueryParms,Link,GeneratedHeaders),
+    jsg_store:put(last_headers,GeneratedHeaders),
     case Result of
       {error,Error} ->
         io:format
@@ -543,9 +545,9 @@ http_request(PreURI,Type,Body,QueryParms,Link,Headers) ->
   URIwithBody =
     case Body of
       {ok, RawBody} ->
-        {URI, gen_headers(Headers, Body), "application/json", iolist_to_binary(mochijson2:encode(RawBody))};
+        {URI, Headers, "application/json", iolist_to_binary(mochijson2:encode(RawBody))};
       _ ->
-        {URI, gen_headers(Headers, Body)}
+        {URI, Headers}
     end,
   Timeout = get_option(timeout),
   Request = [Type,URIwithBody,[{timeout,Timeout}],[]],
@@ -609,7 +611,8 @@ gen_header({struct, PropList}, _) ->
       Y -> Y
     end,
   {"Authorization", "Basic " ++ base64:encode_to_string(<<User/binary, ":", Password/binary>>)};
-gen_header({quickcheck, QcGen}, Body) -> eqc_gen:pick(QcGen(Body)).
+gen_header({quickcheck, QcGen}, Body) -> eqc_gen:pick(QcGen(Body));
+gen_header(Header, _) -> Header.
 
 http_result_type({ok,_}) ->
   ok;
